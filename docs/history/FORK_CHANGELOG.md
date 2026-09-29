@@ -7,6 +7,22 @@
 Статус runtime указывается только там, где пользователь действительно провёл
 проверку. Успешная сборка или compiled-probe не заменяет runtime-приёмку.
 
+## 2026-09-30 — v64 Host Folder as SD (локальная)
+
+- Основной SD Z-controller теперь может подключать обычную Windows-папку как
+  read-only FAT32 без временного образа и копирования файлов.
+- Добавлены Mount, Refresh и Eject, сохранение типа источника/пути, LFN и
+  уникальные 8.3 aliases, вложенные каталоги, прямое секторное чтение,
+  безопасная обработка исчезнувших/недоступных файлов и reparse points.
+- Image/folder заменяются атомарно; обычные IMG/IMA/VHD и отдельная NeoGS SD
+  сохраняют прежнее поведение. Machine Settings показывает текущий источник.
+- Уровень встроенного BaseConf Covox возвращён со значения v63 к 100%, как в
+  принятой сборке v62. Covox и Kempston по умолчанию сохранены.
+- Release, Host Folder SD probe, PentEvo UI probe, полный benchmark и звуковой
+  регрессионный набор прошли. GitHub не изменялся.
+- Чистая local portable v64 и проверенный ZIP находятся в
+  `L:\Work_two\ZX\ZXMAK2-v64-ZXEVO-BC-HostFolderSD-Test-20260930`.
+
 ## 2026-09-29 — v63 ROM Pack / BaseConf defaults (локальная)
 
 - Kempston Joystick включён в чистом BaseConf по умолчанию.
