@@ -29,6 +29,7 @@ internal static class PentEvoProfileProbe
             VerifyMachineSettingsNavigation();
             VerifyUlaMasterVolume();
             VerifyOmniSoundSlots();
+            VerifyCovoxCalibration();
 
             var bus = new BusManager();
             bus.Init(null, true);
@@ -518,6 +519,30 @@ internal static class PentEvoProfileProbe
                 root.Attributes["masterVolume"].Value == "145",
                 "Master volume was not saved in the machine profile");
         }
+    }
+
+    private static void VerifyCovoxCalibration()
+    {
+        var covox = new CovoxMono();
+        using (var control = new CtlSettingsGenericSound())
+        {
+            control.Init(null, null, covox);
+            var volume = GetField<TrackBar>(control, "trkVolume");
+            Assert(volume.Maximum == 200 && volume.Value == 100,
+                "Covox normal 100% level is not centred on its slider");
+            volume.Value = 200;
+            control.Apply();
+            Assert(covox.Volume == 200,
+                "Covox UI does not expose its optional 200% headroom");
+        }
+
+        var xml = new XmlDocument();
+        var node = (XmlElement)xml.AppendChild(xml.CreateElement("Device"));
+        node.SetAttribute("gain", "145");
+        node.SetAttribute("volume", "100");
+        covox.LoadConfigXml(node);
+        Assert(covox.Gain == 100 && covox.Volume == 100,
+            "Build 63 Covox 145% calibration was not repaired on load");
     }
 
     private static void VerifyPentEvoMusicSelector()

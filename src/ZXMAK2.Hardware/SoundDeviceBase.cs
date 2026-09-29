@@ -117,13 +117,18 @@ namespace ZXMAK2.Hardware
             get { return m_audioBuffer ?? new uint[882]; }
         }
 
+        protected virtual int MaximumVolume
+        {
+            get { return 100; }
+        }
+
         public int Volume
         {
             get { return m_volume; }
             set
             {
                 value = value < 0 ? 0 : value;
-                value = value > 100 ? 100 : value;
+                value = value > MaximumVolume ? MaximumVolume : value;
                 var oldVolume = m_volume;
                 m_volume = value;
                 OnConfigChanged();

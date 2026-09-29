@@ -5,6 +5,7 @@ using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Engine.Entities;
 using ZXMAK2.Hardware.Evo;
+using ZXMAK2.Hardware.General;
 
 
 namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
@@ -31,11 +32,16 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             txtDevice.Text = m_busDevice.Name;
             txtDescription.Text = m_busDevice.Description.Replace("\n", Environment.NewLine);
 
+            var isCovox = m_busDevice is CovoxMono;
+            trkVolume.Maximum = isCovox ? 200 : 100;
+            trkVolume.TickFrequency = isCovox ? 10 : 2;
+            lblVolume.Text = isCovox ? "Volume (100% = centre):" : "Volume:";
+
             int value = m_device.Volume;
             if (value < 0)
                 value = 0;
-            if (value > 100)
-                value = 100;
+            if (value > trkVolume.Maximum)
+                value = trkVolume.Maximum;
             trkVolume.Value = value;
         }
 

@@ -72,13 +72,25 @@ namespace ZXMAK2.Hardware.General
             }
         }
 
+        // Covox is intentionally calibrated with a 0..200% user scale so
+        // the normal 100% level is at the centre of the slider.  This keeps
+        // the safe default separate from the optional extra headroom.
+        protected override int MaximumVolume
+        {
+            get { return 200; }
+        }
+
         protected override void OnConfigLoad(XmlNode node)
         {
             base.OnConfigLoad(node);
             NoDos = Utils.GetXmlAttributeAsBool(node, "noDos", NoDos);
             Mask = Utils.GetXmlAttributeAsInt32(node, "mask", Mask);
             Port = Utils.GetXmlAttributeAsInt32(node, "port", Port);
-            Gain = Utils.GetXmlAttributeAsInt32(node, "gain", Gain);
+            var savedGain = Utils.GetXmlAttributeAsInt32(node, "gain", Gain);
+            // Build 63 accidentally shipped 145% as its default calibration.
+            // Repair that exact legacy value while keeping intentional custom
+            // gain settings intact.
+            Gain = savedGain == 145 ? 100 : savedGain;
         }
 
         protected override void OnConfigSave(XmlNode node)
@@ -111,6 +123,8 @@ namespace ZXMAK2.Hardware.General
             builder.Append(string.Format("Mask:  #{0:X4}", Mask));
             builder.Append(Environment.NewLine);
             builder.Append(string.Format("Port:  #{0:X4}", Port));
+            builder.Append(Environment.NewLine);
+            builder.Append(string.Format("Volume:  {0}% (100% = centre)", Volume));
             builder.Append(Environment.NewLine);
             builder.Append(string.Format("Gain:  {0}%", Gain));
             builder.Append(Environment.NewLine);

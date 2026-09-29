@@ -369,6 +369,15 @@ internal static class AudioPathProbe
             var ay = new AYCHRV();
             var beeper = new BeeperDevice();
             var covox = new CovoxMono();
+            Require(covox.Volume == 100 && covox.Gain == 100,
+                "Covox safe calibration is not the 100% default");
+            covox.Volume = 200;
+            Require(covox.Volume == 200,
+                "Covox does not retain its optional 200% headroom");
+            covox.Volume = 201;
+            Require(covox.Volume == 200,
+                "Covox volume limit exceeds 200%");
+            covox.Volume = 100;
             Prepare(ay);
             Prepare(beeper);
             Prepare(covox);
