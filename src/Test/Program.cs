@@ -2594,6 +2594,12 @@ namespace Test
                 File.WriteAllBytes(
                     Path.Combine(games.FullName, "Very Long Spectrum Collection Name.tzx"),
                     nestedPayload);
+                File.WriteAllText(
+                    Path.Combine(games.FullName, "Very Long Spectrum Collection Number One.tap"),
+                    "ONE");
+                File.WriteAllText(
+                    Path.Combine(games.FullName, "Very Long Spectrum Collection Number Two.tap"),
+                    "TWO");
 
                 using (var stream = new HostFolderFat32Stream(root))
                 {
@@ -2627,7 +2633,60 @@ namespace Test
                     AssertHostFolderSd(BytesEqual(
                         ReadFatFile(stream, boot, nestedFile), nestedPayload),
                         "long filename file data differs");
+
+                    var aliasOne = FindFatEntry(
+                        nestedEntries,
+                        "Very Long Spectrum Collection Number One.tap");
+                    var aliasTwo = FindFatEntry(
+                        nestedEntries,
+                        "Very Long Spectrum Collection Number Two.tap");
+                    AssertHostFolderSd(aliasOne != null && aliasTwo != null,
+                        "colliding long filenames are missing");
+                    AssertHostFolderSd(
+                        !string.Equals(aliasOne.ShortName, aliasTwo.ShortName,
+                            StringComparison.OrdinalIgnoreCase),
+                        "colliding long filenames received the same 8.3 alias");
+
+                    File.WriteAllText(Path.Combine(root, "added-after-mount.tap"), "NEW");
+                    rootEntries = ReadFatDirectory(stream, boot, 2);
+                    AssertHostFolderSd(
+                        FindFatEntry(rootEntries, "added-after-mount.tap") == null,
+                        "mounted metadata snapshot changed without Refresh");
+
+                    File.Delete(Path.Combine(
+                        games.FullName,
+                        "Very Long Spectrum Collection Name.tzx"));
+                    var missingData = ReadFatFile(stream, boot, nestedFile);
+                    AssertHostFolderSd(BytesEqual(
+                        missingData,
+                        new byte[nestedPayload.Length]),
+                        "disappeared host file was not handled safely");
                 }
+
+                using (var refreshed = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(refreshed, 0);
+                    var rootEntries = ReadFatDirectory(refreshed, boot, 2);
+                    AssertHostFolderSd(
+                        FindFatEntry(rootEntries, "added-after-mount.tap") != null,
+                        "new host file did not appear after Refresh snapshot");
+                }
+
+                var configured = new ZXMAK2.Hardware.Evo.ZsdPentEvo();
+                configured.ConfigureSource(
+                    ZXMAK2.Hardware.Evo.SdSourceType.HostFolder,
+                    root);
+                var document = new XmlDocument();
+                var configNode = document.AppendChild(document.CreateElement("Device"));
+                configured.SaveConfigXml(configNode);
+                var restored = new ZXMAK2.Hardware.Evo.ZsdPentEvo();
+                restored.LoadConfigXml(configNode);
+                AssertHostFolderSd(
+                    restored.ConfiguredSourceType ==
+                        ZXMAK2.Hardware.Evo.SdSourceType.HostFolder &&
+                    string.Equals(restored.ConfiguredSourcePath, Path.GetFullPath(root),
+                        StringComparison.OrdinalIgnoreCase),
+                    "Host Folder source did not survive configuration round-trip");
                 Console.WriteLine("Host Folder SD FAT32: PASS");
             }
             finally
@@ -2689,6 +2748,11 @@ namespace Test
                         entry.Cluster = ((uint)ReadLe16(sector, offset + 20) << 16) |
                             ReadLe16(sector, offset + 26);
                         entry.Length = ReadLe32(sector, offset + 28);
+                        var stem = Encoding.ASCII.GetString(sector, offset, 8).TrimEnd();
+                        var extension = Encoding.ASCII.GetString(sector, offset + 8, 3).TrimEnd();
+                        entry.ShortName = extension.Length == 0
+                            ? stem
+                            : stem + "." + extension;
                         if (lfnParts.Count > 0)
                         {
                             var name = new StringBuilder();
@@ -2699,9 +2763,7 @@ namespace Test
                         }
                         else
                         {
-                            var stem = Encoding.ASCII.GetString(sector, offset, 8).TrimEnd();
-                            var extension = Encoding.ASCII.GetString(sector, offset + 8, 3).TrimEnd();
-                            entry.Name = extension.Length == 0 ? stem : stem + "." + extension;
+                            entry.Name = entry.ShortName;
                         }
                         if (entry.Name != "." && entry.Name != "..")
                             result.Add(entry);
@@ -2803,6 +2865,7 @@ namespace Test
         private sealed class FatTestEntry
         {
             public string Name;
+            public string ShortName;
             public bool IsDirectory;
             public uint Cluster;
             public uint Length;

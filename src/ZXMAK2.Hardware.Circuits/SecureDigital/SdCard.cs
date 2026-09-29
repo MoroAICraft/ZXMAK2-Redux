@@ -159,9 +159,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 throw new InvalidDataException("The SD Card image size is not a multiple of 512 bytes.");
             }
-            if (stream.Length > MaxImageLength)
+            var maximumLength = stream is HostFolderFat32Stream ?
+                16L * 1024L * 1024L * 1024L : MaxImageLength;
+            if (stream.Length > maximumLength)
             {
-                throw new NotSupportedException("SD Card images larger than 8 GiB are not supported.");
+                throw new NotSupportedException(
+                    stream is HostFolderFat32Stream ?
+                        "Host Folder virtual SD cards larger than 16 GiB are not supported." :
+                        "SD Card images larger than 8 GiB are not supported.");
             }
 
             var sector = new byte[SectorSize];

@@ -17,7 +17,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private const int ReservedSectors = 32;
         private const int FatCount = 2;
         private const long Fat32FileLimit = 0x100000000L;
-        private const long MaximumImageLength = 8L * 1024L * 1024L * 1024L;
+        // Leave FAT/directory headroom when the file payload itself is close
+        // to the requested 8 GiB collection size.
+        private const long MaximumImageLength = 16L * 1024L * 1024L * 1024L;
         private const uint EndOfChain = 0x0FFFFFFF;
 
         private readonly string m_sourceFolder;
@@ -33,6 +35,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private readonly long m_dataStartSector;
         private readonly long m_length;
         private long m_position;
+        private string m_cachedFilePath;
+        private FileStream m_cachedFile;
 
         public HostFolderFat32Stream(string folderPath)
         {
@@ -75,7 +79,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             if (m_length > MaximumImageLength)
             {
                 throw new NotSupportedException(
-                    "The selected folder does not fit in the maximum 8 GiB virtual SD card.");
+                    "The selected folder does not fit in the maximum 16 GiB virtual SD card.");
             }
 
             BuildDirectoryData(m_root);
@@ -109,6 +113,13 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public override void Flush()
         {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                CloseCachedFile();
+            base.Dispose(disposing);
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -179,8 +190,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             node.Parent = parent;
             node.Name = isRoot ? string.Empty : directory.Name;
             node.FullPath = directory.FullName;
-            node.LastWriteTime = SafeDate(directory.LastWriteTime);
-            node.CreationTime = SafeDate(directory.CreationTime);
+            node.LastWriteTime = GetLastWriteTime(directory);
+            node.CreationTime = GetCreationTime(directory);
 
             FileSystemInfo[] entries;
             try
@@ -192,7 +203,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 if (isRoot)
                     throw new IOException("Cannot scan the selected host folder.", ex);
                 AddWarning("Skipped inaccessible folder: " + directory.FullName);
-                return node;
+                return null;
             }
 
             Array.Sort(entries, delegate(FileSystemInfo left, FileSystemInfo right)
@@ -229,7 +240,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 var childDirectory = entry as DirectoryInfo;
                 if (childDirectory != null)
                 {
-                    node.Children.Add(ScanDirectory(childDirectory, node, false));
+                    var childNode = ScanDirectory(childDirectory, node, false);
+                    if (childNode != null)
+                        node.Children.Add(childNode);
                     continue;
                 }
 
@@ -260,8 +273,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 child.Name = file.Name;
                 child.FullPath = file.FullName;
                 child.Length = length;
-                child.LastWriteTime = SafeDate(file.LastWriteTime);
-                child.CreationTime = SafeDate(file.CreationTime);
+                child.LastWriteTime = GetLastWriteTime(file);
+                child.CreationTime = GetCreationTime(file);
                 node.Children.Add(child);
             }
             return node;
@@ -284,7 +297,31 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     return choice;
             }
             throw new NotSupportedException(
-                "The selected folder does not fit in the maximum 8 GiB virtual SD card.");
+                "The selected folder does not fit in the maximum 16 GiB virtual SD card.");
+        }
+
+        private static DateTime GetLastWriteTime(FileSystemInfo item)
+        {
+            try
+            {
+                return SafeDate(item.LastWriteTime);
+            }
+            catch
+            {
+                return new DateTime(1980, 1, 1);
+            }
+        }
+
+        private static DateTime GetCreationTime(FileSystemInfo item)
+        {
+            try
+            {
+                return SafeDate(item.CreationTime);
+            }
+            catch
+            {
+                return new DateTime(1980, 1, 1);
+            }
         }
 
         private static long SumFileBytes(Node node)
@@ -680,28 +717,27 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 return;
             try
             {
-                using (var stream = new FileStream(
-                    node.FullPath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete))
+                if (!File.Exists(node.FullPath))
+                    throw new FileNotFoundException(
+                        "The host file disappeared after the folder was mounted.",
+                        node.FullPath);
+                var stream = GetCachedFile(node.FullPath);
+                if (stream.Length != node.Length)
+                    throw new IOException("The file size changed after the folder was mounted.");
+                stream.Position = fileOffset;
+                var wanted = (int)Math.Min(SectorSize, node.Length - fileOffset);
+                var offset = 0;
+                while (offset < wanted)
                 {
-                    if (stream.Length != node.Length)
-                        throw new IOException("The file size changed after the folder was mounted.");
-                    stream.Position = fileOffset;
-                    var wanted = (int)Math.Min(SectorSize, node.Length - fileOffset);
-                    var offset = 0;
-                    while (offset < wanted)
-                    {
-                        var read = stream.Read(sector, offset, wanted - offset);
-                        if (read == 0)
-                            throw new EndOfStreamException("The host file ended unexpectedly.");
-                        offset += read;
-                    }
+                    var read = stream.Read(sector, offset, wanted - offset);
+                    if (read == 0)
+                        throw new EndOfStreamException("The host file ended unexpectedly.");
+                    offset += read;
                 }
             }
             catch (Exception ex)
             {
+                CloseCachedFile();
                 lock (m_reportedReadErrors)
                 {
                     if (m_reportedReadErrors.Add(node.FullPath))
@@ -714,6 +750,34 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 Array.Clear(sector, 0, sector.Length);
             }
+        }
+
+        private FileStream GetCachedFile(string path)
+        {
+            if (m_cachedFile != null && string.Equals(
+                    m_cachedFilePath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return m_cachedFile;
+            }
+            CloseCachedFile();
+            m_cachedFile = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                4096,
+                FileOptions.RandomAccess);
+            m_cachedFilePath = path;
+            return m_cachedFile;
+        }
+
+        private void CloseCachedFile()
+        {
+            var stream = m_cachedFile;
+            m_cachedFile = null;
+            m_cachedFilePath = null;
+            if (stream != null)
+                stream.Dispose();
         }
 
         private void AddWarning(string warning)

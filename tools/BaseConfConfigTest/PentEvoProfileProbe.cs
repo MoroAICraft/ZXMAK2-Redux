@@ -711,6 +711,10 @@ internal static class PentEvoProfileProbe
             view.Add(new ProbeMediaCommand(
                 MediaCommandAction.Load, 0, "load-z"));
             view.Add(new ProbeMediaCommand(
+                MediaCommandAction.MountFolder, 0, "mount-folder-z"));
+            view.Add(new ProbeMediaCommand(
+                MediaCommandAction.Refresh, 0, "refresh-folder-z"));
+            view.Add(new ProbeMediaCommand(
                 MediaCommandAction.Eject, 0, "eject-z"));
             view.Add(new ProbeMediaCommand(
                 MediaCommandAction.Load, 1, "load-neogs"));
@@ -720,10 +724,43 @@ internal static class PentEvoProfileProbe
             var items = GetField<ToolStripMenuItem[]>(
                 view, "_ejectSdMenuItems");
             var states = GetField<MediaState?[]>(view, "_sdMountedStates");
-            Assert(items[0] != null && items[0].Text == "Eject Z-controller",
-                "Z-controller Eject menu item is missing or too long");
+            Assert(items[0] != null && items[0].Text == "Eject SD",
+                "SD Eject menu item is missing");
             Assert(items[1] != null && items[1].Text == "Eject NeoGS",
                 "NeoGS Eject menu item is missing");
+            ToolStripDropDownButton sdButton = null;
+            foreach (ToolStripItem toolbarItem in toolbar.Items)
+            {
+                var candidate = toolbarItem as ToolStripDropDownButton;
+                if (candidate != null && candidate.ToolTipText == "SD card")
+                {
+                    sdButton = candidate;
+                    break;
+                }
+            }
+            Assert(sdButton != null, "SD toolbar button is missing");
+            var expectedSdMenu = new[]
+            {
+                "Load SD image...",
+                "Mount folder as SD...",
+                "Refresh mounted folder",
+                "Eject SD",
+                null,
+                "Load NeoGS",
+                "Eject NeoGS",
+            };
+            Assert(sdButton.DropDownItems.Count == expectedSdMenu.Length,
+                "SD menu contains an unexpected number of items");
+            for (var index = 0; index < expectedSdMenu.Length; index++)
+            {
+                var expected = expectedSdMenu[index];
+                if (expected == null)
+                    Assert(sdButton.DropDownItems[index] is ToolStripSeparator,
+                        "SD menu separator is misplaced");
+                else
+                    Assert(sdButton.DropDownItems[index].Text == expected,
+                        "SD menu order/text mismatch at item " + index);
+            }
             Assert(items[0].Image != null && items[1].Image != null,
                 "SD menu indicators are missing");
             var unavailable = ((Bitmap)items[0].Image).GetPixel(4, 4);

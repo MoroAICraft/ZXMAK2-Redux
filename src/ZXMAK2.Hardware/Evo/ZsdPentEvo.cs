@@ -468,38 +468,30 @@ namespace ZXMAK2.Hardware.Evo
                 return;
             }
 
-            // Reproduce physical hot swap order: remove and close the old
-            // card before opening the new image. Opening the replacement
-            // first can collide with an image handle retained by an earlier
-            // mount when cycling A -> B -> A.
-            SdCard previous;
-            string previousFileName;
-            SdSourceType previousSourceType;
-            string previousSourcePath;
             lock (cardSync)
             {
-                previous = card;
-                previousFileName = previous != null ? previous.MountedFileName : null;
-                previousSourceType = configuredSourceType;
-                previousSourcePath = configuredSourcePath;
-                card = null;
-                card_cs = false;
-                buf = 0xFF;
-            }
-            if (previous != null)
-            {
-                previous.Close();
+                if (configuredSourceType == SdSourceType.Image &&
+                    string.Equals(configuredSourcePath, fullPath,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    card != null && !string.IsNullOrEmpty(card.MountedFileName))
+                {
+                    card.Reset();
+                    return;
+                }
             }
 
+            // Build and validate the replacement before swapping it in. A
+            // failed open therefore leaves the current source operational.
             SdCard replacement = null;
+            SdCard previous = null;
             try
             {
-                Logger.Info("SD hot swap: close '{0}', open '{1}'",
-                    previousFileName ?? "<none>", fullPath);
+                Logger.Info("SD hot swap: build '{0}'", fullPath);
                 replacement = new SdCard();
                 replacement.Open(fullPath);
                 lock (cardSync)
                 {
+                    previous = card;
                     card = replacement;
                     replacement = null;
                     card_cs = false;
@@ -507,19 +499,14 @@ namespace ZXMAK2.Hardware.Evo
                     configuredSourceType = SdSourceType.Image;
                     configuredSourcePath = fullPath;
                 }
+                if (previous != null)
+                    previous.Close();
                 Logger.Info("SD hot swap completed: '{0}'", fullPath);
-            }
-            catch
-            {
-                RestorePreviousSource(previousSourceType, previousSourcePath);
-                throw;
             }
             finally
             {
                 if (replacement != null)
-                {
                     replacement.Close();
-                }
             }
         }
 
@@ -630,53 +617,6 @@ namespace ZXMAK2.Hardware.Evo
                 throw new DirectoryNotFoundException(
                     "SD source folder not found: " + fullPath);
             return fullPath;
-        }
-
-        private void RestorePreviousSource(
-            SdSourceType sourceType,
-            string sourcePath)
-        {
-            SdCard restored = null;
-            try
-            {
-                restored = new SdCard();
-                if (!string.IsNullOrEmpty(sourcePath))
-                {
-                    if (sourceType == SdSourceType.HostFolder)
-                        restored.OpenHostFolder(sourcePath);
-                    else
-                        restored.Open(sourcePath);
-                }
-                lock (cardSync)
-                {
-                    card = restored;
-                    restored = null;
-                    card_cs = false;
-                    buf = 0xFF;
-                    configuredSourceType = sourceType;
-                    configuredSourcePath = sourcePath ?? string.Empty;
-                }
-                Logger.Info(
-                    "SD hot swap rollback completed: '{0}'",
-                    sourcePath ?? "<none>");
-            }
-            catch (Exception restoreError)
-            {
-                Logger.Error(restoreError);
-                lock (cardSync)
-                {
-                    card = new SdCard();
-                    card_cs = false;
-                    buf = 0xFF;
-                }
-            }
-            finally
-            {
-                if (restored != null)
-                {
-                    restored.Close();
-                }
-            }
         }
 
         #endregion CommandUi

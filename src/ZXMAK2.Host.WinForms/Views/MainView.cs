@@ -716,19 +716,30 @@ namespace ZXMAK2.Host.WinForms.Views
             object commandParameter,
             bool requiresPowerCycle)
         {
-            var viewModel = DataContext as IMainViewModel;
-            if (viewModel == null)
+            var previousCursor = Cursor.Current;
+            UseWaitCursor = true;
+            Cursor.Current = Cursors.WaitCursor;
+            try
             {
-                command.Execute(commandParameter);
-                return;
+                var viewModel = DataContext as IMainViewModel;
+                if (viewModel == null)
+                {
+                    command.Execute(commandParameter);
+                    return;
+                }
+                if (requiresPowerCycle)
+                {
+                    viewModel.ExecuteMediaChange(command, commandParameter);
+                }
+                else
+                {
+                    viewModel.ExecuteFloppyMediaChange(command, commandParameter);
+                }
             }
-            if (requiresPowerCycle)
+            finally
             {
-                viewModel.ExecuteMediaChange(command, commandParameter);
-            }
-            else
-            {
-                viewModel.ExecuteFloppyMediaChange(command, commandParameter);
+                UseWaitCursor = false;
+                Cursor.Current = previousCursor;
             }
         }
 
