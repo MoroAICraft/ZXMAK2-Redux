@@ -9,7 +9,7 @@ using ZXMAK2.Engine.Interfaces;
 namespace ZXMAK2.Hardware.Evo
 {
     /// <summary>
-    /// ZXM-MoonSound Rev.01, CPLD firmware 1.00 (07.09.2016).
+    /// ZXM-MoonSound Rev.01, CPLD firmware 1.01 compatibility.
     ///
     /// The board has one YMF278B/OPL4 at 33.8688 MHz, a 2 MiB YRW801-M
     /// instrument ROM and 1 MiB SRAM.  Rev.01 decodes the low byte only:
@@ -44,7 +44,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             Name = "ZXM-MoonSound Rev.01";
             Description =
-                "Mick Laboratory ZXM-MoonSound Rev.01, CPLD 1.00: " +
+                "Mick Laboratory ZXM-MoonSound Rev.01, CPLD 1.01: " +
                 "YMF278B/OPL4 33.8688 MHz, YRW801-M 2 MB ROM and 1 MB SRAM. " +
                 "Ports: #7E/#7F PCM and #C4-#C7 FM.";
             Category = BusDeviceCategory.Music;
@@ -110,18 +110,17 @@ namespace ZXMAK2.Hardware.Evo
         private void InitializeCore()
         {
             ReleaseCore();
-            m_loadedRomPath = FindRomPath();
-            if (string.IsNullOrEmpty(m_loadedRomPath))
+            byte[] rom = LoadInstrumentRom();
+            if (rom == null)
             {
                 Logger.Error(
-                    "ZXM-MoonSound: 2 MB YRW801-M ROM not found beside " +
-                    "ZXMAK2.exe or in its roms folder");
+                    "ZXM-MoonSound: 2 MB YRW801-M ROM not found in " +
+                    "ROMS.PAK, beside ZXMAK2.exe or in its roms folder");
                 return;
             }
 
             try
             {
-                byte[] rom = File.ReadAllBytes(m_loadedRomPath);
                 if (rom.Length != RomSize)
                     throw new InvalidDataException(
                         "YRW801-M ROM must be exactly 2097152 bytes");
@@ -173,6 +172,26 @@ namespace ZXMAK2.Hardware.Evo
                     NativeMethods.Read(m_core, 0);
             }
             ResetResampler();
+        }
+
+        private byte[] LoadInstrumentRom()
+        {
+            m_loadedRomPath = FindRomPath();
+            if (!string.IsNullOrEmpty(m_loadedRomPath))
+                return File.ReadAllBytes(m_loadedRomPath);
+            foreach (string name in RomNames)
+            {
+                try
+                {
+                    byte[] data = ZXMAK2.Hardware.RomPack.GetRomData(name);
+                    m_loadedRomPath = "ROMS.PAK/" + name;
+                    return data;
+                }
+                catch (FileNotFoundException)
+                {
+                }
+            }
+            return null;
         }
 
         private void ResetResampler()

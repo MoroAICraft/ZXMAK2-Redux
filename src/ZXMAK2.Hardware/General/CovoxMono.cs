@@ -14,6 +14,7 @@ namespace ZXMAK2.Hardware.General
         private bool m_noDos;
         private int m_mask;
         private int m_port;
+        private int m_gain;
 
         
         public CovoxMono()
@@ -24,6 +25,7 @@ namespace ZXMAK2.Hardware.General
             m_noDos = true;
             m_mask = 0xFF;      // pentagon config by default
             m_port = 0xFB;
+            m_gain = 100;
             OnProcessConfigChange();
         }
 
@@ -60,12 +62,23 @@ namespace ZXMAK2.Hardware.General
             }
         }
 
+        public int Gain
+        {
+            get { return m_gain; }
+            set
+            {
+                m_gain = Math.Max(0, Math.Min(200, value));
+                OnConfigChanged();
+            }
+        }
+
         protected override void OnConfigLoad(XmlNode node)
         {
             base.OnConfigLoad(node);
             NoDos = Utils.GetXmlAttributeAsBool(node, "noDos", NoDos);
             Mask = Utils.GetXmlAttributeAsInt32(node, "mask", Mask);
             Port = Utils.GetXmlAttributeAsInt32(node, "port", Port);
+            Gain = Utils.GetXmlAttributeAsInt32(node, "gain", Gain);
         }
 
         protected override void OnConfigSave(XmlNode node)
@@ -74,6 +87,7 @@ namespace ZXMAK2.Hardware.General
             Utils.SetXmlAttribute(node, "noDos", NoDos);
             Utils.SetXmlAttribute(node, "mask", Mask);
             Utils.SetXmlAttribute(node, "port", Port);
+            Utils.SetXmlAttribute(node, "gain", Gain);
         }
 
 
@@ -82,7 +96,8 @@ namespace ZXMAK2.Hardware.General
             base.OnProcessConfigChange();
 
             // process Volume change...
-            m_mult = (ushort.MaxValue * Volume) / (100 * 0xFF);
+            m_mult = (ushort.MaxValue * Volume * Gain) /
+                (100 * 100 * 0xFF);
 
             // update description...
             var builder = new StringBuilder();
@@ -96,6 +111,8 @@ namespace ZXMAK2.Hardware.General
             builder.Append(string.Format("Mask:  #{0:X4}", Mask));
             builder.Append(Environment.NewLine);
             builder.Append(string.Format("Port:  #{0:X4}", Port));
+            builder.Append(Environment.NewLine);
+            builder.Append(string.Format("Gain:  {0}%", Gain));
             builder.Append(Environment.NewLine);
             builder.Append(Environment.NewLine);
             Description = builder.ToString();

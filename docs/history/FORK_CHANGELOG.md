@@ -7,6 +7,15 @@
 Статус runtime указывается только там, где пользователь действительно провёл
 проверку. Успешная сборка или compiled-probe не заменяет runtime-приёмку.
 
+## 2026-09-29 — v63 ROM Pack / BaseConf defaults (локальная)
+
+- Kempston Joystick включён в чистом BaseConf по умолчанию.
+- Встроенный BaseConf Covox усилен до 145%.
+- EVO, Santaka 002 и MoonSound YRW801-M работают из единого ROMS.PAK;
+  отдельной папки roms в portable-сборке нет.
+- MoonSound и OmniSound проверки прошли с ROM только из пакета.
+- GitHub-релиз не изменялся; требуется пользовательская проверка v63.
+
 ## 2026-09-26 — v59 Joystick Game Profiles Test (локальная)
 
 - Именованные игровые профили: весь интерфейс и управление, New/Copy,

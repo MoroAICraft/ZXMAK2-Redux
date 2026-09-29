@@ -121,6 +121,23 @@ namespace ZXMAK2.Hardware
             throw new FileNotFoundException(string.Format("ULA ROM file not found: {0}", romName));
         }
 
+        public static byte[] GetRomData(string fileName)
+        {
+            using (var stream = GetImageStream(fileName))
+            {
+                var data = new byte[stream.Length];
+                int offset = 0;
+                while (offset < data.Length)
+                {
+                    int count = stream.Read(data, offset, data.Length - offset);
+                    if (count <= 0)
+                        throw new EndOfStreamException(fileName);
+                    offset += count;
+                }
+                return data;
+            }
+        }
+
         public static IEnumerable<RomPage> GetRomSet(String romSetName)
         {
             var list = new List<RomPage>();
