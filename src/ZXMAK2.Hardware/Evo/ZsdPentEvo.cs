@@ -14,6 +14,12 @@ using ZXMAK2.Mvvm;
 
 namespace ZXMAK2.Hardware.Evo
 {
+    public enum SdSourceType
+    {
+        Image,
+        HostFolder,
+    }
+
     public class ZsdPentEvo : BusDeviceBase, IMediaStatusDevice,
         ISecureDigitalMediaStatus
     {
@@ -25,9 +31,12 @@ namespace ZXMAK2.Hardware.Evo
         private byte buf;
         private bool card_cs;
         private readonly object cardSync = new object();
-        private SdImageOpenCommand openImageCommand;
-        private SdImageOpenCommand ejectImageCommand;
-        private string configuredImageFileName = string.Empty;
+        private SdMediaCommand openImageCommand;
+        private SdMediaCommand mountFolderCommand;
+        private SdMediaCommand refreshFolderCommand;
+        private SdMediaCommand ejectImageCommand;
+        private SdSourceType configuredSourceType = SdSourceType.Image;
+        private string configuredSourcePath = string.Empty;
 
         #endregion
 
@@ -52,17 +61,29 @@ namespace ZXMAK2.Hardware.Evo
         {
             m_sandbox = bmgr.IsSandbox;
             mem = bmgr.FindDevice<IMemoryDevice>();
-            openImageCommand = new SdImageOpenCommand(
+            openImageCommand = new SdMediaCommand(
                 CommandUi_OnExecute,
                 CommandUi_OnCanExecute,
                 "Open SD Card image...",
                 MediaCommandAction.Load);
-            ejectImageCommand = new SdImageOpenCommand(
+            mountFolderCommand = new SdMediaCommand(
+                MountFolderCommandUi_OnExecute,
+                MountFolderCommandUi_OnCanExecute,
+                "Mount folder as SD...",
+                MediaCommandAction.MountFolder);
+            refreshFolderCommand = new SdMediaCommand(
+                RefreshFolderCommandUi_OnExecute,
+                RefreshFolderCommandUi_OnCanExecute,
+                "Refresh mounted folder",
+                MediaCommandAction.Refresh);
+            ejectImageCommand = new SdMediaCommand(
                 EjectCommandUi_OnExecute,
                 CommandUi_OnCanExecute,
                 "Eject SD Card",
                 MediaCommandAction.Eject);
             bmgr.AddCommandUi(openImageCommand);
+            bmgr.AddCommandUi(mountFolderCommand);
+            bmgr.AddCommandUi(refreshFolderCommand);
             bmgr.AddCommandUi(ejectImageCommand);
 
             bmgr.Events.SubscribeReset(Reset);
@@ -113,15 +134,29 @@ namespace ZXMAK2.Hardware.Evo
         protected override void OnConfigLoad(XmlNode itemNode)
         {
             base.OnConfigLoad(itemNode);
-            configuredImageFileName = Utils.GetXmlAttributeAsString(
+            var legacyImage = Utils.GetXmlAttributeAsString(
                 itemNode, "sdImage", string.Empty);
+            configuredSourcePath = Utils.GetXmlAttributeAsString(
+                itemNode, "sdPath", legacyImage);
+            var source = Utils.GetXmlAttributeAsString(
+                itemNode, "sdSource", "Image");
+            configuredSourceType = string.Equals(
+                source, "HostFolder", StringComparison.OrdinalIgnoreCase) ?
+                SdSourceType.HostFolder : SdSourceType.Image;
         }
 
         protected override void OnConfigSave(XmlNode itemNode)
         {
             base.OnConfigSave(itemNode);
             Utils.SetXmlAttribute(
-                itemNode, "sdImage", configuredImageFileName ?? string.Empty);
+                itemNode,
+                "sdImage",
+                configuredSourceType == SdSourceType.Image ?
+                    configuredSourcePath ?? string.Empty : string.Empty);
+            Utils.SetXmlAttribute(
+                itemNode, "sdSource", configuredSourceType.ToString());
+            Utils.SetXmlAttribute(
+                itemNode, "sdPath", configuredSourcePath ?? string.Empty);
         }
 
 
@@ -238,6 +273,19 @@ namespace ZXMAK2.Hardware.Evo
             return viewResolver.CheckAvailable<IOpenFileDialog>();
         }
 
+        private bool MountFolderCommandUi_OnCanExecute(Object arg)
+        {
+            var viewResolver = Locator.Resolve<IResolver>("View");
+            return viewResolver.CheckAvailable<IFolderBrowserDialog>();
+        }
+
+        private bool RefreshFolderCommandUi_OnCanExecute(Object arg)
+        {
+            return configuredSourceType == SdSourceType.HostFolder &&
+                !string.IsNullOrEmpty(configuredSourcePath) &&
+                Directory.Exists(configuredSourcePath);
+        }
+
         private void CommandUi_OnExecute(Object arg)
         {
             if (!CommandUi_OnCanExecute(arg))
@@ -288,6 +336,65 @@ namespace ZXMAK2.Hardware.Evo
             }
         }
 
+        private void MountFolderCommandUi_OnExecute(Object arg)
+        {
+            if (!MountFolderCommandUi_OnCanExecute(arg))
+                return;
+            try
+            {
+                var viewResolver = Locator.Resolve<IResolver>("View");
+                using (var dialog = viewResolver.TryResolve<IFolderBrowserDialog>())
+                {
+                    if (dialog == null)
+                        return;
+                    dialog.Description = "Select a folder to mount as a read-only SD card";
+                    if (configuredSourceType == SdSourceType.HostFolder &&
+                        Directory.Exists(configuredSourcePath))
+                    {
+                        dialog.SelectedPath = configuredSourcePath;
+                    }
+                    if (dialog.ShowDialog(arg) != DlgResult.OK)
+                        return;
+                    var warningCount = MountHostFolder(dialog.SelectedPath);
+                    mountFolderCommand.NotifyExecutedSuccessfully();
+                    ShowFolderWarnings(warningCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                Locator.Resolve<IUserMessage>()
+                    .Error("Cannot mount folder as SD card!\n\n{0}", ex.Message);
+            }
+        }
+
+        private void RefreshFolderCommandUi_OnExecute(Object arg)
+        {
+            if (!RefreshFolderCommandUi_OnCanExecute(arg))
+                return;
+            try
+            {
+                var warningCount = MountHostFolder(configuredSourcePath);
+                refreshFolderCommand.NotifyExecutedSuccessfully();
+                ShowFolderWarnings(warningCount);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                Locator.Resolve<IUserMessage>()
+                    .Error("Cannot refresh mounted SD folder!\n\n{0}", ex.Message);
+            }
+        }
+
+        private static void ShowFolderWarnings(int warningCount)
+        {
+            if (warningCount <= 0)
+                return;
+            Locator.Resolve<IUserMessage>().Warning(
+                "The folder was mounted, but {0} inaccessible, unsupported, or oversized item(s) were skipped. See the log for details.",
+                warningCount);
+        }
+
         public MediaStatusKind MediaStatusKind
         {
             get { return MediaStatusKind.SecureDigital; }
@@ -312,7 +419,21 @@ namespace ZXMAK2.Hardware.Evo
 
         public string ConfiguredImageFileName
         {
-            get { return configuredImageFileName ?? string.Empty; }
+            get
+            {
+                return configuredSourceType == SdSourceType.Image ?
+                    configuredSourcePath ?? string.Empty : string.Empty;
+            }
+        }
+
+        public SdSourceType ConfiguredSourceType
+        {
+            get { return configuredSourceType; }
+        }
+
+        public string ConfiguredSourcePath
+        {
+            get { return configuredSourcePath ?? string.Empty; }
         }
 
         /// <summary>
@@ -322,7 +443,20 @@ namespace ZXMAK2.Hardware.Evo
         /// </summary>
         public void ConfigureCard(string fileName)
         {
-            configuredImageFileName = NormalizeImageFileName(fileName);
+            ConfigureSource(SdSourceType.Image, fileName);
+        }
+
+        public void ConfigureSource(SdSourceType sourceType, string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                configuredSourceType = SdSourceType.Image;
+                configuredSourcePath = string.Empty;
+                return;
+            }
+            configuredSourceType = sourceType;
+            configuredSourcePath = sourceType == SdSourceType.HostFolder ?
+                NormalizeFolderPath(path) : NormalizeImageFileName(path);
         }
 
         public void MountCard(string fileName)
@@ -340,10 +474,14 @@ namespace ZXMAK2.Hardware.Evo
             // mount when cycling A -> B -> A.
             SdCard previous;
             string previousFileName;
+            SdSourceType previousSourceType;
+            string previousSourcePath;
             lock (cardSync)
             {
                 previous = card;
                 previousFileName = previous != null ? previous.MountedFileName : null;
+                previousSourceType = configuredSourceType;
+                previousSourcePath = configuredSourcePath;
                 card = null;
                 card_cs = false;
                 buf = 0xFF;
@@ -366,13 +504,14 @@ namespace ZXMAK2.Hardware.Evo
                     replacement = null;
                     card_cs = false;
                     buf = 0xFF;
-                    configuredImageFileName = fullPath;
+                    configuredSourceType = SdSourceType.Image;
+                    configuredSourcePath = fullPath;
                 }
                 Logger.Info("SD hot swap completed: '{0}'", fullPath);
             }
             catch
             {
-                RestorePreviousCard(previousFileName);
+                RestorePreviousSource(previousSourceType, previousSourcePath);
                 throw;
             }
             finally
@@ -381,6 +520,43 @@ namespace ZXMAK2.Hardware.Evo
                 {
                     replacement.Close();
                 }
+            }
+        }
+
+        public int MountHostFolder(string folderPath)
+        {
+            var fullPath = NormalizeFolderPath(folderPath);
+            SdCard replacement = null;
+            HostFolderFat32Stream folderStream = null;
+            try
+            {
+                Logger.Info("SD folder mount: build '{0}'", fullPath);
+                replacement = new SdCard();
+                folderStream = replacement.OpenHostFolder(fullPath);
+
+                SdCard previous;
+                lock (cardSync)
+                {
+                    previous = card;
+                    card = replacement;
+                    replacement = null;
+                    card_cs = false;
+                    buf = 0xFF;
+                    configuredSourceType = SdSourceType.HostFolder;
+                    configuredSourcePath = fullPath;
+                }
+                if (previous != null)
+                    previous.Close();
+                Logger.Info(
+                    "SD folder mount completed: '{0}', warnings={1}",
+                    fullPath,
+                    folderStream.Warnings.Count);
+                return folderStream.Warnings.Count;
+            }
+            finally
+            {
+                if (replacement != null)
+                    replacement.Close();
             }
         }
 
@@ -393,7 +569,8 @@ namespace ZXMAK2.Hardware.Evo
                 card = new SdCard();
                 card_cs = false;
                 buf = 0xFF;
-                configuredImageFileName = string.Empty;
+                configuredSourceType = SdSourceType.Image;
+                configuredSourcePath = string.Empty;
             }
             if (previous != null)
             {
@@ -404,19 +581,29 @@ namespace ZXMAK2.Hardware.Evo
 
         private void RestoreConfiguredCard()
         {
-            var configured = configuredImageFileName;
+            var configured = configuredSourcePath;
             if (string.IsNullOrEmpty(configured))
             {
                 return;
             }
             try
             {
-                MountCard(configured);
+                if (configuredSourceType == SdSourceType.HostFolder)
+                    MountHostFolder(configured);
+                else
+                    MountCard(configured);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Cannot restore configured SD card: {0}", configured);
-                EjectCard();
+                Logger.Error(ex, "Cannot restore configured SD source: {0}", configured);
+                lock (cardSync)
+                {
+                    if (card != null)
+                        card.Close();
+                    card = new SdCard();
+                    card_cs = false;
+                    buf = 0xFF;
+                }
             }
         }
 
@@ -434,15 +621,31 @@ namespace ZXMAK2.Hardware.Evo
             return fullPath;
         }
 
-        private void RestorePreviousCard(string fileName)
+        private static string NormalizeFolderPath(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+                return string.Empty;
+            var fullPath = Path.GetFullPath(folderPath.Trim());
+            if (!Directory.Exists(fullPath))
+                throw new DirectoryNotFoundException(
+                    "SD source folder not found: " + fullPath);
+            return fullPath;
+        }
+
+        private void RestorePreviousSource(
+            SdSourceType sourceType,
+            string sourcePath)
         {
             SdCard restored = null;
             try
             {
                 restored = new SdCard();
-                if (!string.IsNullOrEmpty(fileName))
+                if (!string.IsNullOrEmpty(sourcePath))
                 {
-                    restored.Open(fileName);
+                    if (sourceType == SdSourceType.HostFolder)
+                        restored.OpenHostFolder(sourcePath);
+                    else
+                        restored.Open(sourcePath);
                 }
                 lock (cardSync)
                 {
@@ -450,10 +653,12 @@ namespace ZXMAK2.Hardware.Evo
                     restored = null;
                     card_cs = false;
                     buf = 0xFF;
+                    configuredSourceType = sourceType;
+                    configuredSourcePath = sourcePath ?? string.Empty;
                 }
                 Logger.Info(
                     "SD hot swap rollback completed: '{0}'",
-                    fileName ?? "<none>");
+                    sourcePath ?? "<none>");
             }
             catch (Exception restoreError)
             {
@@ -476,9 +681,9 @@ namespace ZXMAK2.Hardware.Evo
 
         #endregion CommandUi
 
-        private sealed class SdImageOpenCommand : CommandDelegate, IMediaCommand
+        private sealed class SdMediaCommand : CommandDelegate, IMediaCommand
         {
-            public SdImageOpenCommand(
+            public SdMediaCommand(
                 Action<object> action,
                 Func<object, bool> canExecute,
                 string text,

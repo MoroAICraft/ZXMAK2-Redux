@@ -49,6 +49,8 @@ namespace ZXMAK2.Host.WinForms.Views
         private bool? _quickBootAvailable;
         private readonly ISuccessCommand[] _openSdCommands =
             new ISuccessCommand[2];
+        private ISuccessCommand _mountFolderSdCommand;
+        private ISuccessCommand _refreshFolderSdCommand;
         private readonly ISuccessCommand[] _ejectSdCommands =
             new ISuccessCommand[2];
         private readonly ToolStripMenuItem[] _ejectSdMenuItems =
@@ -353,6 +355,8 @@ namespace ZXMAK2.Host.WinForms.Views
             _deviceItemAdapters.Clear();
             menuTools.DropDownItems.Clear();
             Array.Clear(_openSdCommands, 0, _openSdCommands.Length);
+            _mountFolderSdCommand = null;
+            _refreshFolderSdCommand = null;
             Array.Clear(_ejectSdCommands, 0, _ejectSdCommands.Length);
             _openHddCommand = null;
             _ejectHddCommand = null;
@@ -404,7 +408,17 @@ namespace ZXMAK2.Host.WinForms.Views
                     {
                         _openSdCommands[mediaCommand.DriveIndex] = mediaCommand;
                     }
-                    else
+                    else if (mediaCommand.MediaAction == MediaCommandAction.MountFolder &&
+                        mediaCommand.DriveIndex == 0)
+                    {
+                        _mountFolderSdCommand = mediaCommand;
+                    }
+                    else if (mediaCommand.MediaAction == MediaCommandAction.Refresh &&
+                        mediaCommand.DriveIndex == 0)
+                    {
+                        _refreshFolderSdCommand = mediaCommand;
+                    }
+                    else if (mediaCommand.MediaAction == MediaCommandAction.Eject)
                     {
                         _ejectSdCommands[mediaCommand.DriveIndex] = mediaCommand;
                     }
@@ -468,7 +482,7 @@ namespace ZXMAK2.Host.WinForms.Views
             InitializeTapeMenu();
             AddMediaToolbarButton(MediaStatusKind.Floppy, "Floppy disk images", index++);
             AddMediaToolbarButton(MediaStatusKind.HardDisk, "HDD image", index++);
-            AddMediaToolbarButton(MediaStatusKind.SecureDigital, "SD card image", index++);
+            AddMediaToolbarButton(MediaStatusKind.SecureDigital, "SD card", index++);
             _opticalButton = AddMediaSplitButton(
                 MediaStatusKind.OpticalDisc,
                 "CD-ROM / DVD-ROM",
@@ -593,20 +607,38 @@ namespace ZXMAK2.Host.WinForms.Views
         private void RebuildMediaToolbarMenus()
         {
             ClearMediaToolbarMenus();
-            var sdNames = new[] { "Z-controller", "NeoGS" };
-            for (var sd = 0; sd < sdNames.Length; sd++)
-            {
-                AddMediaMenuItem(
-                    MediaStatusKind.SecureDigital,
-                    "Load " + sdNames[sd],
-                    _openSdCommands[sd],
-                    true);
-                _ejectSdMenuItems[sd] = AddMediaMenuItem(
-                    MediaStatusKind.SecureDigital,
-                    "Eject " + sdNames[sd],
-                    _ejectSdCommands[sd],
-                    true);
-            }
+            AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Load SD image...",
+                _openSdCommands[0],
+                true);
+            AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Mount folder as SD...",
+                _mountFolderSdCommand,
+                true);
+            AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Refresh mounted folder",
+                _refreshFolderSdCommand,
+                true);
+            _ejectSdMenuItems[0] = AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Eject SD",
+                _ejectSdCommands[0],
+                true);
+            _mediaButtons[MediaStatusKind.SecureDigital]
+                .DropDownItems.Add(new ToolStripSeparator());
+            AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Load NeoGS",
+                _openSdCommands[1],
+                true);
+            _ejectSdMenuItems[1] = AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Eject NeoGS",
+                _ejectSdCommands[1],
+                true);
             AddMediaMenuItem(MediaStatusKind.HardDisk, "Load HDD", _openHddCommand, true);
             AddMediaMenuItem(MediaStatusKind.HardDisk, "Eject HDD", _ejectHddCommand, true);
             for (var drive = 0; drive < 4; drive++)

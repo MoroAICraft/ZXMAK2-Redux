@@ -5,12 +5,14 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using ZXMAK2.Host.Interfaces;
 using ZXMAK2.Host.Entities;
 using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Engine.Entities;
 using ZXMAK2.Engine.Cpu;
+using ZXMAK2.Hardware.Circuits.SecureDigital;
 using System.Threading;
 
 
@@ -85,6 +87,11 @@ namespace Test
             if (args.Length >= 1 && args[0].ToLower() == "/zxnetusb")
             {
                 TestZxNetUsb();
+                return;
+            }
+            if (args.Length >= 1 && args[0].ToLower() == "/hostfoldersd")
+            {
+                TestHostFolderSd();
                 return;
             }
 
@@ -2570,6 +2577,235 @@ namespace Test
                 cpu.ExecCycle();
             watch.Stop();
             Console.WriteLine("{0} [cpu]:\t{1} [ms]", testName, watch.ElapsedMilliseconds);
+        }
+
+        private static void TestHostFolderSd()
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "zxmak2-host-folder-sd-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                var games = Directory.CreateDirectory(Path.Combine(root, "Games"));
+                var rootPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-ROOT");
+                var nestedPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-LONG-NAME");
+                File.WriteAllBytes(Path.Combine(root, "test.trd"), rootPayload);
+                File.WriteAllBytes(
+                    Path.Combine(games.FullName, "Very Long Spectrum Collection Name.tzx"),
+                    nestedPayload);
+
+                using (var stream = new HostFolderFat32Stream(root))
+                {
+                    AssertHostFolderSd(stream.CanRead, "virtual SD is not readable");
+                    AssertHostFolderSd(!stream.CanWrite, "virtual SD is unexpectedly writable");
+                    AssertHostFolderSd((stream.Length % 512) == 0, "virtual SD is not sector aligned");
+                    var boot = ReadHostFolderSector(stream, 0);
+                    AssertHostFolderSd(boot[510] == 0x55 && boot[511] == 0xAA,
+                        "FAT32 boot signature is missing");
+                    AssertHostFolderSd(ReadLe16(boot, 11) == 512,
+                        "FAT32 sector size is invalid");
+                    AssertHostFolderSd(Encoding.ASCII.GetString(boot, 82, 8) == "FAT32   ",
+                        "FAT32 type marker is missing");
+
+                    var rootEntries = ReadFatDirectory(stream, boot, 2);
+                    var rootFile = FindFatEntry(rootEntries, "test.trd");
+                    var gamesEntry = FindFatEntry(rootEntries, "Games");
+                    AssertHostFolderSd(rootFile != null, "root file is missing");
+                    AssertHostFolderSd(gamesEntry != null && gamesEntry.IsDirectory,
+                        "nested directory is missing");
+                    AssertHostFolderSd(BytesEqual(
+                        ReadFatFile(stream, boot, rootFile), rootPayload),
+                        "root file data differs");
+
+                    var nestedEntries = ReadFatDirectory(stream, boot, gamesEntry.Cluster);
+                    var nestedFile = FindFatEntry(
+                        nestedEntries,
+                        "Very Long Spectrum Collection Name.tzx");
+                    AssertHostFolderSd(nestedFile != null,
+                        "long filename entry is missing");
+                    AssertHostFolderSd(BytesEqual(
+                        ReadFatFile(stream, boot, nestedFile), nestedPayload),
+                        "long filename file data differs");
+                }
+                Console.WriteLine("Host Folder SD FAT32: PASS");
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, true);
+            }
+        }
+
+        private static byte[] ReadHostFolderSector(Stream stream, long sector)
+        {
+            var data = new byte[512];
+            stream.Position = sector * 512;
+            var offset = 0;
+            while (offset < data.Length)
+            {
+                var read = stream.Read(data, offset, data.Length - offset);
+                if (read == 0)
+                    throw new EndOfStreamException();
+                offset += read;
+            }
+            return data;
+        }
+
+        private static System.Collections.Generic.List<FatTestEntry> ReadFatDirectory(
+            Stream stream,
+            byte[] boot,
+            uint startCluster)
+        {
+            var sectorsPerCluster = boot[13];
+            var reserved = ReadLe16(boot, 14);
+            var fatCount = boot[16];
+            var sectorsPerFat = ReadLe32(boot, 36);
+            var dataStart = reserved + (long)fatCount * sectorsPerFat;
+            var result = new System.Collections.Generic.List<FatTestEntry>();
+            var lfnParts = new System.Collections.Generic.Dictionary<int, string>();
+            var cluster = startCluster;
+            while (cluster >= 2 && cluster < 0x0FFFFFF8)
+            {
+                for (var sectorIndex = 0; sectorIndex < sectorsPerCluster; sectorIndex++)
+                {
+                    var sector = ReadHostFolderSector(
+                        stream,
+                        dataStart + (cluster - 2) * sectorsPerCluster + sectorIndex);
+                    for (var offset = 0; offset < sector.Length; offset += 32)
+                    {
+                        if (sector[offset] == 0)
+                            return result;
+                        if (sector[offset] == 0xE5)
+                            continue;
+                        if (sector[offset + 11] == 0x0F)
+                        {
+                            var order = sector[offset] & 0x1F;
+                            lfnParts[order] = ReadLfnPart(sector, offset);
+                            continue;
+                        }
+                        var entry = new FatTestEntry();
+                        entry.IsDirectory = (sector[offset + 11] & 0x10) != 0;
+                        entry.Cluster = ((uint)ReadLe16(sector, offset + 20) << 16) |
+                            ReadLe16(sector, offset + 26);
+                        entry.Length = ReadLe32(sector, offset + 28);
+                        if (lfnParts.Count > 0)
+                        {
+                            var name = new StringBuilder();
+                            for (var part = 1; lfnParts.ContainsKey(part); part++)
+                                name.Append(lfnParts[part]);
+                            entry.Name = name.ToString();
+                            lfnParts.Clear();
+                        }
+                        else
+                        {
+                            var stem = Encoding.ASCII.GetString(sector, offset, 8).TrimEnd();
+                            var extension = Encoding.ASCII.GetString(sector, offset + 8, 3).TrimEnd();
+                            entry.Name = extension.Length == 0 ? stem : stem + "." + extension;
+                        }
+                        if (entry.Name != "." && entry.Name != "..")
+                            result.Add(entry);
+                    }
+                }
+                var fatOffset = cluster * 4;
+                var fatSector = reserved + fatOffset / 512;
+                var fatData = ReadHostFolderSector(stream, fatSector);
+                cluster = ReadLe32(fatData, (int)(fatOffset % 512)) & 0x0FFFFFFF;
+            }
+            return result;
+        }
+
+        private static byte[] ReadFatFile(Stream stream, byte[] boot, FatTestEntry entry)
+        {
+            var sectorsPerCluster = boot[13];
+            var reserved = ReadLe16(boot, 14);
+            var dataStart = reserved + (long)boot[16] * ReadLe32(boot, 36);
+            var result = new byte[entry.Length];
+            var completed = 0;
+            var cluster = entry.Cluster;
+            while (completed < result.Length && cluster >= 2 && cluster < 0x0FFFFFF8)
+            {
+                for (var sectorIndex = 0;
+                    sectorIndex < sectorsPerCluster && completed < result.Length;
+                    sectorIndex++)
+                {
+                    var sector = ReadHostFolderSector(
+                        stream,
+                        dataStart + (cluster - 2) * sectorsPerCluster + sectorIndex);
+                    var take = Math.Min(512, result.Length - completed);
+                    Buffer.BlockCopy(sector, 0, result, completed, take);
+                    completed += take;
+                }
+                var fatOffset = cluster * 4;
+                var fatData = ReadHostFolderSector(stream, reserved + fatOffset / 512);
+                cluster = ReadLe32(fatData, (int)(fatOffset % 512)) & 0x0FFFFFFF;
+            }
+            return result;
+        }
+
+        private static string ReadLfnPart(byte[] data, int offset)
+        {
+            var result = new StringBuilder();
+            var positions = new[] { 1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30 };
+            foreach (var position in positions)
+            {
+                var value = ReadLe16(data, offset + position);
+                if (value == 0 || value == 0xFFFF)
+                    break;
+                result.Append((char)value);
+            }
+            return result.ToString();
+        }
+
+        private static FatTestEntry FindFatEntry(
+            System.Collections.Generic.IEnumerable<FatTestEntry> entries,
+            string name)
+        {
+            foreach (var entry in entries)
+            {
+                if (string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase))
+                    return entry;
+            }
+            return null;
+        }
+
+        private static ushort ReadLe16(byte[] data, int offset)
+        {
+            return (ushort)(data[offset] | (data[offset + 1] << 8));
+        }
+
+        private static uint ReadLe32(byte[] data, int offset)
+        {
+            return (uint)(data[offset] |
+                (data[offset + 1] << 8) |
+                (data[offset + 2] << 16) |
+                (data[offset + 3] << 24));
+        }
+
+        private static bool BytesEqual(byte[] left, byte[] right)
+        {
+            if (left.Length != right.Length)
+                return false;
+            for (var index = 0; index < left.Length; index++)
+            {
+                if (left[index] != right[index])
+                    return false;
+            }
+            return true;
+        }
+
+        private static void AssertHostFolderSd(bool condition, string message)
+        {
+            if (!condition)
+                throw new InvalidOperationException("Host Folder SD test failed: " + message);
+        }
+
+        private sealed class FatTestEntry
+        {
+            public string Name;
+            public bool IsDirectory;
+            public uint Cluster;
+            public uint Length;
         }
 
 		private static Stream GetTestStream(string testName)

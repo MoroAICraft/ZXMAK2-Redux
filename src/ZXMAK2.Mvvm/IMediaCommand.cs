@@ -22,6 +22,8 @@ namespace ZXMAK2.Mvvm
     public enum MediaCommandAction
     {
         Load,
+        MountFolder,
+        Refresh,
         Eject,
     }
 }

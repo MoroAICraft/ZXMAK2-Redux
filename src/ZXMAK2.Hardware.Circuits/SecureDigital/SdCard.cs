@@ -42,6 +42,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private Stream fstream;
         private string mountedFileName;
+        private bool writeAccepted;
 
         #endregion Fields
 
@@ -57,6 +58,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         public string MountedFileName
         {
             get { return mountedFileName; }
+        }
+
+        public bool IsReadOnly
+        {
+            get { return fstream != null && !fstream.CanWrite; }
         }
 
         public void Open(string fname)
@@ -81,22 +87,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             try
             {
                 newStream = OpenImageStream(fullName);
-                ValidateImage(newStream);
-
-                // Keep the currently mounted image intact until the replacement
-                // has been opened and validated successfully.
-                var oldStream = fstream;
-
-                fstream = newStream;
-                mountedFileName = fullName;
+                ReplaceStream(newStream, fullName);
                 newStream = null;
-                UpdateCardCapacity(fstream.Length);
-                Reset();
-
-                if (oldStream != null)
-                {
-                    oldStream.Dispose();
-                }
             }
             finally
             {
@@ -105,6 +97,39 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     newStream.Dispose();
                 }
             }
+        }
+
+        public HostFolderFat32Stream OpenHostFolder(string folderPath)
+        {
+            var newStream = new HostFolderFat32Stream(folderPath);
+            try
+            {
+                ReplaceStream(newStream, newStream.SourceFolder);
+                var result = newStream;
+                newStream = null;
+                return result;
+            }
+            finally
+            {
+                if (newStream != null)
+                    newStream.Dispose();
+            }
+        }
+
+        private void ReplaceStream(Stream newStream, string sourceName)
+        {
+            ValidateImage(newStream);
+
+            // Keep the currently mounted source intact until its replacement
+            // has been built and validated successfully.
+            var oldStream = fstream;
+            fstream = newStream;
+            mountedFileName = sourceName;
+            UpdateCardCapacity(fstream.Length);
+            Reset();
+
+            if (oldStream != null)
+                oldStream.Dispose();
         }
 
         private static Stream OpenImageStream(string fileName)
@@ -347,6 +372,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
             appCmd = false;
             wrPos = -1;
+            writeAccepted = false;
         }
 
         public void Wr(byte val)
@@ -477,7 +503,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         if (dataCnt == dataBlockLen) // Запись данных в SD карту
                         {
                             dataCnt = 0;
-                            WriteDataBlock(wrPos);
+                            writeAccepted = WriteDataBlock(wrPos);
 
 
                             NextState = SdState.WR_DATA_RESP;
@@ -494,7 +520,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         {
                             dataCnt = 0;
 
-                            WriteDataBlock(wrPos);
+                            writeAccepted = WriteDataBlock(wrPos);
                             wrPos += dataBlockLen;
                             NextState = SdState.RD_DATA_SIG_MUL;
                         }
@@ -598,14 +624,16 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             ReadDataBlock(position);
         }
 
-        private void WriteDataBlock(long position)
+        private bool WriteDataBlock(long position)
         {
-            if (position < 0 || position > fstream.Length - dataBlockLen)
+            if (fstream == null || !fstream.CanWrite ||
+                position < 0 || position > fstream.Length - dataBlockLen)
             {
-                return;
+                return false;
             }
             fstream.Position = position;
             fstream.Write(buff, 0, dataBlockLen);
+            return true;
         }
 
         public byte Rd()
@@ -846,7 +874,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         case SdState.WR_DATA_RESP:
                             {
                                 currState = SdState.IDLE;
-                                byte Resp = (((byte)SdStatus.DATA_ACCEPTED) << 1) | 1;
+                                var status = writeAccepted ?
+                                    SdStatus.DATA_ACCEPTED : SdStatus.DATA_WR_ERR;
+                                byte Resp = (byte)((((byte)status) << 1) | 1);
                                 return Resp;
                             }
                     }
@@ -861,7 +891,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         case SdState.WR_DATA_RESP:
                             {
                                 currState = SdState.RD_DATA_SIG_MUL;
-                                byte Resp = (((byte)SdStatus.DATA_ACCEPTED) << 1) | 1;
+                                var status = writeAccepted ?
+                                    SdStatus.DATA_ACCEPTED : SdStatus.DATA_WR_ERR;
+                                byte Resp = (byte)((((byte)status) << 1) | 1);
                                 return Resp;
                             }
                     }

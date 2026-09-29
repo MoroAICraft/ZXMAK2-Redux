@@ -73,6 +73,7 @@
     <Compile Include="Interfaces\IMediaRecorder.cs" />
     <Compile Include="Interfaces\IMouseState.cs" />
     <Compile Include="Interfaces\IOpenFileDialog.cs" />
+    <Compile Include="Interfaces\IFolderBrowserDialog.cs" />
     <Compile Include="Interfaces\ISaveFileDialog.cs" />
     <Compile Include="Interfaces\ISecureDigitalMediaStatus.cs" />
     <Compile Include="Interfaces\IOpticalMediaStatus.cs" />
