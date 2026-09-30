@@ -2593,6 +2593,7 @@ namespace Test
                 var rootPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-ROOT");
                 var nestedPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-LONG-NAME");
                 File.WriteAllBytes(Path.Combine(root, "test.trd"), rootPayload);
+                File.WriteAllText(Path.Combine(root, "SHOCK.SCL"), "DELETE");
                 var bin = Directory.CreateDirectory(Path.Combine(root, "bin"));
                 var autoexecPayload = Encoding.ASCII.GetBytes(
                     "wizcfg.com -S\r\nnv.com\r\n");
@@ -2835,6 +2836,28 @@ namespace Test
                 }
                 AssertHostFolderSd(!File.Exists(Path.Combine(root, "RENAMED.TXT")),
                     "guest deletion was not saved to the folder");
+
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var rootSector = ReadLe16(boot, 14) +
+                        (long)boot[16] * ReadLe32(boot, 36);
+                    var directory = ReadHostFolderSector(writable, rootSector);
+                    var offset = 0;
+                    while (offset < directory.Length &&
+                        Encoding.ASCII.GetString(directory, offset, 11) !=
+                            "SHOCK   SCL")
+                        offset += 32;
+                    AssertHostFolderSd(offset < directory.Length &&
+                        directory[offset + 11] == 0x20,
+                        "pre-existing host file should be writable on FAT");
+                    directory[offset] = 0xE5;
+                    writable.Position = rootSector * 512;
+                    writable.Write(directory, 0, directory.Length);
+                    writable.CommitChanges();
+                }
+                AssertHostFolderSd(!File.Exists(Path.Combine(root, "SHOCK.SCL")),
+                    "guest deletion of an existing host file was not saved");
 
                 using (var writable = new HostFolderFat32Stream(root))
                 {
