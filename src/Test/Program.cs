@@ -2618,6 +2618,8 @@ namespace Test
                     AssertHostFolderSd(stream.CanRead, "virtual SD is not readable");
                     AssertHostFolderSd(stream.CanWrite, "virtual SD is not writable");
                     AssertHostFolderSd((stream.Length % 512) == 0, "virtual SD is not sector aligned");
+                    AssertHostFolderSd(stream.Length == 512L * 1024L * 1024L,
+                        "small host folders should use a standard 512 MiB card");
                     var boot = ReadHostFolderSector(stream, 0);
                     AssertHostFolderSd(boot[510] == 0x55 && boot[511] == 0xAA,
                         "FAT32 boot signature is missing");
@@ -2969,6 +2971,8 @@ namespace Test
             {
                 AssertHostFolderSd(!stream.HasChanges,
                     "NedoOS audit requires a clean virtual SD session");
+                AssertHostFolderSd(stream.Length == 4L * 1024L * 1024L * 1024L,
+                    "the current NedoOS collection should use a standard 4 GiB card");
                 var boot = ReadHostFolderSector(stream, 0);
                 var root = ReadFatDirectory(stream, boot, 2);
                 var bin = FindFatEntry(root, "bin");

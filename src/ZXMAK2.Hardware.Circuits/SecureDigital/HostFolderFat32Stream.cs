@@ -69,18 +69,23 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             var usedClusters = nextCluster - 2;
             var reserveClusters = Math.Max(128U, usedClusters / 100U);
             var minimumFat32Clusters = 65525U;
-            m_clusterCount = Math.Max(minimumFat32Clusters, usedClusters + reserveClusters);
-            m_sectorsPerFat = (uint)(((ulong)(m_clusterCount + 2) * 4 +
-                SectorSize - 1) / SectorSize);
-            m_dataStartSector = ReservedSectors + (long)FatCount * m_sectorsPerFat;
-            var totalSectors = m_dataStartSector +
-                (long)m_clusterCount * m_sectorsPerCluster;
-            m_length = totalSectors * SectorSize;
-            if (m_length > MaximumImageLength)
+            var minimumClusterCount = Math.Max(
+                minimumFat32Clusters, usedClusters + reserveClusters);
+            var minimumFatSectors = GetFatSectors(minimumClusterCount);
+            var minimumSectors = ReservedSectors +
+                (long)FatCount * minimumFatSectors +
+                (long)minimumClusterCount * m_sectorsPerCluster;
+            var cardSectors = SelectStandardCardSectors(minimumSectors);
+            m_clusterCount = GetClusterCountForCard(
+                cardSectors, m_sectorsPerCluster);
+            if (m_clusterCount < minimumClusterCount)
             {
                 throw new NotSupportedException(
                     "The selected folder does not fit in the maximum 16 GiB virtual SD card.");
             }
+            m_sectorsPerFat = GetFatSectors(m_clusterCount);
+            m_dataStartSector = ReservedSectors + (long)FatCount * m_sectorsPerFat;
+            m_length = cardSectors * SectorSize;
 
             BuildDirectoryData(m_root);
             InitializeJournal();
@@ -335,6 +340,47 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
             throw new NotSupportedException(
                 "The selected folder does not fit in the maximum 16 GiB virtual SD card.");
+        }
+
+        private static uint GetFatSectors(uint clusterCount)
+        {
+            return (uint)(((ulong)(clusterCount + 2) * 4 +
+                SectorSize - 1) / SectorSize);
+        }
+
+        private static long SelectStandardCardSectors(long minimumSectors)
+        {
+            var capacities = new[] {
+                512L * 1024L * 1024L,
+                1L * 1024L * 1024L * 1024L,
+                2L * 1024L * 1024L * 1024L,
+                4L * 1024L * 1024L * 1024L,
+                8L * 1024L * 1024L * 1024L,
+                MaximumImageLength,
+            };
+            foreach (var capacity in capacities)
+            {
+                if (capacity / SectorSize >= minimumSectors)
+                    return capacity / SectorSize;
+            }
+            throw new NotSupportedException(
+                "The selected folder does not fit in the maximum 16 GiB virtual SD card.");
+        }
+
+        private static uint GetClusterCountForCard(
+            long cardSectors, int sectorsPerCluster)
+        {
+            var clusterCount = (cardSectors - ReservedSectors) /
+                sectorsPerCluster;
+            while (true)
+            {
+                var next = (cardSectors - ReservedSectors -
+                    (long)FatCount * GetFatSectors((uint)clusterCount)) /
+                    sectorsPerCluster;
+                if (next == clusterCount)
+                    return (uint)clusterCount;
+                clusterCount = next;
+            }
         }
 
         private static DateTime GetLastWriteTime(FileSystemInfo item)
