@@ -44,7 +44,7 @@ namespace ZXMAK2.Hardware.General
             m_bitEar = 4;
             //OnProcessConfigChange();
 
-            Volume = 40;    // default 100% is too loud and jamming AY
+            Volume = 50;    // start with the volume slider exactly at its midpoint
         }
 
         #region Properties

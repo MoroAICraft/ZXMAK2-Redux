@@ -391,7 +391,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             foreach (var child in directory.Children)
             {
                 child.ShortName = CreateShortName(child.Name, used);
-                child.NeedsLongName = NeedsLongName(child.Name, child.ShortName);
+                byte caseFlags;
+                child.NeedsLongName = !TryGetShortNameCaseFlags(
+                    child.Name, child.ShortName, out caseFlags);
+                child.ShortNameCaseFlags = caseFlags;
             }
             foreach (var child in directory.Children)
             {
@@ -480,12 +483,45 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             return result;
         }
 
-        private static bool NeedsLongName(string original, byte[] shortName)
+        private static bool TryGetShortNameCaseFlags(
+            string original, byte[] shortName, out byte caseFlags)
         {
+            caseFlags = 0;
             var stem = Encoding.ASCII.GetString(shortName, 0, 8).TrimEnd();
             var extension = Encoding.ASCII.GetString(shortName, 8, 3).TrimEnd();
             var display = extension.Length == 0 ? stem : stem + "." + extension;
-            return !string.Equals(original, display, StringComparison.Ordinal);
+            if (!string.Equals(original, display, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var dot = original.LastIndexOf('.');
+            var originalStem = dot < 0 ? original : original.Substring(0, dot);
+            var originalExtension = dot < 0 ? string.Empty : original.Substring(dot + 1);
+            if (!TryGetPartCaseFlag(originalStem, 0x08, ref caseFlags) ||
+                !TryGetPartCaseFlag(originalExtension, 0x10, ref caseFlags))
+            {
+                caseFlags = 0;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryGetPartCaseFlag(
+            string part, byte lowerCaseFlag, ref byte caseFlags)
+        {
+            var hasLower = false;
+            var hasUpper = false;
+            foreach (var character in part)
+            {
+                if (character >= 'a' && character <= 'z')
+                    hasLower = true;
+                else if (character >= 'A' && character <= 'Z')
+                    hasUpper = true;
+            }
+            if (hasLower && hasUpper)
+                return false;
+            if (hasLower)
+                caseFlags |= lowerCaseFlag;
+            return true;
         }
 
         private void CalculateClusterRequirements(Node node)
@@ -568,7 +604,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private static void WriteShortEntry(byte[] data, ref int offset, Node node)
         {
             Buffer.BlockCopy(node.ShortName, 0, data, offset, 11);
-            data[offset + 11] = node.IsDirectory ? (byte)0x10 : (byte)0x21;
+            data[offset + 11] = node.IsDirectory ? (byte)0x10 : (byte)0x20;
+            data[offset + 12] = node.ShortNameCaseFlags;
             WriteFatDateTime(data, offset, node.CreationTime, 14, 16);
             WriteFatDateTime(data, offset, node.LastWriteTime, 22, 24);
             WriteUInt16(data, offset + 20, (ushort)(node.StartCluster >> 16));
@@ -904,6 +941,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             public DateTime CreationTime;
             public DateTime LastWriteTime;
             public byte[] ShortName;
+            public byte ShortNameCaseFlags;
             public bool NeedsLongName;
             public uint StartCluster;
             public uint ClusterCount;

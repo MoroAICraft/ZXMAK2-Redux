@@ -2632,14 +2632,28 @@ namespace Test
                         "nested directory is missing");
                     AssertHostFolderSd(binEntry != null &&
                         binEntry.ShortName == "BIN", "NedoOS BIN has an invalid 8.3 name");
+                    AssertHostFolderSd(!binEntry.HasLongName &&
+                        binEntry.CaseFlags == 0x08,
+                        "lowercase BIN should use the FAT short-name case flag");
                     var binEntries = ReadFatDirectory(stream, boot, binEntry.Cluster);
-                    AssertHostFolderSd(
-                        FindFatEntry(binEntries, "autoexec.bat").ShortName == "AUTOEXEC.BAT" &&
-                        FindFatEntry(binEntries, "wizcfg.com").ShortName == "WIZCFG.COM" &&
-                        FindFatEntry(binEntries, "nv.com").ShortName == "NV.COM",
+                    var autoexec = FindFatEntry(binEntries, "autoexec.bat");
+                    var wizcfg = FindFatEntry(binEntries, "wizcfg.com");
+                    var nv = FindFatEntry(binEntries, "nv.com");
+                    AssertHostFolderSd(autoexec.ShortName == "AUTOEXEC.BAT" &&
+                        wizcfg.ShortName == "WIZCFG.COM" &&
+                        nv.ShortName == "NV.COM",
                         "NedoOS startup commands have invalid 8.3 names");
+                    AssertHostFolderSd(!autoexec.HasLongName && !wizcfg.HasLongName &&
+                        !nv.HasLongName && autoexec.CaseFlags == 0x18 &&
+                        wizcfg.CaseFlags == 0x18 && nv.CaseFlags == 0x18,
+                        "NedoOS startup commands should be plain 8.3 entries");
+                    AssertHostFolderSd((autoexec.Attributes & 0x01) == 0 &&
+                        (wizcfg.Attributes & 0x01) == 0 &&
+                        (nv.Attributes & 0x01) == 0 &&
+                        (rootFile.Attributes & 0x01) == 0,
+                        "folder files must not have FAT read-only attributes");
                     AssertHostFolderSd(BytesEqual(ReadFatFile(stream, boot,
-                        FindFatEntry(binEntries, "autoexec.bat")), autoexecPayload),
+                        autoexec), autoexecPayload),
                         "NedoOS startup batch content differs");
                     AssertHostFolderSd(BytesEqual(
                         ReadFatFile(stream, boot, rootFile), rootPayload),
@@ -2957,6 +2971,8 @@ namespace Test
                             continue;
                         }
                         var entry = new FatTestEntry();
+                        entry.Attributes = sector[offset + 11];
+                        entry.CaseFlags = sector[offset + 12];
                         entry.IsDirectory = (sector[offset + 11] & 0x10) != 0;
                         entry.Cluster = ((uint)ReadLe16(sector, offset + 20) << 16) |
                             ReadLe16(sector, offset + 26);
@@ -2968,6 +2984,7 @@ namespace Test
                             : stem + "." + extension;
                         if (lfnParts.Count > 0)
                         {
+                            entry.HasLongName = true;
                             var name = new StringBuilder();
                             for (var part = 1; lfnParts.ContainsKey(part); part++)
                                 name.Append(lfnParts[part]);
@@ -3080,6 +3097,9 @@ namespace Test
             public string Name;
             public string ShortName;
             public bool IsDirectory;
+            public bool HasLongName;
+            public byte Attributes;
+            public byte CaseFlags;
             public uint Cluster;
             public uint Length;
         }
