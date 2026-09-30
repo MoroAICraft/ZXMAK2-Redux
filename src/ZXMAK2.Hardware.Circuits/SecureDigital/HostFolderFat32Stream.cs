@@ -7,11 +7,11 @@ using System.Text;
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
 {
     /// <summary>
-    /// Read-only, sector-addressable FAT32 snapshot backed by a host folder.
+    /// Sector-addressable FAT32 snapshot backed by a host folder.
     /// Directory metadata is captured at mount time; file bytes are read from
     /// the original files only when their virtual sectors are requested.
     /// </summary>
-    public sealed class HostFolderFat32Stream : Stream
+    public sealed partial class HostFolderFat32Stream : Stream
     {
         private const int SectorSize = 512;
         private const int ReservedSectors = 32;
@@ -83,6 +83,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
 
             BuildDirectoryData(m_root);
+            InitializeJournal();
         }
 
         public string SourceFolder
@@ -97,7 +98,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public override bool CanRead { get { return true; } }
         public override bool CanSeek { get { return true; } }
-        public override bool CanWrite { get { return false; } }
+        public override bool CanWrite { get { return true; } }
         public override long Length { get { return m_length; } }
 
         public override long Position
@@ -113,12 +114,17 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public override void Flush()
         {
+            if (m_journal != null)
+                m_journal.Flush();
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
+                CloseJournal();
                 CloseCachedFile();
+            }
             base.Dispose(disposing);
         }
 
@@ -138,7 +144,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 var sectorIndex = m_position / SectorSize;
                 var withinSector = (int)(m_position % SectorSize);
-                FillSector(sectorIndex, sector);
+                ReadSector(sectorIndex, sector);
                 var take = Math.Min(
                     remaining - completed,
                     SectorSize - withinSector);
@@ -172,12 +178,43 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public override void SetLength(long value)
         {
-            throw new NotSupportedException("A mounted host folder is read-only.");
+            throw new NotSupportedException("The virtual SD card has a fixed capacity.");
         }
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            throw new NotSupportedException("A mounted host folder is read-only.");
+            if (buffer == null)
+                throw new ArgumentNullException("buffer");
+            if (offset < 0 || count < 0 || offset > buffer.Length - count)
+                throw new ArgumentOutOfRangeException();
+            if (m_position > m_length - count)
+                throw new IOException("Write past the end of the virtual SD card.");
+            var sector = new byte[SectorSize];
+            while (count > 0)
+            {
+                var index = m_position / SectorSize;
+                var within = (int)(m_position % SectorSize);
+                var take = Math.Min(count, SectorSize - within);
+                ReadSector(index, sector);
+                var changed = false;
+                for (var byteIndex = 0; byteIndex < take; byteIndex++)
+                {
+                    if (sector[within + byteIndex] != buffer[offset + byteIndex])
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+                if (changed)
+                {
+                    Buffer.BlockCopy(buffer, offset, sector, within, take);
+                    AppendJournalSector(index, sector);
+                    m_changedSectors[index] = (byte[])sector.Clone();
+                }
+                m_position += take;
+                offset += take;
+                count -= take;
+            }
         }
 
         private Node ScanDirectory(

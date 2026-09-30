@@ -243,6 +243,8 @@ namespace ZXMAK2.Host.Presentation
             {
                 return false;
             }
+            if (!PrepareClose())
+                return false;
             var appFolder = Utils.GetAppDataFolder();
             m_vm.Dispose();
             m_vm = null;
@@ -251,6 +253,43 @@ namespace ZXMAK2.Host.Presentation
             DeleteStateFile(Path.Combine(appFolder, "ZXMAK2.cmos"));
             DeleteStateFile(Path.Combine(appFolder, "ZXMAK2.nvram"));
             return true;
+        }
+
+        public bool PrepareClose()
+        {
+            if (m_vm == null)
+                return true;
+            var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
+            if (sd == null || !sd.HasPendingChanges)
+                return true;
+            var running = m_vm.IsRunning;
+            if (running)
+                m_vm.DoStop();
+            try
+            {
+                return sd.PrepareForMediaChange();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                m_userMessage.Error("Cannot save SD changes!\n\n{0}", ex.Message);
+                return false;
+            }
+            finally
+            {
+                if (running && m_vm != null && !m_vm.IsRunning)
+                    m_vm.DoRun();
+            }
+        }
+
+        public bool HasPendingSdChanges
+        {
+            get
+            {
+                var sd = m_vm == null ? null :
+                    m_vm.Bus.FindDevice<IWritableSdSession>();
+                return sd != null && sd.HasPendingChanges;
+            }
         }
 
         private void ExecuteMediaChange(
@@ -580,6 +619,13 @@ namespace ZXMAK2.Host.Presentation
             else
             {
                 m_vm.SaveConfigAs(fileName);
+            }
+            var sdSession = m_vm.Bus.FindDevice<IWritableSdSession>();
+            if (sdSession != null)
+            {
+                if (!string.IsNullOrEmpty(sdSession.RestoreWarning))
+                    m_userMessage.Warning(sdSession.RestoreWarning);
+                sdSession.PromptForRecoveredSession();
             }
             if (m_startupImage != null)
             {
@@ -1143,6 +1189,9 @@ namespace ZXMAK2.Host.Presentation
             m_vm.DoStop();
             try
             {
+                var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
+                if (sd != null && !sd.PrepareForMediaChange())
+                    return;
                 m_vm.Bus.LoadConfigXml(busNode);
                 m_vm.DoReset();
                 m_vm.SaveConfig();

@@ -59,6 +59,9 @@
     <Compile Include="RtcChip.cs" />
     <Compile Include="SecureDigital\SdCard.cs" />
     <Compile Include="SecureDigital\HostFolderFat32Stream.cs" />
+    <Compile Include="SecureDigital\HostFolderFat32Stream.Journal.cs" />
+    <Compile Include="SecureDigital\HostFolderFat32Stream.Commit.cs" />
+    <Compile Include="SecureDigital\SdImageSessionStream.cs" />
     <Compile Include="SecureDigital\SdCommand.cs" />
     <Compile Include="SecureDigital\SdState.cs" />
     <Compile Include="SecureDigital\SdStatus.cs" />

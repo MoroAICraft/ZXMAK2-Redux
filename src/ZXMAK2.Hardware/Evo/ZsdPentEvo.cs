@@ -21,7 +21,7 @@ namespace ZXMAK2.Hardware.Evo
     }
 
     public class ZsdPentEvo : BusDeviceBase, IMediaStatusDevice,
-        ISecureDigitalMediaStatus
+        ISecureDigitalMediaStatus, IWritableSdSession
     {
         #region Fields
 
@@ -34,9 +34,102 @@ namespace ZXMAK2.Hardware.Evo
         private SdMediaCommand openImageCommand;
         private SdMediaCommand mountFolderCommand;
         private SdMediaCommand refreshFolderCommand;
+        private SdMediaCommand exportFolderCommand;
         private SdMediaCommand ejectImageCommand;
         private SdSourceType configuredSourceType = SdSourceType.Image;
         private string configuredSourcePath = string.Empty;
+        private string m_restoreWarning;
+
+        public string RestoreWarning { get { return m_restoreWarning; } }
+
+        public void PromptForRecoveredSession()
+        {
+            lock (cardSync)
+            {
+                var folder = card == null ? null : card.HostFolderStream;
+                var image = card == null ? null : card.ImageSessionStream;
+                if ((folder == null || !folder.WasRecovered) &&
+                    (image == null || !image.WasRecovered))
+                    return;
+                var result = Locator.Resolve<IUserQuery>().Show(
+                    "An unfinished SD session was found after the previous run.\n\n" +
+                    "Restore its changes?\n\n" +
+                    "Yes: keep the changes for this session.\n" +
+                    "No: discard them; the source remains unchanged.",
+                    "Recover SD changes?",
+                    DlgButtonSet.YesNo,
+                    DlgIcon.Question);
+                // Closing the prompt is treated as keeping the data.
+                if (result == DlgResult.No)
+                {
+                    if (folder != null)
+                        folder.DiscardChanges();
+                    else
+                        image.DiscardChanges();
+                    card.Reset();
+                }
+                if (folder != null)
+                    folder.WasRecovered = false;
+                if (image != null)
+                    image.WasRecovered = false;
+            }
+        }
+
+        public bool HasPendingChanges
+        {
+            get
+            {
+                lock (cardSync)
+                {
+                    var folder = card == null ? null : card.HostFolderStream;
+                    var image = card == null ? null : card.ImageSessionStream;
+                    return folder != null && folder.HasChanges ||
+                        image != null && image.HasChanges;
+                }
+            }
+        }
+
+        public bool PrepareForMediaChange()
+        {
+            lock (cardSync)
+            {
+                var folder = card == null ? null : card.HostFolderStream;
+                var image = card == null ? null : card.ImageSessionStream;
+                if ((folder == null || !folder.HasChanges) &&
+                    (image == null || !image.HasChanges))
+                    return true;
+
+                var query = Locator.Resolve<IUserQuery>();
+                var choice = query.Show(
+                    "The mounted SD card has unsaved changes.\n\n" +
+                    "Yes: save them to the original " +
+                        (folder != null ? "Windows folder" : "SD image") + ".\n" +
+                    "No: discard them.\n" +
+                    "Cancel: keep the SD card mounted.",
+                    "Save SD changes?",
+                    DlgButtonSet.YesNoCancel,
+                    DlgIcon.Question);
+                if (choice == DlgResult.Cancel)
+                    return false;
+                if (choice == DlgResult.Yes)
+                {
+                    if (folder != null)
+                        folder.CommitChanges();
+                    else
+                        image.CommitChanges();
+                }
+                else if (choice == DlgResult.No)
+                {
+                    if (folder != null)
+                        folder.DiscardChanges();
+                    else
+                        image.DiscardChanges();
+                }
+                else
+                    return false;
+                return true;
+            }
+        }
 
         #endregion
 
@@ -76,6 +169,11 @@ namespace ZXMAK2.Hardware.Evo
                 RefreshFolderCommandUi_OnCanExecute,
                 "Refresh mounted folder",
                 MediaCommandAction.Refresh);
+            exportFolderCommand = new SdMediaCommand(
+                ExportFolderCommandUi_OnExecute,
+                ExportFolderCommandUi_OnCanExecute,
+                "Save SD session as image...",
+                MediaCommandAction.Export);
             ejectImageCommand = new SdMediaCommand(
                 EjectCommandUi_OnExecute,
                 CommandUi_OnCanExecute,
@@ -84,6 +182,7 @@ namespace ZXMAK2.Hardware.Evo
             bmgr.AddCommandUi(openImageCommand);
             bmgr.AddCommandUi(mountFolderCommand);
             bmgr.AddCommandUi(refreshFolderCommand);
+            bmgr.AddCommandUi(exportFolderCommand);
             bmgr.AddCommandUi(ejectImageCommand);
 
             bmgr.Events.SubscribeReset(Reset);
@@ -286,6 +385,50 @@ namespace ZXMAK2.Hardware.Evo
                 Directory.Exists(configuredSourcePath);
         }
 
+        private bool ExportFolderCommandUi_OnCanExecute(Object arg)
+        {
+            var viewResolver = Locator.Resolve<IResolver>("View");
+            return HasPendingChanges &&
+                configuredSourceType == SdSourceType.HostFolder &&
+                viewResolver.CheckAvailable<ISaveFileDialog>();
+        }
+
+        private void ExportFolderCommandUi_OnExecute(Object arg)
+        {
+            if (!ExportFolderCommandUi_OnCanExecute(arg))
+                return;
+            try
+            {
+                var viewResolver = Locator.Resolve<IResolver>("View");
+                using (var dialog = viewResolver.TryResolve<ISaveFileDialog>())
+                {
+                    if (dialog == null)
+                        return;
+                    dialog.Title = "Save virtual SD card as an image";
+                    dialog.Filter = "SD image (*.img)|*.img";
+                    dialog.DefaultExt = "img";
+                    dialog.OverwritePrompt = true;
+                    if (dialog.ShowDialog(arg) != DlgResult.OK)
+                        return;
+                    lock (cardSync)
+                    {
+                        var folder = card == null ? null : card.HostFolderStream;
+                        if (folder == null)
+                            return;
+                        folder.ExportImage(dialog.FileName);
+                    }
+                    Locator.Resolve<IUserMessage>().Info(
+                        "The SD session was saved as an image. The mounted folder remains unchanged.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                Locator.Resolve<IUserMessage>().Error(
+                    "Cannot save SD session as an image!\n\n{0}", ex.Message);
+            }
+        }
+
         private void CommandUi_OnExecute(Object arg)
         {
             if (!CommandUi_OnCanExecute(arg))
@@ -310,7 +453,8 @@ namespace ZXMAK2.Hardware.Evo
                     return;
                 }
 
-                MountCard(dlg.FileName);
+                if (!MountCard(dlg.FileName))
+                    return;
                 openImageCommand.NotifyExecutedSuccessfully();
             }
             catch (Exception ex)
@@ -325,7 +469,8 @@ namespace ZXMAK2.Hardware.Evo
         {
             try
             {
-                EjectCard();
+                if (!EjectCard())
+                    return;
                 ejectImageCommand.NotifyExecutedSuccessfully();
             }
             catch (Exception ex)
@@ -347,7 +492,7 @@ namespace ZXMAK2.Hardware.Evo
                 {
                     if (dialog == null)
                         return;
-                    dialog.Description = "Select a folder to mount as a read-only SD card";
+                    dialog.Description = "Select a folder to mount as an SD card";
                     if (configuredSourceType == SdSourceType.HostFolder &&
                         Directory.Exists(configuredSourcePath))
                     {
@@ -356,6 +501,8 @@ namespace ZXMAK2.Hardware.Evo
                     if (dialog.ShowDialog(arg) != DlgResult.OK)
                         return;
                     var warningCount = MountHostFolder(dialog.SelectedPath);
+                    if (warningCount < 0)
+                        return;
                     mountFolderCommand.NotifyExecutedSuccessfully();
                     ShowFolderWarnings(warningCount);
                 }
@@ -375,6 +522,8 @@ namespace ZXMAK2.Hardware.Evo
             try
             {
                 var warningCount = MountHostFolder(configuredSourcePath);
+                if (warningCount < 0)
+                    return;
                 refreshFolderCommand.NotifyExecutedSuccessfully();
                 ShowFolderWarnings(warningCount);
             }
@@ -459,13 +608,12 @@ namespace ZXMAK2.Hardware.Evo
                 NormalizeFolderPath(path) : NormalizeImageFileName(path);
         }
 
-        public void MountCard(string fileName)
+        public bool MountCard(string fileName)
         {
             var fullPath = NormalizeImageFileName(fileName);
             if (string.IsNullOrEmpty(fullPath))
             {
-                EjectCard();
-                return;
+                return EjectCard();
             }
 
             lock (cardSync)
@@ -476,9 +624,12 @@ namespace ZXMAK2.Hardware.Evo
                     card != null && !string.IsNullOrEmpty(card.MountedFileName))
                 {
                     card.Reset();
-                    return;
+                    return true;
                 }
             }
+
+            if (!PrepareForMediaChange())
+                return false;
 
             // Build and validate the replacement before swapping it in. A
             // failed open therefore leaves the current source operational.
@@ -502,6 +653,7 @@ namespace ZXMAK2.Hardware.Evo
                 if (previous != null)
                     previous.Close();
                 Logger.Info("SD hot swap completed: '{0}'", fullPath);
+                return true;
             }
             finally
             {
@@ -513,6 +665,8 @@ namespace ZXMAK2.Hardware.Evo
         public int MountHostFolder(string folderPath)
         {
             var fullPath = NormalizeFolderPath(folderPath);
+            if (!PrepareForMediaChange())
+                return -1;
             SdCard replacement = null;
             HostFolderFat32Stream folderStream = null;
             try
@@ -547,8 +701,10 @@ namespace ZXMAK2.Hardware.Evo
             }
         }
 
-        public void EjectCard()
+        public bool EjectCard()
         {
+            if (!PrepareForMediaChange())
+                return false;
             SdCard previous;
             lock (cardSync)
             {
@@ -564,6 +720,7 @@ namespace ZXMAK2.Hardware.Evo
                 previous.Close();
             }
             Logger.Info("SD card ejected");
+            return true;
         }
 
         private void RestoreConfiguredCard()
@@ -583,6 +740,8 @@ namespace ZXMAK2.Hardware.Evo
             catch (Exception ex)
             {
                 Logger.Error(ex, "Cannot restore configured SD source: {0}", configured);
+                m_restoreWarning = "The configured SD source could not be opened: " +
+                    ex.Message;
                 lock (cardSync)
                 {
                     if (card != null)

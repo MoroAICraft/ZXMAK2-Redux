@@ -93,7 +93,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             m_hint.Location = new Point(9, 157);
             m_hint.Size = new Size(282, 58);
             m_hint.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            m_hint.Text = "The selected SD source stays connected after restart until you replace or eject it. Host folders are always read-only.";
+            m_hint.Text = "The selected SD source stays connected after restart. Changes are saved when you confirm on eject, refresh, or exit.";
             m_group.Controls.Add(m_hint);
         }
 
@@ -137,7 +137,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             {
                 using (var dialog = new FolderBrowserDialog())
                 {
-                    dialog.Description = "Select a folder to mount as a read-only SD card";
+                    dialog.Description = "Select a folder to mount as an SD card";
                     if (Directory.Exists(m_path.Text))
                         dialog.SelectedPath = m_path.Text;
                     if (dialog.ShowDialog() != DialogResult.OK)

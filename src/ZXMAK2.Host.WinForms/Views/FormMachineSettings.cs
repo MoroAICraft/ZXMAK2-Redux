@@ -797,8 +797,17 @@ namespace ZXMAK2.Host.WinForms.Views
                 bool running = m_vm.IsRunning;
                 // Internal Apply calls during Add/rebuild only stage edits.
                 // Write the shared profile library at the user's final Apply.
-                foreach(var joystick in m_ctlList.OfType<CtlSettingsJoystick>()) joystick.CommitProfileLibrary();
                 m_vm.DoStop();
+
+                var liveSd = m_vm.Bus.FindDevice<ZsdPentEvo>();
+                if (sdMediaChanged && liveSd != null &&
+                    !liveSd.PrepareForMediaChange())
+                {
+                    if (running)
+                        m_vm.DoRun();
+                    return;
+                }
+                foreach(var joystick in m_ctlList.OfType<CtlSettingsJoystick>()) joystick.CommitProfileLibrary();
 
 
                 var bmgr = m_vm.Bus;

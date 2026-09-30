@@ -18,6 +18,8 @@ namespace ZXMAK2.Host.Presentation.Interfaces
         MediaState GetMediaState(MediaStatusKind mediaKind, int index);
         bool ResetCmosState();
         bool PrepareFactoryReset();
+        bool PrepareClose();
+        bool HasPendingSdChanges { get; }
         int GetEvoDisplayMode();
         void SetEvoDisplayMode(int mode);
     }

@@ -65,6 +65,16 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             get { return fstream != null && !fstream.CanWrite; }
         }
 
+        public HostFolderFat32Stream HostFolderStream
+        {
+            get { return fstream as HostFolderFat32Stream; }
+        }
+
+        public SdImageSessionStream ImageSessionStream
+        {
+            get { return fstream as SdImageSessionStream; }
+        }
+
         public void Open(string fname)
         {
             if (!File.Exists(fname))
@@ -86,7 +96,16 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             Stream newStream = null;
             try
             {
-                newStream = OpenImageStream(fullName);
+                var imageStream = OpenImageStream(fullName);
+                try
+                {
+                    newStream = new SdImageSessionStream(imageStream, fullName);
+                }
+                catch
+                {
+                    imageStream.Dispose();
+                    throw;
+                }
                 ReplaceStream(newStream, fullName);
                 newStream = null;
             }
@@ -636,9 +655,17 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 return false;
             }
-            fstream.Position = position;
-            fstream.Write(buff, 0, dataBlockLen);
-            return true;
+            try
+            {
+                fstream.Position = position;
+                fstream.Write(buff, 0, dataBlockLen);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "SD card write failed");
+                return false;
+            }
         }
 
         public byte Rd()

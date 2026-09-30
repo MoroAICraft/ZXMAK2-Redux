@@ -24,6 +24,7 @@ namespace ZXMAK2.Mvvm
         Load,
         MountFolder,
         Refresh,
+        Export,
         Eject,
     }
 }

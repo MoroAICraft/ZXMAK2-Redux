@@ -51,6 +51,8 @@ namespace ZXMAK2.Host.WinForms.Views
             new ISuccessCommand[2];
         private ISuccessCommand _mountFolderSdCommand;
         private ISuccessCommand _refreshFolderSdCommand;
+        private ISuccessCommand _exportFolderSdCommand;
+        private ToolStripMenuItem _exportSdMenuItem;
         private readonly ISuccessCommand[] _ejectSdCommands =
             new ISuccessCommand[2];
         private readonly ToolStripMenuItem[] _ejectSdMenuItems =
@@ -366,6 +368,8 @@ namespace ZXMAK2.Host.WinForms.Views
             Array.Clear(_openSdCommands, 0, _openSdCommands.Length);
             _mountFolderSdCommand = null;
             _refreshFolderSdCommand = null;
+            _exportFolderSdCommand = null;
+            _exportSdMenuItem = null;
             Array.Clear(_ejectSdCommands, 0, _ejectSdCommands.Length);
             _openHddCommand = null;
             _ejectHddCommand = null;
@@ -426,6 +430,11 @@ namespace ZXMAK2.Host.WinForms.Views
                         mediaCommand.DriveIndex == 0)
                     {
                         _refreshFolderSdCommand = mediaCommand;
+                    }
+                    else if (mediaCommand.MediaAction == MediaCommandAction.Export &&
+                        mediaCommand.DriveIndex == 0)
+                    {
+                        _exportFolderSdCommand = mediaCommand;
                     }
                     else if (mediaCommand.MediaAction == MediaCommandAction.Eject)
                     {
@@ -640,6 +649,11 @@ namespace ZXMAK2.Host.WinForms.Views
                 "Refresh mounted folder",
                 _refreshFolderSdCommand,
                 true);
+            _exportSdMenuItem = AddMediaMenuItem(
+                MediaStatusKind.SecureDigital,
+                "Save SD session as image...",
+                _exportFolderSdCommand,
+                false);
             _ejectSdMenuItems[0] = AddMediaMenuItem(
                 MediaStatusKind.SecureDigital,
                 "Eject SD",
@@ -838,8 +852,12 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override void OnClosing(CancelEventArgs e)
         {
+            var model = DataContext as IMainViewModel;
+            if (!e.Cancel && model != null && !model.PrepareClose())
+                e.Cancel = true;
             base.OnClosing(e);
-            _isFormShown = false;
+            if (!e.Cancel)
+                _isFormShown = false;
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -1590,6 +1608,19 @@ namespace ZXMAK2.Host.WinForms.Views
                     : viewModel.GetMediaState(
                         MediaStatusKind.SecureDigital,
                         index));
+            var dirty = viewModel != null &&
+                viewModel.HasPendingSdChanges;
+            if (_ejectSdMenuItems[0] != null)
+                _ejectSdMenuItems[0].Text = dirty ?
+                    "Eject SD (unsaved changes)" : "Eject SD";
+            if (_exportSdMenuItem != null)
+                _exportSdMenuItem.Enabled = dirty &&
+                    _exportFolderSdCommand != null;
+            ToolStripDropDownButton button;
+            if (_mediaButtons.TryGetValue(MediaStatusKind.SecureDigital,
+                    out button))
+                button.ToolTipText = dirty ?
+                    "SD card has unsaved changes" : "SD card";
         }
 
         private void UpdateFloppyMenuIndicators(IMainViewModel viewModel)

@@ -76,6 +76,7 @@
     <Compile Include="Interfaces\IFolderBrowserDialog.cs" />
     <Compile Include="Interfaces\ISaveFileDialog.cs" />
     <Compile Include="Interfaces\ISecureDigitalMediaStatus.cs" />
+    <Compile Include="Interfaces\IWritableSdSession.cs" />
     <Compile Include="Interfaces\IOpticalMediaStatus.cs" />
     <Compile Include="Interfaces\IFrameSound.cs" />
     <Compile Include="Interfaces\IUserHelp.cs" />

@@ -2613,7 +2613,7 @@ namespace Test
                 using (var stream = new HostFolderFat32Stream(root))
                 {
                     AssertHostFolderSd(stream.CanRead, "virtual SD is not readable");
-                    AssertHostFolderSd(!stream.CanWrite, "virtual SD is unexpectedly writable");
+                    AssertHostFolderSd(stream.CanWrite, "virtual SD is not writable");
                     AssertHostFolderSd((stream.Length % 512) == 0, "virtual SD is not sector aligned");
                     var boot = ReadHostFolderSector(stream, 0);
                     AssertHostFolderSd(boot[510] == 0x55 && boot[511] == 0xAA,
@@ -2692,6 +2692,198 @@ namespace Test
                         FindFatEntry(rootEntries, "added-after-mount.tap") != null,
                         "new host file did not appear after Refresh snapshot");
                 }
+
+                var originalHostData = File.ReadAllBytes(Path.Combine(root, "test.trd"));
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var file = FindFatEntry(ReadFatDirectory(writable, boot, 2), "test.trd");
+                    var dataStart = ReadLe16(boot, 14) +
+                        (long)boot[16] * ReadLe32(boot, 36);
+                    var fileSector = dataStart +
+                        (file.Cluster - 2) * boot[13];
+                    var sector = ReadHostFolderSector(writable, fileSector);
+                    sector[0] = (byte)'Q';
+                    writable.Position = fileSector * 512;
+                    writable.Write(sector, 0, sector.Length);
+                    AssertHostFolderSd(writable.HasChanges,
+                        "SD write did not mark the session changed");
+                    AssertHostFolderSd(BytesEqual(
+                        File.ReadAllBytes(Path.Combine(root, "test.trd")),
+                        originalHostData),
+                        "SD write touched the source folder before confirmation");
+                }
+                using (var recovered = new HostFolderFat32Stream(root))
+                {
+                    AssertHostFolderSd(recovered.HasChanges,
+                        "unsaved SD changes were not recovered");
+                    recovered.CommitChanges();
+                }
+                AssertHostFolderSd(File.ReadAllBytes(
+                    Path.Combine(root, "test.trd"))[0] == (byte)'Q',
+                    "confirmed SD write was not saved to the source folder");
+
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var reserved = ReadLe16(boot, 14);
+                    var fatSectors = ReadLe32(boot, 36);
+                    var dataStart = reserved + (long)boot[16] * fatSectors;
+                    uint freeCluster = 2;
+                    while (true)
+                    {
+                        var fat = ReadHostFolderSector(writable,
+                            reserved + freeCluster / 128);
+                        if (ReadLe32(fat, (int)(freeCluster % 128) * 4) == 0)
+                        {
+                            var position = (int)(freeCluster % 128) * 4;
+                            fat[position] = 0xFF;
+                            fat[position + 1] = 0xFF;
+                            fat[position + 2] = 0xFF;
+                            fat[position + 3] = 0x0F;
+                            writable.Position = (reserved + freeCluster / 128) * 512L;
+                            writable.Write(fat, 0, fat.Length);
+                            break;
+                        }
+                        freeCluster++;
+                    }
+                    var data = ReadHostFolderSector(writable,
+                        dataStart + (freeCluster - 2) * boot[13]);
+                    Encoding.ASCII.GetBytes("NEW!").CopyTo(data, 0);
+                    writable.Position =
+                        (dataStart + (freeCluster - 2) * boot[13]) * 512;
+                    writable.Write(data, 0, data.Length);
+
+                    var rootSector = ReadHostFolderSector(writable, dataStart);
+                    var entryOffset = 0;
+                    while (rootSector[entryOffset] != 0)
+                        entryOffset += 32;
+                    Encoding.ASCII.GetBytes("CREATED TXT")
+                        .CopyTo(rootSector, entryOffset);
+                    rootSector[entryOffset + 11] = 0x20;
+                    rootSector[entryOffset + 20] = (byte)(freeCluster >> 16);
+                    rootSector[entryOffset + 21] = (byte)(freeCluster >> 24);
+                    rootSector[entryOffset + 26] = (byte)freeCluster;
+                    rootSector[entryOffset + 27] = (byte)(freeCluster >> 8);
+                    rootSector[entryOffset + 28] = 4;
+                    writable.Position = dataStart * 512;
+                    writable.Write(rootSector, 0, rootSector.Length);
+                    AssertHostFolderSd(!File.Exists(Path.Combine(root, "CREATED.TXT")),
+                        "a guest-created file escaped before confirmation");
+                    writable.CommitChanges();
+                }
+                AssertHostFolderSd(File.ReadAllText(Path.Combine(root,
+                    "CREATED.TXT")) == "NEW!",
+                    "guest-created FAT file was not saved to the folder");
+
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var rootSector = ReadLe16(boot, 14) +
+                        (long)boot[16] * ReadLe32(boot, 36);
+                    var directory = ReadHostFolderSector(writable, rootSector);
+                    var offset = 0;
+                    while (offset < directory.Length &&
+                        Encoding.ASCII.GetString(directory, offset, 11) !=
+                            "CREATED TXT")
+                        offset += 32;
+                    AssertHostFolderSd(offset < directory.Length,
+                        "new file was not visible before rename");
+                    Encoding.ASCII.GetBytes("RENAMED TXT")
+                        .CopyTo(directory, offset);
+                    writable.Position = rootSector * 512;
+                    writable.Write(directory, 0, directory.Length);
+                    writable.CommitChanges();
+                }
+                AssertHostFolderSd(!File.Exists(Path.Combine(root, "CREATED.TXT")) &&
+                    File.ReadAllText(Path.Combine(root, "RENAMED.TXT")) == "NEW!",
+                    "guest rename was not saved to the folder");
+
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var rootSector = ReadLe16(boot, 14) +
+                        (long)boot[16] * ReadLe32(boot, 36);
+                    var directory = ReadHostFolderSector(writable, rootSector);
+                    var offset = 0;
+                    while (offset < directory.Length &&
+                        Encoding.ASCII.GetString(directory, offset, 11) !=
+                            "RENAMED TXT")
+                        offset += 32;
+                    AssertHostFolderSd(offset < directory.Length,
+                        "new file was not visible after remount");
+                    directory[offset] = 0xE5;
+                    writable.Position = rootSector * 512;
+                    writable.Write(directory, 0, directory.Length);
+                    writable.CommitChanges();
+                }
+                AssertHostFolderSd(!File.Exists(Path.Combine(root, "RENAMED.TXT")),
+                    "guest deletion was not saved to the folder");
+
+                using (var writable = new HostFolderFat32Stream(root))
+                {
+                    var boot = ReadHostFolderSector(writable, 0);
+                    var file = FindFatEntry(ReadFatDirectory(writable,
+                        boot, 2), "test.trd");
+                    var dataStart = ReadLe16(boot, 14) +
+                        (long)boot[16] * ReadLe32(boot, 36);
+                    var sectorNumber = dataStart +
+                        (file.Cluster - 2) * boot[13];
+                    var sector = ReadHostFolderSector(writable, sectorNumber);
+                    sector[0] = (byte)'R';
+                    writable.Position = sectorNumber * 512;
+                    writable.Write(sector, 0, sector.Length);
+                    File.WriteAllText(Path.Combine(root, "external-change.tap"),
+                        "WINDOWS");
+                    var rejected = false;
+                    try { writable.CommitChanges(); }
+                    catch (IOException) { rejected = true; }
+                    AssertHostFolderSd(rejected && writable.HasChanges &&
+                        File.ReadAllText(Path.Combine(root,
+                            "external-change.tap")) == "WINDOWS" &&
+                        File.ReadAllBytes(Path.Combine(root, "test.trd"))[0] ==
+                            (byte)'Q',
+                        "external folder change was not protected");
+                    writable.DiscardChanges();
+                }
+
+                var imagePath = Path.Combine(root, "session.img");
+                File.WriteAllBytes(imagePath, new byte[1024]);
+                using (var image = new SdImageSessionStream(
+                    File.Open(imagePath, FileMode.Open, FileAccess.ReadWrite,
+                        FileShare.Read), imagePath))
+                {
+                    image.Position = 100;
+                    image.Write(new byte[] { 0x51, 0x52 }, 0, 2);
+                    using (var original = new FileStream(imagePath,
+                        FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        original.Position = 100;
+                        AssertHostFolderSd(original.ReadByte() == 0,
+                            "SD image was modified before confirmation");
+                    }
+                }
+                using (var image = new SdImageSessionStream(
+                    File.Open(imagePath, FileMode.Open, FileAccess.ReadWrite,
+                        FileShare.Read), imagePath))
+                {
+                    AssertHostFolderSd(image.HasChanges,
+                        "unsaved SD image session was not recovered");
+                    image.CommitChanges();
+                }
+                AssertHostFolderSd(File.ReadAllBytes(imagePath)[100] == 0x51 &&
+                    File.ReadAllBytes(imagePath)[101] == 0x52,
+                    "confirmed SD image write was not applied");
+                using (var image = new SdImageSessionStream(
+                    File.Open(imagePath, FileMode.Open, FileAccess.ReadWrite,
+                        FileShare.Read), imagePath))
+                {
+                    image.Position = 100;
+                    image.Write(new byte[] { 0x58 }, 0, 1);
+                    image.DiscardChanges();
+                }
+                AssertHostFolderSd(File.ReadAllBytes(imagePath)[100] == 0x51,
+                    "discarded SD image changes reached the source");
 
                 var configured = new ZXMAK2.Hardware.Evo.ZsdPentEvo();
                 configured.ConfigureSource(
