@@ -37,7 +37,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             Controls.Add(m_group);
 
             m_connected = new CheckBox();
-            m_connected.Text = "SD card connected";
+            m_connected.Text = "SD card inserted";
             m_connected.AutoSize = true;
             m_connected.Location = new Point(9, 24);
             m_connected.CheckedChanged += connected_CheckedChanged;
@@ -179,6 +179,11 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
 
         private void path_TextChanged(object sender, EventArgs e)
         {
+            if (!string.IsNullOrWhiteSpace(m_path.Text) &&
+                !m_connected.Checked)
+            {
+                m_connected.Checked = true;
+            }
             UpdateStatus();
         }
 
@@ -191,8 +196,10 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         private void UpdateEnabled()
         {
             var enabled = m_connected.Checked;
-            m_path.Enabled = enabled;
-            m_source.Enabled = enabled;
+            // The controller remains available with no removable media.
+            // Browsing or typing a source inserts it automatically.
+            m_path.Enabled = true;
+            m_source.Enabled = true;
             m_browse.Enabled = true;
             m_eject.Enabled = enabled || !string.IsNullOrEmpty(m_path.Text);
         }

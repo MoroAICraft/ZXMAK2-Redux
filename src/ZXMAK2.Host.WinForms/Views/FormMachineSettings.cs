@@ -873,10 +873,12 @@ namespace ZXMAK2.Host.WinForms.Views
             if (currentDevice == null || pendingDevice == null)
                 return currentDevice != pendingDevice;
 
-            return !string.Equals(
-                NormalizeMediaPath(currentDevice.ConfiguredImageFileName),
-                NormalizeMediaPath(pendingDevice.ConfiguredImageFileName),
-                StringComparison.OrdinalIgnoreCase);
+            return currentDevice.ConfiguredSourceType !=
+                    pendingDevice.ConfiguredSourceType ||
+                !string.Equals(
+                    NormalizeMediaPath(currentDevice.ConfiguredSourcePath),
+                    NormalizeMediaPath(pendingDevice.ConfiguredSourcePath),
+                    StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsNeoGsSdMediaChanged(

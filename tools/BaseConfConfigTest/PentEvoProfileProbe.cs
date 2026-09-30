@@ -8,6 +8,8 @@ using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Hardware.Evo;
 using ZXMAK2.Hardware.General;
+using ZXMAK2.Dependency;
+using ZXMAK2.Host.Interfaces;
 using ZXMAK2.Host.WinForms.Views;
 using ZXMAK2.Host.WinForms.Mdx;
 using ZXMAK2.Host.WinForms.Views.Configuration.Devices;
@@ -30,6 +32,8 @@ internal static class PentEvoProfileProbe
             VerifyUlaMasterVolume();
             VerifyOmniSoundSlots();
             VerifyCovoxCalibration();
+            VerifyZsdFolderSettings();
+            VerifyFolderDialogRegistration();
 
             var bus = new BusManager();
             bus.Init(null, true);
@@ -543,6 +547,63 @@ internal static class PentEvoProfileProbe
         covox.LoadConfigXml(node);
         Assert(covox.Gain == 100 && covox.Volume == 100,
             "Build 63 Covox 145% calibration was not repaired on load");
+    }
+
+    private static void VerifyZsdFolderSettings()
+    {
+        var current = new ZsdPentEvo();
+        var pending = new ZsdPentEvo();
+        var folder = Environment.CurrentDirectory;
+        pending.ConfigureSource(SdSourceType.HostFolder, folder);
+
+        var mediaChanged = typeof(FormMachineSettings).GetMethod(
+            "IsSdMediaChanged",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert(mediaChanged != null,
+            "Machine Settings has no SD media change detector");
+        Assert((bool)mediaChanged.Invoke(null, new object[] { current, pending }),
+            "Mounting a host folder does not request a cold power cycle");
+        current.ConfigureSource(SdSourceType.HostFolder, folder);
+        Assert(!(bool)mediaChanged.Invoke(null, new object[] { current, pending }),
+            "Unchanged host-folder media requests an unnecessary power cycle");
+        pending.ConfigureCard(string.Empty);
+        Assert((bool)mediaChanged.Invoke(null, new object[] { current, pending }),
+            "Ejecting a host folder does not request a cold power cycle");
+
+        var settingsDevice = new ZsdPentEvo();
+        using (var control = new CtlSettingsZsdPentEvo())
+        {
+            control.Init(null, null, settingsDevice);
+            var connected = GetField<CheckBox>(control, "m_connected");
+            var source = GetField<ComboBox>(control, "m_source");
+            var path = GetField<TextBox>(control, "m_path");
+            Assert(!connected.Checked && source.Enabled && path.Enabled,
+                "Empty SD controller disables source selection");
+            source.SelectedIndex = 1;
+            path.Text = folder;
+            Assert(connected.Checked,
+                "Choosing an SD source did not insert the media");
+            control.Apply();
+            Assert(settingsDevice.ConfiguredSourceType ==
+                    SdSourceType.HostFolder &&
+                string.Equals(settingsDevice.ConfiguredSourcePath, folder,
+                    StringComparison.OrdinalIgnoreCase),
+                "Machine Settings did not retain the selected host folder");
+        }
+    }
+
+    private static void VerifyFolderDialogRegistration()
+    {
+        using (var resolver = new ResolverUnity("winforms"))
+        {
+            Assert(resolver.CheckAvailable<IFolderBrowserDialog>(),
+                "Host-folder dialog is absent from the packaged UI configuration");
+            using (var dialog = resolver.Resolve<IFolderBrowserDialog>())
+            {
+                Assert(dialog != null,
+                    "Host-folder dialog registration cannot be resolved");
+            }
+        }
     }
 
     private static void VerifyPentEvoMusicSelector()
