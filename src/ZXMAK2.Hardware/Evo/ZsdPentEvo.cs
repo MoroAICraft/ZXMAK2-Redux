@@ -388,9 +388,12 @@ namespace ZXMAK2.Hardware.Evo
         private bool ExportFolderCommandUi_OnCanExecute(Object arg)
         {
             var viewResolver = Locator.Resolve<IResolver>("View");
-            return HasPendingChanges &&
-                configuredSourceType == SdSourceType.HostFolder &&
-                viewResolver.CheckAvailable<ISaveFileDialog>();
+            lock (cardSync)
+            {
+                return configuredSourceType == SdSourceType.HostFolder &&
+                    card != null && card.HostFolderStream != null &&
+                    viewResolver.CheckAvailable<ISaveFileDialog>();
+            }
         }
 
         private void ExportFolderCommandUi_OnExecute(Object arg)

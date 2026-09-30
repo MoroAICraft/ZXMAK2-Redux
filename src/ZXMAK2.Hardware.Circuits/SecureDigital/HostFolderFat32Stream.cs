@@ -250,6 +250,16 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
             Array.Sort(entries, delegate(FileSystemInfo left, FileSystemInfo right)
             {
+                // NedoOS resolves programs through BIN with a one-cluster
+                // compatibility scan.  Keep its boot chain in the first
+                // directory cluster even when the host folder contains a
+                // large, alphabetically sorted tool collection.  Direct
+                // lookups can follow the full FAT chain, which is why the
+                // same program still worked after manually entering BIN.
+                var leftPriority = GetBootProgramPriority(left.Name);
+                var rightPriority = GetBootProgramPriority(right.Name);
+                if (leftPriority != rightPriority)
+                    return leftPriority.CompareTo(rightPriority);
                 var compare = StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
                 return compare != 0 ? compare : StringComparer.Ordinal.Compare(left.Name, right.Name);
             });
@@ -320,6 +330,21 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 node.Children.Add(child);
             }
             return node;
+        }
+
+        private static int GetBootProgramPriority(string name)
+        {
+            if (string.Equals(name, "cmd.com", StringComparison.OrdinalIgnoreCase))
+                return 0;
+            if (string.Equals(name, "term.com", StringComparison.OrdinalIgnoreCase))
+                return 1;
+            if (string.Equals(name, "autoexec.bat", StringComparison.OrdinalIgnoreCase))
+                return 2;
+            if (string.Equals(name, "nv.com", StringComparison.OrdinalIgnoreCase))
+                return 3;
+            if (string.Equals(name, "wizcfg.com", StringComparison.OrdinalIgnoreCase))
+                return 4;
+            return 5;
         }
 
         private int SelectSectorsPerCluster(Node root)

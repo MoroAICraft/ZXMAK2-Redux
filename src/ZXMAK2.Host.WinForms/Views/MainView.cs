@@ -1614,8 +1614,9 @@ namespace ZXMAK2.Host.WinForms.Views
                 _ejectSdMenuItems[0].Text = dirty ?
                     "Eject SD (unsaved changes)" : "Eject SD";
             if (_exportSdMenuItem != null)
-                _exportSdMenuItem.Enabled = dirty &&
-                    _exportFolderSdCommand != null;
+                _exportSdMenuItem.Enabled =
+                    _exportFolderSdCommand != null &&
+                    _exportFolderSdCommand.CanExecute(this);
             ToolStripDropDownButton button;
             if (_mediaButtons.TryGetValue(MediaStatusKind.SecureDigital,
                     out button))

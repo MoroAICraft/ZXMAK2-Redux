@@ -2603,6 +2603,19 @@ namespace Test
                     Encoding.ASCII.GetBytes("WIZ"));
                 File.WriteAllBytes(Path.Combine(bin.FullName, "nv.com"),
                     Encoding.ASCII.GetBytes("NV"));
+                File.WriteAllBytes(Path.Combine(bin.FullName, "cmd.com"),
+                    Encoding.ASCII.GetBytes("CMD"));
+                File.WriteAllBytes(Path.Combine(bin.FullName, "term.com"),
+                    Encoding.ASCII.GetBytes("TERM"));
+                // Force BIN to span more than one directory cluster.  NedoOS
+                // must still find its startup programs through the global
+                // program search used before CMD changes into BIN.
+                for (var index = 0; index < 150; index++)
+                {
+                    File.WriteAllBytes(Path.Combine(bin.FullName,
+                        string.Format("tool{0:000}.com", index)),
+                        new byte[] { (byte)index });
+                }
                 File.WriteAllBytes(
                     Path.Combine(games.FullName, "Very Long Spectrum Collection Name.tzx"),
                     nestedPayload);
@@ -2652,6 +2665,9 @@ namespace Test
                         !nv.HasLongName && autoexec.CaseFlags == 0x18 &&
                         wizcfg.CaseFlags == 0x18 && nv.CaseFlags == 0x18,
                         "NedoOS startup commands should be plain 8.3 entries");
+                    AssertHostFolderSd(IsEntryInFirstDirectoryCluster(stream,
+                        boot, binEntry.Cluster, "WIZCFG  COM"),
+                        "NedoOS WIZCFG is outside the first BIN directory cluster");
                     AssertHostFolderSd((autoexec.Attributes & 0x01) == 0 &&
                         (wizcfg.Attributes & 0x01) == 0 &&
                         (nv.Attributes & 0x01) == 0 &&
@@ -2965,6 +2981,30 @@ namespace Test
             return data;
         }
 
+        private static bool IsEntryInFirstDirectoryCluster(
+            Stream stream,
+            byte[] boot,
+            uint directoryCluster,
+            string shortName)
+        {
+            var dataStart = ReadLe16(boot, 14) +
+                (long)boot[16] * ReadLe32(boot, 36);
+            for (var sectorIndex = 0; sectorIndex < boot[13]; sectorIndex++)
+            {
+                var sector = ReadHostFolderSector(stream,
+                    dataStart + (directoryCluster - 2) * boot[13] + sectorIndex);
+                for (var offset = 0; offset < sector.Length; offset += 32)
+                {
+                    if (sector[offset] == 0)
+                        return false;
+                    if (sector[offset] != 0xE5 && sector[offset + 11] != 0x0F &&
+                        Encoding.ASCII.GetString(sector, offset, 11) == shortName)
+                        return true;
+                }
+            }
+            return false;
+        }
+
         private static void AuditNedoOsHostFolder(string folderPath)
         {
             using (var stream = new HostFolderFat32Stream(folderPath))
@@ -2992,6 +3032,9 @@ namespace Test
                         File.ReadAllBytes(Path.Combine(folderPath, "bin", fileName))),
                         "NedoOS startup file differs in virtual SD: " + fileName);
                 }
+                AssertHostFolderSd(IsEntryInFirstDirectoryCluster(stream,
+                    boot, bin.Cluster, "WIZCFG  COM"),
+                    "NedoOS WIZCFG is outside the first BIN directory cluster");
                 var sdBoot = FindFatEntry(root, "sd_boot.$C");
                 AssertHostFolderSd(sdBoot != null &&
                     BytesEqual(ReadFatFile(stream, boot, sdBoot),
