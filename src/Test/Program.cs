@@ -92,6 +92,8 @@ namespace Test
             if (args.Length >= 1 && args[0].ToLower() == "/hostfoldersd")
             {
                 TestHostFolderSd();
+                if (args.Length >= 2)
+                    AuditNedoOsHostFolder(args[1]);
                 return;
             }
 
@@ -2936,6 +2938,40 @@ namespace Test
                 offset += read;
             }
             return data;
+        }
+
+        private static void AuditNedoOsHostFolder(string folderPath)
+        {
+            using (var stream = new HostFolderFat32Stream(folderPath))
+            {
+                AssertHostFolderSd(!stream.HasChanges,
+                    "NedoOS audit requires a clean virtual SD session");
+                var boot = ReadHostFolderSector(stream, 0);
+                var root = ReadFatDirectory(stream, boot, 2);
+                var bin = FindFatEntry(root, "bin");
+                AssertHostFolderSd(bin != null && bin.IsDirectory &&
+                    !bin.HasLongName && bin.CaseFlags == 0x08,
+                    "NedoOS BIN directory is not a plain 8.3 entry");
+                var files = ReadFatDirectory(stream, boot, bin.Cluster);
+                foreach (var fileName in new[] {
+                    "autoexec.bat", "cmd.com", "term.com", "nv.com", "wizcfg.com" })
+                {
+                    var file = FindFatEntry(files, fileName);
+                    AssertHostFolderSd(file != null && !file.HasLongName &&
+                        file.CaseFlags == 0x18 &&
+                        (file.Attributes & 0x01) == 0,
+                        "NedoOS startup file has incompatible metadata: " + fileName);
+                    AssertHostFolderSd(BytesEqual(ReadFatFile(stream, boot, file),
+                        File.ReadAllBytes(Path.Combine(folderPath, "bin", fileName))),
+                        "NedoOS startup file differs in virtual SD: " + fileName);
+                }
+                var sdBoot = FindFatEntry(root, "sd_boot.$C");
+                AssertHostFolderSd(sdBoot != null &&
+                    BytesEqual(ReadFatFile(stream, boot, sdBoot),
+                        File.ReadAllBytes(Path.Combine(folderPath, "sd_boot.$C"))),
+                    "NedoOS SD boot program differs in virtual SD");
+                Console.WriteLine("NedoOS folder startup files: PASS");
+            }
         }
 
         private static System.Collections.Generic.List<FatTestEntry> ReadFatDirectory(
