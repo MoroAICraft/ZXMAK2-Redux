@@ -2650,6 +2650,10 @@ namespace Test
                         "nested directory is missing");
                     AssertHostFolderSd(binEntry != null &&
                         binEntry.ShortName == "BIN", "NedoOS BIN has an invalid 8.3 name");
+                    AssertHostFolderSd(rootEntries.Count > 0 &&
+                        rootEntries[0].ShortName == "BIN" &&
+                        !rootEntries[0].HasLongName,
+                        "NedoOS BIN is not the first root directory entry");
                     AssertHostFolderSd(!binEntry.HasLongName &&
                         binEntry.CaseFlags == 0x08,
                         "lowercase BIN should use the FAT short-name case flag");
@@ -3019,6 +3023,9 @@ namespace Test
                 AssertHostFolderSd(bin != null && bin.IsDirectory &&
                     !bin.HasLongName && bin.CaseFlags == 0x08,
                     "NedoOS BIN directory is not a plain 8.3 entry");
+                AssertHostFolderSd(root.Count > 0 &&
+                    root[0].ShortName == "BIN" && !root[0].HasLongName,
+                    "NedoOS BIN is not the first root directory entry");
                 var files = ReadFatDirectory(stream, boot, bin.Cluster);
                 foreach (var fileName in new[] {
                     "autoexec.bat", "cmd.com", "term.com", "nv.com", "wizcfg.com" })

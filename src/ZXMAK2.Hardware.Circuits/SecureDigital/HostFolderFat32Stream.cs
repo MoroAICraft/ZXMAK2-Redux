@@ -250,6 +250,20 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
             Array.Sort(entries, delegate(FileSystemInfo left, FileSystemInfo right)
             {
+                // NedoOS searches its global BIN path with a limited root
+                // directory scan during startup.  Real bootable cards place
+                // BIN in the first root entry, so mirror that layout for a
+                // host folder and for images exported from it.
+                if (isRoot)
+                {
+                    var leftIsBin = string.Equals(left.Name, "bin",
+                        StringComparison.OrdinalIgnoreCase);
+                    var rightIsBin = string.Equals(right.Name, "bin",
+                        StringComparison.OrdinalIgnoreCase);
+                    if (leftIsBin != rightIsBin)
+                        return leftIsBin ? -1 : 1;
+                }
+
                 // NedoOS resolves programs through BIN with a one-cluster
                 // compatibility scan.  Keep its boot chain in the first
                 // directory cluster even when the host folder contains a
