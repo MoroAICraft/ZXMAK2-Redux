@@ -2657,6 +2657,12 @@ namespace Test
                     AssertHostFolderSd(!binEntry.HasLongName &&
                         binEntry.CaseFlags == 0x08,
                         "lowercase BIN should use the FAT short-name case flag");
+                    AssertHostFolderSd(ReadFatDirectoryParentCluster(stream,
+                        boot, binEntry.Cluster) == 0,
+                        "BIN must mark the FAT32 root as its parent with cluster zero");
+                    AssertHostFolderSd(ReadFatDirectoryParentCluster(stream,
+                        boot, gamesEntry.Cluster) == 0,
+                        "root child must mark the FAT32 root as its parent with cluster zero");
                     var binEntries = ReadFatDirectory(stream, boot, binEntry.Cluster);
                     var autoexec = FindFatEntry(binEntries, "autoexec.bat");
                     var wizcfg = FindFatEntry(binEntries, "wizcfg.com");
@@ -3009,6 +3015,21 @@ namespace Test
             return false;
         }
 
+        private static uint ReadFatDirectoryParentCluster(
+            Stream stream, byte[] boot, uint directoryCluster)
+        {
+            var dataStart = ReadLe16(boot, 14) +
+                (long)boot[16] * ReadLe32(boot, 36);
+            var sector = ReadHostFolderSector(stream,
+                dataStart + (directoryCluster - 2) * boot[13]);
+            const int parentOffset = 32;
+            AssertHostFolderSd(Encoding.ASCII.GetString(sector,
+                parentOffset, 11) == "..         ",
+                "directory is missing its FAT parent entry");
+            return ((uint)ReadLe16(sector, parentOffset + 20) << 16) |
+                ReadLe16(sector, parentOffset + 26);
+        }
+
         private static void AuditNedoOsHostFolder(string folderPath)
         {
             using (var stream = new HostFolderFat32Stream(folderPath))
@@ -3023,6 +3044,9 @@ namespace Test
                 AssertHostFolderSd(bin != null && bin.IsDirectory &&
                     !bin.HasLongName && bin.CaseFlags == 0x08,
                     "NedoOS BIN directory is not a plain 8.3 entry");
+                AssertHostFolderSd(ReadFatDirectoryParentCluster(stream,
+                    boot, bin.Cluster) == 0,
+                    "NedoOS BIN must mark the FAT32 root as its parent with cluster zero");
                 AssertHostFolderSd(root.Count > 0 &&
                     root[0].ShortName == "BIN" && !root[0].HasLongName,
                     "NedoOS BIN is not the first root directory entry");

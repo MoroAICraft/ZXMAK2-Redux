@@ -656,7 +656,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     node.DirectoryData,
                     ref offset,
                     "..",
-                    node.Parent.Parent == null ? node.Parent.StartCluster : node.Parent.StartCluster);
+                    // FAT32 uses cluster zero in ".." when the parent is
+                    // the root.  Pointing this entry at root cluster 2 makes
+                    // FatFs getcwd walk past the root, which breaks NedoOS's
+                    // BIN-based command lookup during autoexec.bat startup.
+                    node.Parent.Parent == null ? 0U : node.Parent.StartCluster);
             }
             foreach (var child in node.Children)
             {
