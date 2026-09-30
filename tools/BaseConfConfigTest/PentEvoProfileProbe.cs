@@ -527,7 +527,19 @@ internal static class PentEvoProfileProbe
 
     private static void VerifyCovoxCalibration()
     {
+        Assert(new UlaPentEvo().InternalSoundVolume == 50 &&
+            new AYCHRV().Volume == 50 &&
+            new BeeperPentEvo().Volume == 50,
+            "BaseConf Music/Beeper defaults are not centred at 50%");
         var covox = new CovoxMono();
+        var multiplier = typeof(CovoxMono).GetField("m_mult",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert(multiplier != null, "Covox output multiplier is missing");
+        var originalLevel = (int)multiplier.GetValue(covox);
+        covox.NoDos = false;
+        var baseConfLevel = (int)multiplier.GetValue(covox);
+        Assert(Math.Abs(baseConfLevel * 100 - originalLevel * 55) <= 100,
+            "BaseConf Covox output was not reduced by 45%");
         using (var control = new CtlSettingsGenericSound())
         {
             control.Init(null, null, covox);

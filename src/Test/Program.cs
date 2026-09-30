@@ -2591,6 +2591,15 @@ namespace Test
                 var rootPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-ROOT");
                 var nestedPayload = Encoding.ASCII.GetBytes("ZXMAK2-HOST-SD-LONG-NAME");
                 File.WriteAllBytes(Path.Combine(root, "test.trd"), rootPayload);
+                var bin = Directory.CreateDirectory(Path.Combine(root, "bin"));
+                var autoexecPayload = Encoding.ASCII.GetBytes(
+                    "wizcfg.com -S\r\nnv.com\r\n");
+                File.WriteAllBytes(Path.Combine(bin.FullName, "autoexec.bat"),
+                    autoexecPayload);
+                File.WriteAllBytes(Path.Combine(bin.FullName, "wizcfg.com"),
+                    Encoding.ASCII.GetBytes("WIZ"));
+                File.WriteAllBytes(Path.Combine(bin.FullName, "nv.com"),
+                    Encoding.ASCII.GetBytes("NV"));
                 File.WriteAllBytes(
                     Path.Combine(games.FullName, "Very Long Spectrum Collection Name.tzx"),
                     nestedPayload);
@@ -2617,9 +2626,21 @@ namespace Test
                     var rootEntries = ReadFatDirectory(stream, boot, 2);
                     var rootFile = FindFatEntry(rootEntries, "test.trd");
                     var gamesEntry = FindFatEntry(rootEntries, "Games");
+                    var binEntry = FindFatEntry(rootEntries, "bin");
                     AssertHostFolderSd(rootFile != null, "root file is missing");
                     AssertHostFolderSd(gamesEntry != null && gamesEntry.IsDirectory,
                         "nested directory is missing");
+                    AssertHostFolderSd(binEntry != null &&
+                        binEntry.ShortName == "BIN", "NedoOS BIN has an invalid 8.3 name");
+                    var binEntries = ReadFatDirectory(stream, boot, binEntry.Cluster);
+                    AssertHostFolderSd(
+                        FindFatEntry(binEntries, "autoexec.bat").ShortName == "AUTOEXEC.BAT" &&
+                        FindFatEntry(binEntries, "wizcfg.com").ShortName == "WIZCFG.COM" &&
+                        FindFatEntry(binEntries, "nv.com").ShortName == "NV.COM",
+                        "NedoOS startup commands have invalid 8.3 names");
+                    AssertHostFolderSd(BytesEqual(ReadFatFile(stream, boot,
+                        FindFatEntry(binEntries, "autoexec.bat")), autoexecPayload),
+                        "NedoOS startup batch content differs");
                     AssertHostFolderSd(BytesEqual(
                         ReadFatFile(stream, boot, rootFile), rootPayload),
                         "root file data differs");

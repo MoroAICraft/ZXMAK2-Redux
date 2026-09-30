@@ -403,7 +403,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             string extension)
         {
             var expected = extension.Length == 0 ? stem : stem + "." + extension;
-            return string.Equals(original, expected, StringComparison.Ordinal);
+            // FAT short names are uppercase on disk even when Windows stores
+            // the same 8.3 name in lowercase. Do not turn bin/autoexec.bat or
+            // wizcfg.com into BIN~1/AUTOEX~1.BAT/WIZCFG~1.COM.
+            return string.Equals(original, expected, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string CleanShortPart(string value)

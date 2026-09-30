@@ -447,7 +447,7 @@ namespace ZXMAK2.Hardware.Evo
                 m_ulaPlusColors[i] = DecodeUlaPlusColor(0);
             InternalSound = PentEvoInternalSound.AY8910CHRV;
             OmniSoundPreviousMusic = PentEvoInternalSound.None;
-            InternalSoundVolume = 100;
+            InternalSoundVolume = 50;
             ZxBusSlot1Enabled = false;
             ZxBusSlot1Device = PentEvoZxBusDevice.Empty;
             ZxBusSlot2Enabled = false;

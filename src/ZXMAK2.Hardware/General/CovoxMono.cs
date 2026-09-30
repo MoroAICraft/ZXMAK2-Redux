@@ -10,6 +10,7 @@ namespace ZXMAK2.Hardware.General
 {
     public class CovoxMono : SoundDeviceBase
     {
+        private const int BaseConfOutputCalibrationPercent = 55;
         private IMemoryDevice m_memory;
         private bool m_noDos;
         private int m_mask;
@@ -108,8 +109,10 @@ namespace ZXMAK2.Hardware.General
             base.OnProcessConfigChange();
 
             // process Volume change...
-            m_mult = (ushort.MaxValue * Volume * Gain) /
-                (100 * 100 * 0xFF);
+            var calibration = !NoDos && Mask == 0xFF && Port == 0xFB
+                ? BaseConfOutputCalibrationPercent : 100;
+            m_mult = (int)((long)ushort.MaxValue * Volume * Gain *
+                calibration / (100L * 100 * 100 * 0xFF));
 
             // update description...
             var builder = new StringBuilder();
@@ -127,6 +130,11 @@ namespace ZXMAK2.Hardware.General
             builder.Append(string.Format("Volume:  {0}% (100% = centre)", Volume));
             builder.Append(Environment.NewLine);
             builder.Append(string.Format("Gain:  {0}%", Gain));
+            if (calibration != 100)
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(string.Format("BaseConf output:  {0}%", calibration));
+            }
             builder.Append(Environment.NewLine);
             builder.Append(Environment.NewLine);
             Description = builder.ToString();
@@ -156,7 +164,7 @@ namespace ZXMAK2.Hardware.General
                 return;
             handled = true;
 
-            var dac = (ushort)(value * m_mult);
+            var dac = (ushort)Math.Min(ushort.MaxValue, value * (long)m_mult);
             UpdateDac(dac, dac);
         }
     }

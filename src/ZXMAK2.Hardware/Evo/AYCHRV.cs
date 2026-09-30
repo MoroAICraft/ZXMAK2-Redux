@@ -13,6 +13,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             Name = "AY8910-CHRV";
             Description = "AY8910 with #FE value on IRB input (required for PentEvo)";
+            Volume = 50;
             IrbHandler += PsgDevice_OnIrbHandler;
         }
 

@@ -88,6 +88,9 @@ namespace ZXMAK2.Host.WinForms.Views
         private bool _isToolBarPopupActive;
         private bool _isFullScreenChanging;
         private bool _isFormShown;
+        private volatile int _openHostMenus;
+
+        internal bool IsHostMenuOpen { get { return _openHostMenus > 0; } }
 
         #endregion Fields
 
@@ -112,6 +115,12 @@ namespace ZXMAK2.Host.WinForms.Views
             InitializeComponent();
             InitializeEvoDisplayMenu();
             InitializeMediaToolbar();
+            TrackHostMenu(menuFile);
+            TrackHostMenu(menuView);
+            TrackHostMenu(menuVm);
+            TrackHostMenu(menuTools);
+            TrackHostMenu(menuHelp);
+            TrackHostMenu(tbrDropDownMachines);
             Icon = ResourceImages.IconApp;
             LoadMachineMenu();
 
@@ -506,6 +515,7 @@ namespace ZXMAK2.Host.WinForms.Views
             button.Text = toolTip;
             button.ToolTipText = toolTip;
             button.Enabled = false;
+            TrackHostMenu(button);
             tbrStrip.Items.Insert(index, button);
             SetSplitButtonImage(button, mediaKind, MediaState.Unavailable);
             return button;
@@ -556,9 +566,17 @@ namespace ZXMAK2.Host.WinForms.Views
             button.Text = toolTip;
             button.ToolTipText = toolTip;
             button.Enabled = false;
+            TrackHostMenu(button);
             _mediaButtons.Add(mediaKind, button);
             tbrStrip.Items.Insert(index, button);
             SetMediaToolbarImage(mediaKind, MediaState.Unavailable);
+        }
+
+        private void TrackHostMenu(ToolStripDropDownItem item)
+        {
+            item.DropDownOpened += (sender, args) => _openHostMenus++;
+            item.DropDownClosed += (sender, args) =>
+                _openHostMenus = Math.Max(0, _openHostMenus - 1);
         }
 
         private void ClearMediaToolbarMenus()

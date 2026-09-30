@@ -27,6 +27,7 @@ using System.IO;
 using ZXMAK2.Host.Interfaces;
 using ZXMAK2.Host.Entities.Tools;
 using ZXMAK2.Host.WinForms.Tools;
+using ZXMAK2.Host.WinForms.Views;
 using ZXMAK2.DirectX;
 using ZXMAK2.DirectX.DirectInput;
 using ZxmakKey = ZXMAK2.Host.Entities.Key;
@@ -43,6 +44,7 @@ namespace ZXMAK2.Host.WinForms.Mdx
         private KeyboardStateMapper<MdxKey> _mapper = new KeyboardStateMapper<MdxKey>();
         private readonly Dictionary<ZxmakKey, bool> _state = new Dictionary<ZxmakKey, bool>();
         private bool _isAcquired;
+        private bool _suppressArrowsUntilReleased;
 
 
 
@@ -124,9 +126,22 @@ namespace ZXMAK2.Host.WinForms.Mdx
                 var suppressGuestP = IsMachineSettingsShortcutPressed(_diState);
                 var suppressGuestEnter = IsFullScreenShortcutPressed(_diState);
                 var suppressGuestS = IsMaximumSpeedShortcutPressed(_diState);
+                var mainView = _form as MainView;
+                var suppressGuestArrows = mainView != null && mainView.IsHostMenuOpen;
+                if (suppressGuestArrows)
+                    _suppressArrowsUntilReleased = true;
+                else if (_diState[(int)MdxKey.UpArrow] == 0 &&
+                    _diState[(int)MdxKey.DownArrow] == 0 &&
+                    _diState[(int)MdxKey.LeftArrow] == 0 &&
+                    _diState[(int)MdxKey.RightArrow] == 0)
+                    _suppressArrowsUntilReleased = false;
                 foreach (var key in _mapper.Keys)
                 {
                     _state[key] = _diState[(int)_mapper[key]] != 0 &&
+                        !(_suppressArrowsUntilReleased && (key == ZxmakKey.UpArrow ||
+                            key == ZxmakKey.DownArrow ||
+                            key == ZxmakKey.LeftArrow ||
+                            key == ZxmakKey.RightArrow)) &&
                         !(suppressGuestP && key == ZxmakKey.P) &&
                         !(suppressGuestEnter && (key == ZxmakKey.Return ||
                             key == ZxmakKey.NumPadEnter)) &&

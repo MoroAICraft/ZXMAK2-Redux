@@ -21,7 +21,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             Name = "BEEPER PENTEVO";
             Description = "ZX-Evo BaseConf beeper/tape-out mux";
-            Volume = 40;
+            Volume = 50;
         }
 
         [HardwareValue("DATA", Description = "Last value written to low byte FE")]
