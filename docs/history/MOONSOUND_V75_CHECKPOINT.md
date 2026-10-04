@@ -51,3 +51,12 @@ MSBuild: VS2022 BuildTools. После сборки CorFlags Test.exe/ZXMAK2.exe
 GS ROM добавлен только в локальный output/runtime ROMS.PAK, не в tracked
 src/ZXMAK2/ROMS.PAK. Чистая пересборка требует повторной локальной упаковки
 пользовательского GS ROM (описано в tools/MoonSoundTest/README.md).
+
+Упаковка по уточнению пользователя: все сборки размещать в L:\Work_two\ZX,
+папка ZXMAK2-vNN-ZXEVO-BC-<название>-Test-YYYYMMDD. Внутри release и ZIP
+с таким же именем без даты; ZIP содержит верхний каталог release/.
+v75: ZXMAK2-v75-ZXEVO-BC-MoonSound-CPLD101-Test-20261004.
+Дополнительный Clean ZIP: без Test.exe/config, vmz/vmide/cmos, внешнего Yamaha
+ROM; нужные SF2, DLL, configs и лицензии сохраняются. Yamaha ROM добавлен
+в локальный release/ROMS.PAK с SHA256-проверкой, чтобы Clean не потерял OPL4.
+Полная версия и исходная папка на D: сохранены. Ничего не опубликовано.
