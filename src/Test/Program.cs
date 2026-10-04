@@ -82,6 +82,14 @@ namespace Test
             if (args.Length >= 1 && args[0].ToLower() == "/moonsound")
             {
                 TestZxmMoonSound();
+                TestZxmMoonSound(48000);
+                TestZxmMoonSound(96000);
+                TestMoonFlashPersistence();
+                return;
+            }
+            if (args.Length >= 2 && args[0].ToLower() == "/moonservice")
+            {
+                TestMoonService(args[1]);
                 return;
             }
             if (args.Length >= 1 && args[0].ToLower() == "/zxnetusb")
@@ -585,7 +593,7 @@ namespace Test
             return peak;
         }
 
-        private static void TestZxmMoonSound()
+        private static void TestZxmMoonSound(int sampleRate = 44100)
         {
             IMemoryDevice memory =
                 new ZXMAK2.Hardware.Spectrum.MemorySpectrum48();
@@ -597,6 +605,7 @@ namespace Test
             machine.BusManager.Add((BusDeviceBase)memory);
             machine.BusManager.Add((BusDeviceBase)ula);
             machine.BusManager.Add(board);
+            machine.BusManager.SampleRate = sampleRate;
             if (!machine.BusManager.Connect() || !board.CoreAvailable)
                 throw new InvalidOperationException(
                     "MoonSound core/ROM is unavailable");
@@ -615,20 +624,20 @@ namespace Test
 
             // Verify the physical 1 MiB SRAM immediately after the 2 MiB
             // YRW801-M ROM through the OPL4 memory access registers.
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x02, 0x01);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x03, 0x20);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x04, 0x00);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x05, 0x00);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x06, 0x5A);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x03, 0x20);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x04, 0x00);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x05, 0x00);
-            AddPortWrite(fm, 0x347E, 0x06);
-            AddPortReadAndStore(fm, 0x347F, ramReadAddress);
-            AddMoonSoundWaveWrite(fm, 0x127E, 0x02, 0x00);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x02, 0x01);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x03, 0x20);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x04, 0x00);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x05, 0x00);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x06, 0x5A);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x03, 0x20);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x04, 0x00);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x05, 0x00);
+            AddPortWrite(fm, 0x34C2, 0x06);
+            AddPortReadAndStore(fm, 0x34C3, ramReadAddress);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0x02, 0x00);
 
             // One OPL3 voice. #C4/#C5 are the low register bank.
-            AddMoonSoundWaveWrite(fm, 0x127E, 0xF8, 0x00);
+            AddMoonSoundWaveWrite(fm, 0x12C2, 0xF8, 0x00);
             AddMoonSoundFmWrite(fm, 0x34C4, 0x20, 0x01);
             AddMoonSoundFmWrite(fm, 0x34C4, 0x23, 0x01);
             AddMoonSoundFmWrite(fm, 0x34C4, 0x40, 0x10);
@@ -670,6 +679,30 @@ namespace Test
             machine.ExecuteFrame();
             var pcmPeak = GetStereoPeak(board.AudioBuffer);
 
+            // NedoOS gp/common/moonsound.asm + startup.asm detector:
+            // IN #C6 remaps PCM; two idle status reads, then timer 2 overflow.
+            var detector = new System.Collections.Generic.List<byte>();
+            AddPortReadAndStore(detector, 0xC6, 0x5200);
+            AddPortReadAndStore(detector, 0xC4, 0x5201);
+            AddPortReadAndStore(detector, 0xC4, 0x5202);
+            AddMoonSoundFmWrite(detector, 0xC4, 0x03, 0xFF);
+            AddMoonSoundFmWrite(detector, 0xC4, 0x04, 0x42);
+            detector.AddRange(new byte[] { 0x01, 0x00, 0x08, 0x0B, 0x78, 0xB1, 0x20, 0xFB });
+            AddPortReadAndStore(detector, 0xC4, 0x5203);
+            AddMoonSoundFmWrite(detector, 0xC4, 0x04, 0x80);
+            AddMoonSoundFmWrite(detector, 0xC4, 0x04, 0x00);
+            detector.Add(0x18); detector.Add(0xFE);
+            for (var index = 0; index < detector.Count; index++)
+                memory.WRMEM_DBG((ushort)(start + index), detector[index]);
+            machine.DebugReset();
+            machine.CPU.regs.PC = start;
+            machine.ExecuteFrame();
+            var nedoDetectPassed = memory.RDMEM_DBG(0x5200) != 0xFF &&
+                memory.RDMEM_DBG(0x5201) == 0 && memory.RDMEM_DBG(0x5202) == 0 &&
+                memory.RDMEM_DBG(0x5203) == 0xA0;
+            var portMapPassed = TestMoonSoundPortMap(board);
+            var flashIdPassed = TestMoonSoundFlashId(board);
+
             // The Rev.01 CPLD releases its decoded ports when PentEvo
             // enables TR-DOS I/O. Exercise that motherboard gate without
             // replacing the Spectrum memory used by the audio program.
@@ -700,16 +733,16 @@ namespace Test
             machine.Dispose();
             var passed = status0 != 0xFF && status1 != 0xFF &&
                 ramValue == 0x5A && fmPeak > 64 && pcmPeak > 64 &&
-                dosGatePassed;
+                dosGatePassed && portMapPassed && flashIdPassed && nedoDetectPassed;
             Console.ForegroundColor = passed
                 ? ConsoleColor.Green : ConsoleColor.Red;
             Console.WriteLine(
-                "ZXM-MoonSound Rev.01: status=#{0:X2}/#{1:X2}, " +
+                "ZXM-MoonSound Rev.01 @{10} Hz: status=#{0:X2}/#{1:X2}, " +
                 "SRAM=#{2:X2}, FM peak={3}, PCM peak={4}, " +
-                "TR-DOS gate={5}: {6}",
+                "TR-DOS gate={5}, CPLD 1.01={7}, MX29F016={8}, NedoOS={9}: {6}",
                 status0, status1, ramValue, fmPeak, pcmPeak,
                 dosGatePassed ? "PASS" : "FAIL",
-                passed ? "PASS" : "FAIL");
+                passed ? "PASS" : "FAIL", portMapPassed, flashIdPassed, nedoDetectPassed, sampleRate);
             Console.ResetColor();
             if (!passed)
                 Environment.ExitCode = 1;
@@ -723,6 +756,210 @@ namespace Test
         {
             AddPortWrite(program, addressPort, register);
             AddPortWrite(program, (ushort)(addressPort + 1), value);
+        }
+
+        private static byte MoonRead(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice board,
+            string method, ushort port, out bool handled)
+        {
+            var arguments = new object[] { port, (byte)0xFF, false };
+            board.GetType().GetMethod(method, System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic).Invoke(board, arguments);
+            handled = (bool)arguments[2];
+            return (byte)arguments[1];
+        }
+
+        private static void TestMoonService(string binaryPath)
+        {
+            IMemoryDevice memory = new ZXMAK2.Hardware.Spectrum.MemorySpectrum48();
+            var board = new ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice();
+            var machine = GetTestMachine(Resources.machines_test);
+            machine.BusManager.Disconnect();
+            machine.BusManager.Clear();
+            machine.BusManager.Add((BusDeviceBase)memory);
+            machine.BusManager.Add(new ZXMAK2.Hardware.Spectrum.UlaSpectrum48());
+            machine.BusManager.Add(board);
+            if (!machine.BusManager.Connect() || !board.CoreAvailable)
+                throw new InvalidOperationException("MoonSound unavailable");
+            byte[] binary = File.ReadAllBytes(binaryPath);
+            if (binary.Length != 10451)
+                throw new InvalidDataException("Expected unmodified Micklab MoonService v0.3a binary");
+            for (int index = 0; index < binary.Length; index++)
+                memory.WRMEM_DBG((ushort)(0x6000 + index), binary[index]);
+            machine.IsRunning = false;
+            machine.DebugReset();
+            machine.CPU.regs.SP = 0x5B00;
+            machine.CPU.regs.IY = 0x5C3A;
+            // Invoke the unchanged service routines, without its keyboard
+            // menu/BASIC exit path (this fixture does not boot BASIC).
+            byte[] calls = { 0xCD, 0x0F, 0x64, 0xCD, 0x7E, 0x64,
+                0xCD, 0x17, 0x6F, 0x18, 0xFE };
+            for (int index = 0; index < calls.Length; index++)
+                memory.WRMEM_DBG((ushort)(0x9000 + index), calls[index]);
+            machine.CPU.regs.PC = 0x9000;
+            for (int frame = 0; frame < 150; frame++)
+                machine.ExecuteFrame();
+            // Symbols from the vendor's moonsound_service.lst (not patches).
+            byte chipId = memory.RDMEM_DBG(0x88D0);
+            byte manufacturer = memory.RDMEM_DBG(0x74F0);
+            byte device = memory.RDMEM_DBG(0x74F1);
+            bool passed = chipId == 0x20 && manufacturer == 0xC2 && device == 0xAD;
+            Console.WriteLine("Unmodified MoonService v0.3a: chip=#{0:X2}, flash=#{1:X2}/#{2:X2}: {3}",
+                chipId, manufacturer, device, passed ? "PASS" : "FAIL");
+            if (!passed)
+                Console.WriteLine("PC=#{0:X4}, SP=#{1:X4}, first byte=#{2:X2}",
+                    machine.CPU.regs.PC, machine.CPU.regs.SP, memory.RDMEM_DBG(0x6000));
+            machine.Dispose();
+            if (!passed)
+                Environment.ExitCode = 1;
+        }
+
+        private static void TestMoonFlashPersistence()
+        {
+            // Use an isolated synthetic chip. Never program the user's Yamaha
+            // image or the normal per-install flash file during a smoke test.
+            var board = new ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice();
+            const BindingFlags hidden = BindingFlags.NonPublic | BindingFlags.Instance;
+            var boardType = board.GetType();
+            var native = boardType.GetNestedType("NativeMethods", BindingFlags.NonPublic);
+            var coreField = boardType.GetField("m_core", hidden);
+            Func<string, object[], object> call = (name, arguments) =>
+                native.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)
+                    .Invoke(null, arguments);
+            var rom = new byte[0x200000];
+            for (int index = 0; index < rom.Length; index++) rom[index] = 0xFF;
+            var folder = Path.Combine(Path.GetTempPath(), "ZXMAK2-MoonFlash-" +
+                Guid.NewGuid().ToString("N"));
+            var path = Path.Combine(folder, "flash.bin");
+            boardType.GetField("m_flashPath", hidden).SetValue(board, path);
+            IntPtr chip = (IntPtr)call("Create", new object[] { rom, (uint)rom.Length, (uint)0x100000 });
+            coreField.SetValue(board, chip);
+            try
+            {
+                if (chip == IntPtr.Zero) throw new InvalidOperationException("Synthetic MoonSound unavailable");
+                Action<int, byte> reg = (index, value) =>
+                {
+                    MoonWrite(board, "WriteWavePort", 0x7E, (byte)index);
+                    MoonWrite(board, "WriteWavePort", 0x7F, value);
+                };
+                Action<int, byte> store = (address, value) =>
+                {
+                    reg(3, (byte)(address >> 16)); reg(4, (byte)(address >> 8));
+                    reg(5, (byte)address); reg(6, value);
+                };
+                MoonWrite(board, "WriteFmPort", 0xC6, 5);
+                MoonWrite(board, "WriteFmPort", 0xC7, 3);
+                reg(2, 0x11);
+                store(0x555, 0xAA); store(0x2AA, 0x55); store(0x555, 0xA0);
+                store(0x1234, 0x5A);
+                call("Generate", new object[] { chip, new short[4], (uint)2 });
+                boardType.GetMethod("SaveFlash", hidden).Invoke(board, null);
+                if (File.ReadAllBytes(path)[0x1234] != 0x5A)
+                    throw new InvalidOperationException("MoonSound flash writeback failed");
+                store(0x555, 0xAA); store(0x2AA, 0x55); store(0x555, 0xA0);
+                store(0x1234, 0x50);
+                call("Generate", new object[] { chip, new short[4], (uint)2 });
+                boardType.GetMethod("SaveFlash", hidden).Invoke(board, null);
+                byte[] saved = File.ReadAllBytes(path);
+                if (saved.Length != rom.Length || saved[0x1234] != 0x50 ||
+                    File.ReadAllBytes(path + ".bak")[0x1234] != 0x5A)
+                    throw new InvalidOperationException("MoonSound atomic flash replace/backup failed");
+                call("Destroy", new object[] { chip });
+                coreField.SetValue(board, IntPtr.Zero);
+                chip = (IntPtr)call("Create", new object[] { saved, (uint)saved.Length, (uint)0x100000 });
+                coreField.SetValue(board, chip);
+                MoonWrite(board, "WriteFmPort", 0xC6, 5);
+                MoonWrite(board, "WriteFmPort", 0xC7, 3);
+                reg(2, 0x11); reg(3, 0); reg(4, 0x12); reg(5, 0x34);
+                MoonWrite(board, "WriteWavePort", 0x7E, 6);
+                bool handled;
+                if (MoonRead(board, "ReadWavePort", 0x7F, out handled) != 0x50 || !handled)
+                    throw new InvalidOperationException("MoonSound saved flash reload failed");
+                Console.WriteLine("MoonSound flash: atomic save, backup and reload of synthetic ROM: PASS");
+            }
+            finally
+            {
+                if (chip != IntPtr.Zero) call("Destroy", new object[] { chip });
+                coreField.SetValue(board, IntPtr.Zero);
+                // Only the two explicitly named fixture files; no recursive delete.
+                if (File.Exists(path)) File.Delete(path);
+                if (File.Exists(path + ".bak")) File.Delete(path + ".bak");
+                if (Directory.Exists(folder)) Directory.Delete(folder);
+            }
+        }
+
+        private static void MoonWrite(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice board,
+            string method, ushort port, byte value)
+        {
+            var arguments = new object[] { port, value, false };
+            board.GetType().GetMethod(method, System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic).Invoke(board, arguments);
+        }
+
+        private static bool TestMoonSoundPortMap(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice board)
+        {
+            bool handled;
+            board.ResetState();
+            MoonRead(board, "ReadWavePort", 0x117F, out handled);
+            bool passed = handled;
+            MoonRead(board, "ReadWavePort", 0x22C3, out handled);
+            passed &= !handled;
+            // OUT #C6 selects FM bank 1 but must leave PCM in legacy mode.
+            MoonWrite(board, "WriteFmPort", 0x33C6, 0x05);
+            MoonWrite(board, "WriteFmPort", 0x44C7, 0x03);
+            MoonRead(board, "ReadWavePort", 0x557F, out handled);
+            passed &= handled;
+            MoonRead(board, "ReadFmPort", 0x66C6, out handled);
+            passed &= handled;
+            MoonWrite(board, "WriteWavePort", 0x77C2, 0x02);
+            passed &= (MoonRead(board, "ReadWavePort", 0x88C3, out handled) & 0xE0) == 0x20;
+            passed &= handled;
+            MoonRead(board, "ReadWavePort", 0x997F, out handled);
+            passed &= !handled;
+            // Status polling at #C4 must not switch back to #7E.
+            MoonRead(board, "ReadFmPort", 0xAAC4, out handled);
+            MoonRead(board, "ReadWavePort", 0xBBC3, out handled);
+            passed &= handled;
+            board.ResetState();
+            MoonRead(board, "ReadWavePort", 0xCCC3, out handled);
+            passed &= !handled;
+            MoonRead(board, "ReadWavePort", 0xDD7F, out handled);
+            return passed && handled;
+        }
+
+        private static void MoonFlashAddress(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice board,
+            int address)
+        {
+            for (int register = 3; register <= 5; register++)
+            {
+                MoonWrite(board, "WriteWavePort", 0xC2, (byte)register);
+                MoonWrite(board, "WriteWavePort", 0xC3,
+                    (byte)(address >> ((5 - register) * 8)));
+            }
+            MoonWrite(board, "WriteWavePort", 0xC2, 6);
+        }
+
+        private static bool TestMoonSoundFlashId(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice board)
+        {
+            bool handled;
+            MoonWrite(board, "WriteFmPort", 0xC6, 5);
+            MoonWrite(board, "WriteFmPort", 0xC7, 3);
+            MoonRead(board, "ReadFmPort", 0xC6, out handled);
+            MoonWrite(board, "WriteWavePort", 0xC2, 2);
+            MoonWrite(board, "WriteWavePort", 0xC3, 0x11);
+            int[] addresses = { 0x555, 0x2AA, 0x555 };
+            byte[] values = { 0xAA, 0x55, 0x90 };
+            for (int index = 0; index < addresses.Length; index++)
+            {
+                MoonFlashAddress(board, addresses[index]);
+                MoonWrite(board, "WriteWavePort", 0xC3, values[index]);
+            }
+            MoonFlashAddress(board, 0);
+            byte manufacturer = MoonRead(board, "ReadWavePort", 0xC3, out handled);
+            byte device = MoonRead(board, "ReadWavePort", 0xC3, out handled);
+            MoonFlashAddress(board, 0);
+            MoonWrite(board, "WriteWavePort", 0xC3, 0xF0);
+            board.ResetState();
+            return manufacturer == 0xC2 && device == 0xAD;
         }
 
         private static void TestZxNetUsb()

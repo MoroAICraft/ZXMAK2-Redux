@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using ZXMAK2.Engine;
 using ZXMAK2.Engine.Entities;
 using ZXMAK2.Engine.Interfaces;
@@ -13,9 +14,8 @@ namespace ZXMAK2.Hardware.Evo
     ///
     /// The board has one YMF278B/OPL4 at 33.8688 MHz, a 2 MiB YRW801-M
     /// instrument ROM and 1 MiB SRAM.  Rev.01 decodes the low byte only:
-    /// #7E/#7F for the PCM side and #C4-#C7 for the FM side.  This is the
-    /// fixed port map from the published dd2.tdf firmware; there are no
-    /// configurable jumpers in this revision.
+    /// #7E/#7F PCM after reset, #C2/#C3 after reading #C6 (CPLD 1.01),
+    /// and #C4-#C7 FM. There are no configurable jumpers in this revision.
     /// </summary>
     public sealed class ZxmMoonSoundDevice : SoundDeviceBase,
         ISoundMixerConfiguration
@@ -34,6 +34,8 @@ namespace ZXMAK2.Hardware.Evo
         private int m_renderSample;
         private bool m_rendering;
         private string m_loadedRomPath = string.Empty;
+        private string m_flashPath = string.Empty;
+        private bool m_pcmRemapped;
         private MemoryPentEvo m_hostMemory;
         private double m_resamplePhase;
         private int m_resampleRate;
@@ -46,15 +48,17 @@ namespace ZXMAK2.Hardware.Evo
             Description =
                 "Mick Laboratory ZXM-MoonSound Rev.01, CPLD 1.01: " +
                 "YMF278B/OPL4 33.8688 MHz, YRW801-M 2 MB ROM and 1 MB SRAM. " +
-                "Ports: #7E/#7F PCM and #C4-#C7 FM.";
+                "MX29F016 flash; PCM #7E/#7F, switches to #C2/#C3 on " +
+                "reading #C6; FM #C4-#C7.";
             Category = BusDeviceCategory.Music;
+            ResampleHostOutput = true;
         }
 
         public bool RejectDc { get { return true; } }
         public bool CoreAvailable { get { return m_core != IntPtr.Zero; } }
         public string LoadedRomPath { get { return m_loadedRomPath; } }
-        // Experimental OmniSound output adapter; legacy MoonSound remains
-        // bit-identical at its accepted 44.1 kHz path.
+        // The physical clock is independent of the host's output sample rate.
+        // The 44.1 kHz path remains bit-identical.
         public bool ResampleHostOutput { get; set; }
         // OmniSound shares the Max OPL3 and MoonSound OPL4 FM port group.
         // Select Max's decoder/reset status without duplicating FM voices.
@@ -67,6 +71,8 @@ namespace ZXMAK2.Hardware.Evo
             InitializeCore();
             bmgr.Events.SubscribeWrIo(0x00FE, 0x007E, WriteWavePort);
             bmgr.Events.SubscribeRdIo(0x00FE, 0x007E, ReadWavePort);
+            bmgr.Events.SubscribeWrIo(0x00FE, 0x00C2, WriteWavePort);
+            bmgr.Events.SubscribeRdIo(0x00FE, 0x00C2, ReadWavePort);
             bmgr.Events.SubscribeWrIo(0x00FC, 0x00C4, WriteFmPort);
             bmgr.Events.SubscribeRdIo(0x00FC, 0x00C4, ReadFmPort);
             bmgr.Events.SubscribeReset(ResetChip);
@@ -116,7 +122,10 @@ namespace ZXMAK2.Hardware.Evo
                 Logger.Error(
                     "ZXM-MoonSound: 2 MB YRW801-M ROM not found in " +
                     "ROMS.PAK, beside ZXMAK2.exe or in its roms folder");
-                return;
+                // The chip and SRAM still exist with a blank/unpopulated ROM.
+                rom = new byte[RomSize];
+                for (int index = 0; index < rom.Length; index++)
+                    rom[index] = 0xFF;
             }
 
             try
@@ -124,6 +133,29 @@ namespace ZXMAK2.Hardware.Evo
                 if (rom.Length != RomSize)
                     throw new InvalidDataException(
                         "YRW801-M ROM must be exactly 2097152 bytes");
+                m_pcmRemapped = false;
+                m_flashPath = GetFlashPath(rom);
+                if (File.Exists(m_flashPath))
+                {
+                    try
+                    {
+                        byte[] savedFlash = File.ReadAllBytes(m_flashPath);
+                        if (savedFlash.Length != RomSize)
+                            Logger.Error("MoonSound saved flash has invalid size; using instrument ROM");
+                        else
+                            rom = savedFlash;
+                    }
+                    catch (IOException ex)
+                    {
+                        Logger.Error("MoonSound saved flash unavailable; using instrument ROM");
+                        Logger.Error(ex);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        Logger.Error("MoonSound saved flash inaccessible; using instrument ROM");
+                        Logger.Error(ex);
+                    }
+                }
                 m_core = NativeMethods.Create(rom, (uint)rom.Length, RamSize);
                 if (m_core == IntPtr.Zero)
                     throw new InvalidOperationException(
@@ -158,6 +190,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             if (m_core == IntPtr.Zero)
                 return;
+            SaveFlash();
             NativeMethods.Destroy(m_core);
             m_core = IntPtr.Zero;
         }
@@ -165,6 +198,7 @@ namespace ZXMAK2.Hardware.Evo
         private void ResetChip()
         {
             RenderToCurrentTime();
+            m_pcmRemapped = false;
             if (m_core != IntPtr.Zero)
             {
                 NativeMethods.Reset(m_core);
@@ -172,6 +206,45 @@ namespace ZXMAK2.Hardware.Evo
                     NativeMethods.Read(m_core, 0);
             }
             ResetResampler();
+        }
+
+        private static string GetFlashPath(byte[] rom)
+        {
+            // Keep the supplied Yamaha image untouched. Each portable install
+            // and factory ROM has its own persistent virtual flash.
+            using (var hash = SHA256.Create())
+            {
+                var sourceId = BitConverter.ToString(hash.ComputeHash(rom)).Replace("-", "");
+                var installId = BitConverter.ToString(hash.ComputeHash(
+                    System.Text.Encoding.UTF8.GetBytes(Utils.GetAppFolder().ToUpperInvariant())))
+                    .Replace("-", "").Substring(0, 16);
+                return Path.Combine(Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData), "ZXMAK2",
+                    "MoonSoundFlash", installId + "-" + sourceId + ".bin");
+            }
+        }
+
+        private void SaveFlash()
+        {
+            if (string.IsNullOrEmpty(m_flashPath) || !NativeMethods.FlashDirty(m_core))
+                return;
+            string pending = m_flashPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                var data = new byte[RomSize];
+                NativeMethods.CopyFlash(m_core, data, (uint)data.Length);
+                Directory.CreateDirectory(Path.GetDirectoryName(m_flashPath));
+                File.WriteAllBytes(pending, data);
+                if (File.Exists(m_flashPath))
+                    File.Replace(pending, m_flashPath, m_flashPath + ".bak");
+                else
+                    File.Move(pending, m_flashPath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("MoonSound flash could not be saved: " + m_flashPath);
+                Logger.Error(ex);
+            }
         }
 
         private byte[] LoadInstrumentRom()
@@ -205,7 +278,7 @@ namespace ZXMAK2.Hardware.Evo
         private void WriteWavePort(ushort address, byte value,
             ref bool handled)
         {
-            if (!AreExpansionPortsAvailable)
+            if (!AreExpansionPortsAvailable || !IsActiveWavePort(address))
                 return;
             RenderToCurrentTime();
             if (m_core != IntPtr.Zero)
@@ -217,7 +290,7 @@ namespace ZXMAK2.Hardware.Evo
         private void ReadWavePort(ushort address, ref byte value,
             ref bool handled)
         {
-            if (!AreExpansionPortsAvailable)
+            if (!AreExpansionPortsAvailable || !IsActiveWavePort(address))
                 return;
             RenderToCurrentTime();
             value = m_core != IntPtr.Zero && (address & 1) != 0
@@ -244,12 +317,21 @@ namespace ZXMAK2.Hardware.Evo
                 (!MaxOpl3Interface && !AreExpansionPortsAvailable))
                 return;
             RenderToCurrentTime();
+            // The CPLD latch is triggered by IN #C6, not OUT to the bank-1
+            // address register. Plain OPL3 writes must not break legacy PCM.
+            if ((address & 0xFF) == 0xC6)
+                m_pcmRemapped = true;
             // Both even ports expose the common YMF278B status.  OPL3 data
             // ports are write-only on the physical chip.
             value = m_core != IntPtr.Zero && (address & 1) == 0
                 ? NativeMethods.Read(m_core, 0)
                 : (byte)0xFF;
             handled = true;
+        }
+
+        private bool IsActiveWavePort(ushort address)
+        {
+            return (address & 0xFE) == (m_pcmRemapped ? 0xC2 : 0x7E);
         }
 
         /// <summary>
@@ -366,6 +448,16 @@ namespace ZXMAK2.Hardware.Evo
                 EntryPoint = "ymfm_opl4_generate")]
             internal static extern void Generate(
                 IntPtr instance, [Out] short[] output, uint samples);
+
+            [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl,
+                EntryPoint = "ymfm_opl4_flash_dirty")]
+            [return: MarshalAs(UnmanagedType.I1)]
+            internal static extern bool FlashDirty(IntPtr instance);
+
+            [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl,
+                EntryPoint = "ymfm_opl4_copy_flash")]
+            internal static extern void CopyFlash(
+                IntPtr instance, [Out] byte[] output, uint size);
         }
     }
 }

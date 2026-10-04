@@ -803,12 +803,9 @@ namespace ZXMAK2.Hardware.Evo
                 if (!File.Exists(path))
                     path = Path.Combine(appFolder,
                         "ZX-MultiSound-Max-GS.bin");
-                if (!File.Exists(path))
-                    throw new FileNotFoundException(
-                        "ZX-MultiSound Max GS firmware is required: " +
-                        "copy the supplied AM29F040B@PLCC32.BIN to roms/" +
-                        "ZX-MultiSound-Max-GS.bin", path);
-                var firmware = File.ReadAllBytes(path);
+                var firmware = File.Exists(path)
+                    ? File.ReadAllBytes(path)
+                    : RomPack.GetRomData("ZX-MultiSound-Max-GS.bin");
                 if (firmware.Length != GsRomSizeMax)
                     throw new InvalidDataException(
                         "ZX-MultiSound Max GS firmware must be 512 KiB");
