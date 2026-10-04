@@ -81,18 +81,15 @@ namespace ZXMAK2.Engine
             {
                 m_hostKeyboard.Scan();
                 var state = m_hostKeyboard.State;
-                //if (!((state[Key.LeftAlt] || state[Key.RightAlt]) && state[Key.Return]))
+                // UI ownership is resolved once by the host reader. Keyboard
+                // devices and keyboard-driven joysticks share that same state.
+                foreach (var kbd in m_keyboards)
                 {
-                    // lock for Alt+Enter?
-                    // TODO: implement system key lock (set from ui)
-                    foreach (var kbd in m_keyboards)
-                    {
-                        kbd.KeyboardState = m_hostKeyboard.State;
-                    }
+                    kbd.KeyboardState = state;
                 }
                 if (m_hostJoystick != null)
                 {
-                    m_hostJoystick.KeyboardState = m_hostKeyboard.State;
+                    m_hostJoystick.KeyboardState = state;
                 }
             }
             if (m_hostMouse != null && m_mouses.Length > 0)

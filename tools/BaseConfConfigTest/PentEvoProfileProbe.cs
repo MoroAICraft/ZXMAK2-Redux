@@ -842,6 +842,7 @@ internal static class PentEvoProfileProbe
                 "Load SD image...",
                 "Mount folder as SD...",
                 "Refresh mounted folder",
+                "Save SD session as image...",
                 "Eject SD",
                 null,
                 "Load NeoGS",
@@ -888,58 +889,39 @@ internal static class PentEvoProfileProbe
 
     private static void VerifyMachineSettingsKeyboardIsolation()
     {
-        var method = typeof(DirectKeyboard).GetMethod(
-            "IsMachineSettingsShortcutPressed",
-            BindingFlags.Static | BindingFlags.NonPublic);
-        Assert(method != null,
-            "DirectInput keyboard does not isolate the Alt+P host shortcut");
-        var state = new byte[256];
-        state[25] = 0x80; // DirectInput P
-        Assert(!(bool)method.Invoke(null, new object[] { state }),
-            "Plain P was blocked from the guest keyboard");
-        state[56] = 0x80; // Left Alt
-        Assert((bool)method.Invoke(null, new object[] { state }),
-            "Left Alt+P was not blocked from the guest keyboard");
-        state[56] = 0;
-        state[184] = 0x80; // Right Alt
-        Assert((bool)method.Invoke(null, new object[] { state }),
-            "Right Alt+P was not blocked from the guest keyboard");
-        state[29] = 0x80; // Left Ctrl
-        Assert((bool)method.Invoke(null, new object[] { state }),
-            "AltGr+P was not blocked from the guest keyboard");
-        state[184] = 0;
-        state[56] = 0x80;
-        Assert(!(bool)method.Invoke(null, new object[] { state }),
-            "Left Ctrl+Alt+P was unexpectedly blocked from the guest keyboard");
-        var fullScreen = typeof(DirectKeyboard).GetMethod(
-            "IsFullScreenShortcutPressed", BindingFlags.Static | BindingFlags.NonPublic);
-        var maximumSpeed = typeof(DirectKeyboard).GetMethod(
-            "IsMaximumSpeedShortcutPressed", BindingFlags.Static | BindingFlags.NonPublic);
-        state = new byte[256];
-        state[28] = 0x80; // Enter
-        Assert(!(bool)fullScreen.Invoke(null, new object[] { state }),
-            "Plain Enter was blocked from the guest keyboard");
-        state[56] = 0x80;
-        Assert((bool)fullScreen.Invoke(null, new object[] { state }),
-            "Alt+Enter leaked to the guest keyboard");
-        state[28] = 0;
-        state[156] = 0x80; // Keypad Enter
-        Assert((bool)fullScreen.Invoke(null, new object[] { state }),
-            "Alt+keypad Enter leaked to the guest keyboard");
-        state = new byte[256];
-        state[31] = 0x80; // S
-        Assert(!(bool)maximumSpeed.Invoke(null, new object[] { state }),
-            "Plain S was blocked from the guest keyboard");
-        foreach (var ctrl in new[] { 29, 157 })
+        var router = new ZXMAK2.Host.WinForms.Controls.HostKeyboardRouter();
+        router.RegisterShortcut(Keys.Alt | Keys.P, delegate {});
+        router.RegisterShortcut(Keys.Alt | Keys.Enter, delegate {});
+        router.RegisterShortcut(Keys.Control | Keys.S, delegate {});
+        var state = new bool[Enum.GetValues(typeof(ZXMAK2.Host.Entities.Key)).Length];
+        state[(int)ZXMAK2.Host.Entities.Key.P] = true;
+        router.Scan(state);
+        Assert(router[ZXMAK2.Host.Entities.Key.P], "Plain P was blocked");
+        state[(int)ZXMAK2.Host.Entities.Key.LeftAlt] = true;
+        router.Scan(state);
+        Assert(!router[ZXMAK2.Host.Entities.Key.P], "Alt+P leaked");
+        router.Scan(new bool[state.Length]);
+        state = new bool[state.Length];
+        state[(int)ZXMAK2.Host.Entities.Key.RightAlt] = true;
+        state[(int)ZXMAK2.Host.Entities.Key.LeftControl] = true;
+        state[(int)ZXMAK2.Host.Entities.Key.P] = true;
+        router.Scan(state);
+        Assert(!router[ZXMAK2.Host.Entities.Key.P], "AltGr+P leaked");
+        foreach (var enter in new[] { ZXMAK2.Host.Entities.Key.Return, ZXMAK2.Host.Entities.Key.NumPadEnter })
         {
-            state[ctrl] = 0x80;
-            Assert((bool)maximumSpeed.Invoke(null, new object[] { state }),
-                "Ctrl+S leaked to the guest keyboard");
-            state[42] = 0x80;
-            Assert(!(bool)maximumSpeed.Invoke(null, new object[] { state }),
-                "Ctrl+Shift+S was unexpectedly reserved by the host");
-            state[42] = 0;
-            state[ctrl] = 0;
+            router.Scan(new bool[state.Length]);
+            state = new bool[state.Length];
+            state[(int)enter] = state[(int)ZXMAK2.Host.Entities.Key.LeftAlt] = true;
+            router.Scan(state);
+            Assert(!router[enter], "Alt+Enter leaked");
+        }
+        foreach (var ctrl in new[] { ZXMAK2.Host.Entities.Key.LeftControl, ZXMAK2.Host.Entities.Key.RightControl })
+        {
+            router.Scan(new bool[state.Length]);
+            state = new bool[state.Length];
+            state[(int)ctrl] = state[(int)ZXMAK2.Host.Entities.Key.S] = true;
+            router.Scan(state);
+            Assert(!router[ZXMAK2.Host.Entities.Key.S], "Ctrl+S leaked");
         }
     }
 

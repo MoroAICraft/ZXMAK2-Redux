@@ -931,6 +931,8 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if ((keyData & (Keys.Control | Keys.Alt)) == (Keys.Control | Keys.Alt) && _host != null)
+                _host.Uncapture();
             if (TryExecuteHostShortcut(keyData))
                 return true;
             return base.ProcessCmdKey(ref msg, keyData);
