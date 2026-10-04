@@ -15,7 +15,8 @@ namespace ZXMAK2.Hardware.Evo
     /// The board has one YMF278B/OPL4 at 33.8688 MHz, a 2 MiB YRW801-M
     /// instrument ROM and 1 MiB SRAM.  Rev.01 decodes the low byte only:
     /// #7E/#7F PCM after reset, #C2/#C3 after reading #C6 (CPLD 1.01),
-    /// and #C4-#C7 FM. There are no configurable jumpers in this revision.
+    /// and #C4-#C7 FM. JP1 "PentEvo" disables the external /DOS gate;
+    /// PCM remapping in firmware 1.01 is latched by reading #C6.
     /// </summary>
     public sealed class ZxmMoonSoundDevice : SoundDeviceBase,
         ISoundMixerConfiguration
@@ -37,6 +38,11 @@ namespace ZXMAK2.Hardware.Evo
         private string m_flashPath = string.Empty;
         private bool m_pcmRemapped;
         private MemoryPentEvo m_hostMemory;
+        // Rev.01 JP1 "PentEvo" grounds C_PEVO. Rev.C ZXBUS B20 is
+        // unconnected; board R5 pulls C_IODOS high. Keep the pin-level
+        // ENDOS gate, rather than confusing it with the internal DOS latch.
+        internal bool PentEvoJumperClosed { get; set; }
+        internal bool IoDosInputHigh { get; set; }
         private double m_resamplePhase;
         private int m_resampleRate;
         private int m_previousLeft, m_previousRight;
@@ -52,6 +58,8 @@ namespace ZXMAK2.Hardware.Evo
                 "reading #C6; FM #C4-#C7.";
             Category = BusDeviceCategory.Music;
             ResampleHostOutput = true;
+            PentEvoJumperClosed = true;
+            IoDosInputHigh = true;
         }
 
         public bool RejectDc { get { return true; } }
@@ -278,7 +286,7 @@ namespace ZXMAK2.Hardware.Evo
         private void WriteWavePort(ushort address, byte value,
             ref bool handled)
         {
-            if (!AreExpansionPortsAvailable || !IsActiveWavePort(address))
+            if (!AreExpansionPortsAvailable(address) || !IsActiveWavePort(address))
                 return;
             RenderToCurrentTime();
             if (m_core != IntPtr.Zero)
@@ -290,7 +298,7 @@ namespace ZXMAK2.Hardware.Evo
         private void ReadWavePort(ushort address, ref byte value,
             ref bool handled)
         {
-            if (!AreExpansionPortsAvailable || !IsActiveWavePort(address))
+            if (!AreExpansionPortsAvailable(address) || !IsActiveWavePort(address))
                 return;
             RenderToCurrentTime();
             value = m_core != IntPtr.Zero && (address & 1) != 0
@@ -302,7 +310,7 @@ namespace ZXMAK2.Hardware.Evo
         private void WriteFmPort(ushort address, byte value,
             ref bool handled)
         {
-            if (!MaxOpl3Interface && !AreExpansionPortsAvailable)
+            if (!MaxOpl3Interface && !AreExpansionPortsAvailable(address))
                 return;
             RenderToCurrentTime();
             if (m_core != IntPtr.Zero)
@@ -314,7 +322,7 @@ namespace ZXMAK2.Hardware.Evo
             ref bool handled)
         {
             if ((MaxOpl3Interface && handled) ||
-                (!MaxOpl3Interface && !AreExpansionPortsAvailable))
+                (!MaxOpl3Interface && !AreExpansionPortsAvailable(address)))
                 return;
             RenderToCurrentTime();
             // The CPLD latch is triggered by IN #C6, not OUT to the bank-1
@@ -335,13 +343,16 @@ namespace ZXMAK2.Hardware.Evo
         }
 
         /// <summary>
-        /// Rev.01 CPLD signal ENDOS disconnects both MoonSound port groups
-        /// while the PentEvo TR-DOS ports are enabled.  A non-PentEvo host
-        /// has no such motherboard gate, so retain the board's own decoder.
+        /// CPLD: ENDOS = (!C_DOS & C_PEVO) | !C_IODOS.
+        /// C_DOS is the external /DOS (ROMPG1) pin, NOT Memory.DOSEN.
+        /// With the PentEvo jumper closed, C_PEVO=0; Rev.C leaves IODOS
+        /// open/pulled high. Thus CPM/DOSEN does not disable this board.
+        /// The actual pin gate remains testable for a driven IODOS or open JP1.
         /// </summary>
-        private bool AreExpansionPortsAvailable
+        private bool AreExpansionPortsAvailable(ushort address)
         {
-            get { return m_hostMemory == null || !m_hostMemory.DOSEN; }
+            return IoDosInputHigh && (m_hostMemory == null ||
+                PentEvoJumperClosed || m_hostMemory.GetZxBusDosN(address));
         }
 
         private void RenderToCurrentTime()

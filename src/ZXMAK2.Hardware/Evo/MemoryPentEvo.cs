@@ -1054,6 +1054,23 @@ namespace ZXMAK2.Hardware.Evo
             set { base.DOSEN = value | CPM; }
         }
 
+        internal bool GetZxBusDosN(ushort address)
+        {
+            // BaseConf top.v: dos_n=rompg[1]; zmem selects the mapped page
+            // using ZA[15:14], also on IO cycles. This is not zdos.dos.
+            byte[] mapped;
+            switch (address >> 14)
+            {
+                case 0: mapped = MapRead0000; break;
+                case 1: mapped = MapRead4000; break;
+                case 2: mapped = MapRead8000; break;
+                default: mapped = MapReadC000; break;
+            }
+            int page = Array.IndexOf(RamPages, mapped);
+            if (page < 0) page = Array.IndexOf(RomPages, mapped);
+            return (page & 2) != 0;
+        }
+
         public override bool SYSEN
         {
             get { return SHADOW; }

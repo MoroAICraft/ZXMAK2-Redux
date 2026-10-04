@@ -703,8 +703,9 @@ namespace Test
             var portMapPassed = TestMoonSoundPortMap(board);
             var flashIdPassed = TestMoonSoundFlashId(board);
 
-            // The Rev.01 CPLD releases its decoded ports when PentEvo
-            // enables TR-DOS I/O. Exercise that motherboard gate without
+            // Rev.01 ENDOS uses physical pins: JP1 grounds C_PEVO on
+            // PentEvo, while R5 pulls the unconnected IODOS high. Exercise
+            // a driven-low IODOS gate, not the unrelated DOSEN latch, without
             // replacing the Spectrum memory used by the audio program.
             var pentEvoMemory = new ZXMAK2.Hardware.Evo.MemoryPentEvo();
             typeof(ZXMAK2.Hardware.MemoryBase)
@@ -717,6 +718,10 @@ namespace Test
                     System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic)
                 .SetValue(board, pentEvoMemory);
+            var ioDosPin = typeof(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice)
+                .GetProperty("IoDosInputHigh", System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic);
+            ioDosPin.SetValue(board, false, null);
             var gatedRead = typeof(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice)
                 .GetMethod("ReadWavePort",
                     System.Reflection.BindingFlags.Instance |
@@ -728,6 +733,46 @@ namespace Test
             gatedRead.Invoke(board, gatedArguments);
             var dosGatePassed = !(bool)gatedArguments[2] &&
                 (byte)gatedArguments[1] == 0xA5;
+            // A driven-low IODOS must release all reads AND writes,
+            // including the #C6 latch trigger and both PCM aliases.
+            foreach (ushort port in new ushort[] { 0x12C2, 0x12C3, 0x12C4,
+                0x12C5, 0x12C6, 0x12C7, 0x127E, 0x127F })
+            {
+                bool fmPort = (port & 255) >= 0xC4 && (port & 255) <= 0xC7;
+                foreach (bool write in new bool[] { false, true })
+                {
+                    var args = new object[] { port, (byte)0xA5, false };
+                    var method = (write ? "Write" : "Read") + (fmPort ? "FmPort" : "WavePort");
+                    board.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(board, args);
+                    dosGatePassed &= !(bool)args[2] && (byte)args[1] == 0xA5;
+                }
+            }
+            ioDosPin.SetValue(board, true, null);
+            var jumper = board.GetType().GetProperty("PentEvoJumperClosed",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            jumper.SetValue(board, false, null);
+            var available = board.GetType().GetMethod("AreExpansionPortsAvailable",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            // ROMPG1 follows the selected physical page on I/O cycles.
+            // Test both RAM and ROM pages with JP1 open, independently of DOSEN.
+            foreach (bool rom in new bool[] { false, true })
+                for (int window = 0; window < 4; window++)
+                {
+                    string name = "MapRead" + (window * 0x4000).ToString("X4");
+                    typeof(ZXMAK2.Hardware.MemoryBase).GetField(name,
+                        BindingFlags.Instance | BindingFlags.NonPublic).SetValue(pentEvoMemory,
+                            rom ? pentEvoMemory.RomPages[window] : pentEvoMemory.RamPages[window]);
+                    ushort port = (ushort)((window * 0x4000) | 0xC4);
+                    dosGatePassed &= (bool)available.Invoke(board, new object[] { port }) ==
+                        ((window & 2) != 0);
+                }
+            jumper.SetValue(board, true, null);
+            gatedArguments = new object[] { (ushort)0x12C4, (byte)0xA5, false };
+            typeof(ZXMAK2.Hardware.Evo.ZxmMoonSoundDevice).GetMethod("ReadFmPort",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .Invoke(board, gatedArguments);
+            dosGatePassed &= (bool)gatedArguments[2] && (byte)gatedArguments[1] != 0xFF;
 
             machine.BusManager.Disconnect();
             machine.Dispose();
@@ -739,7 +784,7 @@ namespace Test
             Console.WriteLine(
                 "ZXM-MoonSound Rev.01 @{10} Hz: status=#{0:X2}/#{1:X2}, " +
                 "SRAM=#{2:X2}, FM peak={3}, PCM peak={4}, " +
-                "TR-DOS gate={5}, CPLD 1.01={7}, MX29F016={8}, NedoOS={9}: {6}",
+                "IODOS pin gate={5}, CPLD 1.01={7}, MX29F016={8}, NedoOS={9}: {6}",
                 status0, status1, ramValue, fmPeak, pcmPeak,
                 dosGatePassed ? "PASS" : "FAIL",
                 passed ? "PASS" : "FAIL", portMapPassed, flashIdPassed, nedoDetectPassed, sampleRate);

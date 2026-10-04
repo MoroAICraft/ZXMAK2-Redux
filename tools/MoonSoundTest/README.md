@@ -31,6 +31,24 @@ contains a CPLD `.pof`, not the YRW801 instrument ROM. The PCM latch behavior is
 confirmed by NedoOS's `switch_to_pcm_ports_c2_c3` macro; the public 1.00 RTL
 documents the original decoder/ENDOS gate.
 
+## v77 real NedoOS / ENDOS regression
+
+`RealNedoProbe.cs` runs the original ROM, SD boot, NedoOS and an unmodified
+OmniPlayer in the emulator engine. It injects only guest keyboard states and
+logs the original port handlers, not substitute timer routines. Compile x86
+against the runtime DLLs including ZX-OmniSound; place its executable/config
+beside those DLLs and run only on a **copied** SD folder:
+
+```
+RealNedoProbe.exe <profile.vmz> <copied-SD-folder> <trace-folder> key:D5 wait:300 key:F10 key:Return gp key:Return key:Escape key:Y gp
+```
+
+Add `board:OmniSound` to test the shared PCM block. Actual clock values are
+recorded; a requested speed is not proof of that speed surviving NedoOS.
+`/moonsound` now tests physical IODOS-low release and open JP1/ROMPG1 instead
+of the incorrect assumption that MemoryPentEvo.DOSEN disables the board.
+See `docs/history/MOONSOUND_NEDOOS_ENDOS_V77.md` for traces and limitations.
+
 Flash model limits: program/erase contents update immediately, polling waits
 the modelled completion time. No electrical failures/wear, program of other
 sectors during erase suspend, or multiple-sector erase queue is modelled.
