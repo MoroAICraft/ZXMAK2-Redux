@@ -1456,6 +1456,13 @@ namespace Test
             if (!machine.BusManager.Connect())
                 throw new InvalidOperationException("OmniSound connect failed");
 
+            // v76: the composite board must use the same corrected CPLD/flash
+            // as standalone MoonSound, without a second implementation.
+            if (!TestMoonSoundPortMap(board.MoonSound) || !TestMoonSoundFlashId(board.MoonSound))
+                throw new InvalidOperationException("OmniSound MoonSound port/flash integration failed");
+            board.ResetState();
+            Console.WriteLine("OmniSound shared MoonSound CPLD 1.01 / MX29F016 C2/AD: PASS");
+
             var renderers = new System.Collections.Generic.List<ISoundRenderer>(
                 board.SoundRenderers);
             var core = typeof(ZXMAK2.Hardware.Evo.ZxMultiSoundCore);

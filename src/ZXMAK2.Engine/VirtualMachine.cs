@@ -380,6 +380,12 @@ namespace ZXMAK2.Engine
 
         private bool m_bpTriggered;
 
+        private void ResetHostKeyboard()
+        {
+            var keyboard = m_host.Keyboard as IResettableHostKeyboard;
+            if (keyboard != null) keyboard.ResetState();
+        }
+
         public void DoReset()
         {
             lock (m_sync)
@@ -387,6 +393,7 @@ namespace ZXMAK2.Engine
                 var run = IsRunning;
                 DoStop();
                 m_bpTriggered = false;
+                ResetHostKeyboard();
                 Spectrum.DebugReset();
                 if (run && !m_bpTriggered)
                 {
@@ -403,6 +410,8 @@ namespace ZXMAK2.Engine
                 var run = IsRunning;
                 DoStop();
                 m_bpTriggered = false;
+
+                ResetHostKeyboard();
 
                 // A physical power cycle starts PentEvo with cleared RAM.
                 // ERS keeps its initialized SD-card descriptor in RAM, so a

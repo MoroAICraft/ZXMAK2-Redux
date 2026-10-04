@@ -55,6 +55,9 @@ namespace ZXMAK2.Host.WinForms.Tools
         [DllImport("user32.dll")]
         public static extern short GetKeyState(int virtualKey);
 
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int virtualKey);
+
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr GetAncestor(IntPtr hwnd, int gaFlags);
 

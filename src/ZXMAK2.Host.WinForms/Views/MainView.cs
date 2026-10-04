@@ -90,9 +90,10 @@ namespace ZXMAK2.Host.WinForms.Views
         private bool _isToolBarPopupActive;
         private bool _isFullScreenChanging;
         private bool _isFormShown;
-        private volatile int _openHostMenus;
+        private readonly HostKeyboardRouter _keyboardRouter = new HostKeyboardRouter();
+        private HostKeyboardMessageFilter _keyboardMessages;
 
-        internal bool IsHostMenuOpen { get { return _openHostMenus > 0; } }
+        internal HostKeyboardRouter KeyboardRouter { get { return _keyboardRouter; } }
 
         #endregion Fields
 
@@ -115,6 +116,9 @@ namespace ZXMAK2.Host.WinForms.Views
 
             SetStyle(ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint, true);
             InitializeComponent();
+            _keyboardMessages = new HostKeyboardMessageFilter(this, _keyboardRouter);
+            _keyboardMessages.TrackStrip(mnuStrip);
+            _keyboardMessages.TrackStrip(tbrStrip);
             InitializeEvoDisplayMenu();
             InitializeMediaToolbar();
             TrackHostMenu(menuFile);
@@ -127,6 +131,7 @@ namespace ZXMAK2.Host.WinForms.Views
             LoadMachineMenu();
 
             Bind();
+            InitializeKeyboardShortcuts();
 
             _quickBootStateTimer.Interval = 100;
             _quickBootStateTimer.Tick += QuickBootStateTimer_OnTick;
@@ -583,9 +588,7 @@ namespace ZXMAK2.Host.WinForms.Views
 
         private void TrackHostMenu(ToolStripDropDownItem item)
         {
-            item.DropDownOpened += (sender, args) => _openHostMenus++;
-            item.DropDownClosed += (sender, args) =>
-                _openHostMenus = Math.Max(0, _openHostMenus - 1);
+            _keyboardMessages.TrackMenu(item);
         }
 
         private void ClearMediaToolbarMenus()
@@ -928,8 +931,6 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            // DirectInput independently reads physical keys; its shortcut
-            // filters prevent guest input. This path executes host commands.
             if (TryExecuteHostShortcut(keyData))
                 return true;
             return base.ProcessCmdKey(ref msg, keyData);
@@ -937,6 +938,8 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            if (e.Alt && e.Control && _host != null)
+                _host.Uncapture();
             if (TryExecuteHostShortcut(e.KeyData))
             {
                 e.SuppressKeyPress = true;
@@ -944,86 +947,52 @@ namespace ZXMAK2.Host.WinForms.Views
                 return;
             }
             base.OnKeyDown(e);
-            if (_host.IsCaptured)
+            if (_host != null && _host.IsCaptured)
             {
                 e.SuppressKeyPress = true;
-            }
-            if (e.Alt && e.Control)
-            {
-                _host.Uncapture();
-            }
-            //RESET
-            if (e.KeyCode == Keys.F12)
-            {
-                if (e.Alt && e.Control)
-                {
-                    RequestFactoryReset();
-                }
-                else if (e.Control && !e.Alt)
-                {
-                    RequestCmosReset();
-                }
-                else if (!e.Alt && !e.Shift)
-                {
-                    // This form does not receive a debugger-window F12 key,
-                    // so the debugger keeps its own existing F12 behavior.
-                    OnCommand(CommandVmWarmReset);
-                    RefreshMediaToolbarStates();
-                }
-                e.SuppressKeyPress = true;
-                e.Handled = true;
-                return;
-            }
-            // STOP/RUN
-            if (e.KeyCode == Keys.Pause)
-            {
-                OnCommand(CommandVmPause);
-                e.Handled = true;
-                return;
-            }
-            if (e.Alt && e.Control && e.KeyCode == Keys.F1)
-            {
-                OnCommand(CommandQuickLoad);
-                e.Handled = true;
-                return;
-            }
-            if (e.Alt && e.Control && e.KeyCode == Keys.F8)
-            {
-                OnCommand(CommandTapePause);
-                e.Handled = true;
-                return;
             }
         }
 
         private bool TryExecuteHostShortcut(Keys keyData)
         {
-            ToolStripMenuItem item;
-            if (IsAltHostShortcut(keyData, Keys.P))
-                item = menuVmSettings;
-            else if (IsAltHostShortcut(keyData, Keys.Enter))
-                item = menuViewFullScreen;
-            else if (keyData == (Keys.Control | Keys.S))
-                item = menuVmMaximumSpeed;
-            else
-                return false;
-            if (item.Enabled)
-                item.PerformClick();
-            return true;
+            return _keyboardRouter.ExecuteShortcut(keyData,
+                (NativeMethods.GetKeyState(0xA5) & 0x8000) != 0);
         }
 
-        private static bool IsAltHostShortcut(Keys keyData, Keys key)
+        private void InitializeKeyboardShortcuts()
         {
-            var modifiers = keyData & Keys.Modifiers;
-            if ((keyData & Keys.KeyCode) != key ||
-                (modifiers & Keys.Alt) == 0 ||
-                (modifiers & Keys.Shift) != 0)
+            // Menu ShortcutKeys are the source of truth, including future additions.
+            RegisterMenuShortcuts(mnuStrip.Items);
+            _keyboardRouter.RegisterShortcut(Keys.Alt | Keys.P, () => ClickShortcut(menuVmSettings));
+            _keyboardRouter.RegisterShortcut(Keys.Alt | Keys.Enter, () => ClickShortcut(menuViewFullScreen));
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.S, () => ClickShortcut(menuVmMaximumSpeed));
+            _keyboardRouter.RegisterShortcut(Keys.Pause, () => OnCommand(CommandVmPause));
+            _keyboardRouter.RegisterShortcut(Keys.F12, () =>
             {
-                return false;
+                OnCommand(CommandVmWarmReset);
+                RefreshMediaToolbarStates();
+            });
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.F12, RequestCmosReset);
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.Alt | Keys.F12, RequestFactoryReset);
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.Alt | Keys.F1, () => OnCommand(CommandQuickLoad));
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.Alt | Keys.F8, () => OnCommand(CommandTapePause));
+        }
+
+        private static void ClickShortcut(ToolStripMenuItem item)
+        {
+            if (item.Enabled) item.PerformClick();
+        }
+
+        private void RegisterMenuShortcuts(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                var menu = item as ToolStripMenuItem;
+                if (menu == null) continue;
+                if (menu.ShortcutKeys != Keys.None)
+                    _keyboardRouter.RegisterShortcut(menu.ShortcutKeys, () => ClickShortcut(menu));
+                RegisterMenuShortcuts(menu.DropDownItems);
             }
-            // On Windows, right Alt (AltGr) can also report Ctrl. Do not
-            // treat a real left Ctrl+Alt+P as this shortcut.
-            return (modifiers & Keys.Control) == 0 ||
-                (NativeMethods.GetKeyState(0xA5) & 0x8000) != 0;
         }
 
         protected override void OnDeactivate(EventArgs e)

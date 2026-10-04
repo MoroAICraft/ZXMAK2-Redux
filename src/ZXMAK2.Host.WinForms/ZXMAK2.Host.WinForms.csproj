@@ -59,6 +59,7 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Controls\WinFormsKeyboard.cs" />
+    <Compile Include="Controls\HostKeyboardRouter.cs" />
     <Compile Include="Controls\Separator.cs">
       <SubType>Component</SubType>
     </Compile>

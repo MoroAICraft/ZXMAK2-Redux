@@ -1,93 +1,88 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
-using ZXMAK2.Host.Entities;
 using ZXMAK2.Host.Entities.Tools;
 using ZXMAK2.Host.Interfaces;
+using ZXMAK2.Host.WinForms.Tools;
+using ZXMAK2.Host.WinForms.Views;
+using GuestKey = ZXMAK2.Host.Entities.Key;
 
 namespace ZXMAK2.Host.WinForms.Controls
 {
-    public sealed class WinFormsKeyboard : IHostKeyboard, IKeyboardState
+    // Physical polling sees ProcessCmdKey-owned keys and releases outside the window.
+    public sealed class WinFormsKeyboard : IHostKeyboard, IResettableHostKeyboard
     {
+        private readonly object _sync = new object();
         private readonly Form _form;
+        private readonly HostKeyboardRouter _router;
         private readonly KeyboardStateMapper<Keys> _mapper = new KeyboardStateMapper<Keys>();
-        private readonly Dictionary<Key, bool> _state = new Dictionary<Key, bool>();
+        private readonly bool[] _physical = new bool[Enum.GetValues(typeof(GuestKey)).Length];
+        private IntPtr _handle;
+        private bool _disposed;
 
         public WinFormsKeyboard(Form form)
         {
-            if (form == null)
-            {
-                throw new ArgumentNullException("form");
-            }
+            if (form == null) throw new ArgumentNullException("form");
             _form = form;
-            _mapper.LoadMapFromString(
-                global::ZXMAK2.Host.WinForms.Properties.Resources.Keyboard_WinForms);
-            foreach (var key in _mapper.Keys)
+            _handle = form.Handle;
+            var main = form as MainView;
+            _router = main == null ? new HostKeyboardRouter() : main.KeyboardRouter;
+            _mapper.LoadMapFromString(Properties.Resources.Keyboard_WinForms);
+            form.Deactivate += OnDeactivate;
+            form.HandleCreated += OnHandleCreated;
+            form.HandleDestroyed += OnHandleDestroyed;
+        }
+
+        public IKeyboardState State { get { return _router; } }
+
+        public void Scan()
+        {
+            lock (_sync)
             {
-                _state[key] = false;
+                if (_disposed || _handle == IntPtr.Zero || _handle != NativeMethods.GetForegroundWindow())
+                {
+                    _router.ClearState();
+                    return;
+                }
+                Array.Clear(_physical, 0, _physical.Length);
+                foreach (var key in _mapper.Keys)
+                    _physical[(int)key] = (NativeMethods.GetAsyncKeyState(VirtualKey(key)) & 0x8000) != 0;
+                _router.Scan(_physical);
             }
-            _form.KeyDown += Form_OnKeyDown;
-            _form.KeyUp += Form_OnKeyUp;
+        }
+
+        private int VirtualKey(GuestKey key)
+        {
+            switch (key)
+            {
+                case GuestKey.LeftShift: return 0xA0;
+                case GuestKey.RightShift: return 0xA1;
+                case GuestKey.LeftControl: return 0xA2;
+                case GuestKey.RightControl: return 0xA3;
+                case GuestKey.LeftAlt: return 0xA4;
+                case GuestKey.RightAlt: return 0xA5;
+                default: return (int)_mapper[key];
+            }
+        }
+
+        public void ResetState() { lock (_sync) _router.ClearState(); }
+        private void OnDeactivate(object sender, EventArgs args) { ResetState(); }
+        private void OnHandleCreated(object sender, EventArgs args) { lock (_sync) _handle = _form.Handle; }
+        private void OnHandleDestroyed(object sender, EventArgs args)
+        {
+            lock (_sync) { _handle = IntPtr.Zero; _router.ClearState(); }
         }
 
         public void Dispose()
         {
-        }
-
-
-        #region IHostKeyboard
-
-        public void Scan()
-        {
-        }
-
-        public IKeyboardState State
-        {
-            get { return this; }
-        }
-
-        #endregion IHostKeyboard
-
-
-        #region IKeyboardState
-
-        public bool this[Key key]
-        {
-            get { return _state.ContainsKey(key) && _state[key]; }
-        }
-
-        #endregion IKeyboardState
-
-
-        #region Private
-
-        private void Form_OnKeyDown(object sender, KeyEventArgs e)
-        {
-            //Logger.Debug("KeyCode={0}, KeyValue={1}, Modifiers={2}", e.KeyCode, e.KeyValue, e.Modifiers);
-            foreach (var key in _mapper.Keys.ToArray())
+            lock (_sync)
             {
-                if (_mapper[key] == e.KeyCode)
-                {
-                    _state[key] = true;
-                    //Logger.Debug("DN: {0}", key);
-                }
+                if (_disposed) return;
+                _disposed = true;
+                _router.ClearState();
+                _form.Deactivate -= OnDeactivate;
+                _form.HandleCreated -= OnHandleCreated;
+                _form.HandleDestroyed -= OnHandleDestroyed;
             }
         }
-
-        private void Form_OnKeyUp(object sender, KeyEventArgs e)
-        {
-            foreach (var key in _mapper.Keys.ToArray())
-            {
-                if (_mapper[key] == e.KeyCode)
-                {
-                    _state[key] = false;
-                    //Logger.Debug("UP: {0}", key);
-                }
-            }
-        }
-
-        #endregion Private
     }
 }

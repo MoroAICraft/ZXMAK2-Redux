@@ -77,7 +77,7 @@ namespace ZXMAK2.Engine
         public void Scan()
         {
             if (m_hostKeyboard != null &&
-                (m_keyboards.Length > 0 || m_hostJoystick.IsKeyboardStateRequired))
+                (m_keyboards.Length > 0 || (m_hostJoystick != null && m_hostJoystick.IsKeyboardStateRequired)))
             {
                 m_hostKeyboard.Scan();
                 var state = m_hostKeyboard.State;
