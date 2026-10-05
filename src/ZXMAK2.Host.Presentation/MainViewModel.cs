@@ -259,15 +259,17 @@ namespace ZXMAK2.Host.Presentation
         {
             if (m_vm == null)
                 return true;
-            var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
-            if (sd == null || !sd.HasPendingChanges)
-                return true;
             var running = m_vm.IsRunning;
             if (running)
                 m_vm.DoStop();
+            var accepted = false;
             try
             {
-                return sd.PrepareForMediaChange();
+                // Stop before testing dirty state. After accepting close the
+                // guest must not write again between confirmation and disposal.
+                var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
+                accepted = sd == null || sd.PrepareForMediaChange();
+                return accepted;
             }
             catch (Exception ex)
             {
@@ -277,7 +279,7 @@ namespace ZXMAK2.Host.Presentation
             }
             finally
             {
-                if (running && m_vm != null && !m_vm.IsRunning)
+                if (!accepted && running && m_vm != null && !m_vm.IsRunning)
                     m_vm.DoRun();
             }
         }

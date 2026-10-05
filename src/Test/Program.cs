@@ -3046,16 +3046,58 @@ namespace Test
                         File.ReadAllBytes(Path.Combine(root, "test.trd")),
                         originalHostData),
                         "SD write touched the source folder before confirmation");
+                    var journal = (string)typeof(HostFolderFat32Stream).GetField(
+                        "m_journalPath", System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic).GetValue(writable);
+                    AssertHostFolderSd(File.Exists(journal) && journal.StartsWith(
+                        SdSessionStorage.GetDirectory("HostFolders") +
+                        Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase),
+                        "host-folder journal is not portable");
+                    writable.CommitChanges();
+                    AssertHostFolderSd(!writable.HasChanges && !File.Exists(journal),
+                        "accepted save did not clear the folder journal");
                 }
-                using (var recovered = new HostFolderFat32Stream(root))
+                using (var fresh = new HostFolderFat32Stream(root))
                 {
-                    AssertHostFolderSd(recovered.HasChanges,
-                        "unsaved SD changes were not recovered");
-                    recovered.CommitChanges();
+                    AssertHostFolderSd(!fresh.HasChanges && !fresh.WasRecovered,
+                        "new folder mount must not recover a previous session");
                 }
                 AssertHostFolderSd(File.ReadAllBytes(
                     Path.Combine(root, "test.trd"))[0] == (byte)'Q',
                     "confirmed SD write was not saved to the source folder");
+
+                // Simulate a crashed/copied journal, then change the PC folder.
+                // A fresh mount must use PC data even with that journal present.
+                string abandonedJournal = null;
+                try
+                {
+                    using (var abandoned = new HostFolderFat32Stream(root))
+                    {
+                        var sector = ReadHostFolderSector(abandoned, 0);
+                        sector[3] ^= 1;
+                        abandoned.Position = 0;
+                        abandoned.Write(sector, 0, sector.Length);
+                        var journal = (string)typeof(HostFolderFat32Stream).GetField(
+                            "m_journalPath", System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.NonPublic).GetValue(abandoned);
+                        abandonedJournal = Path.Combine(Path.GetDirectoryName(journal),
+                            Guid.NewGuid().ToString("N") + ".journal");
+                        File.Copy(journal, abandonedJournal);
+                    }
+                    File.WriteAllText(Path.Combine(root, "pc-after-crash.txt"), "CURRENT");
+                    using (var fresh = new HostFolderFat32Stream(root))
+                    {
+                        AssertHostFolderSd(!fresh.HasChanges && !fresh.WasRecovered &&
+                            FindFatEntry(ReadFatDirectory(fresh,
+                                ReadHostFolderSector(fresh, 0), 2), "pc-after-crash.txt") != null,
+                            "stale journal blocked or overlaid changed PC folder");
+                    }
+                }
+                finally
+                {
+                    if (abandonedJournal != null && File.Exists(abandonedJournal))
+                        File.Delete(abandonedJournal);
+                }
 
                 using (var writable = new HostFolderFat32Stream(root))
                 {
@@ -3211,6 +3253,12 @@ namespace Test
                 {
                     image.Position = 100;
                     image.Write(new byte[] { 0x51, 0x52 }, 0, 2);
+                    var journal = (string)typeof(SdImageSessionStream).GetField(
+                        "m_journalPath", System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic).GetValue(image);
+                    AssertHostFolderSd(File.Exists(journal) && journal.StartsWith(
+                        SdSessionStorage.GetDirectory("Images") + Path.DirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase), "SD image journal is not portable");
                     using (var original = new FileStream(imagePath,
                         FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     {
@@ -3256,12 +3304,64 @@ namespace Test
                     string.Equals(restored.ConfiguredSourcePath, Path.GetFullPath(root),
                         StringComparison.OrdinalIgnoreCase),
                     "Host Folder source did not survive configuration round-trip");
+                TestPortableSdStartup(root);
                 Console.WriteLine("Host Folder SD FAT32: PASS");
             }
             finally
             {
                 if (Directory.Exists(root))
                     Directory.Delete(root, true);
+            }
+        }
+
+        private static void TestPortableSdStartup(string testRoot)
+        {
+            var flags = System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic;
+            var restore = typeof(ZXMAK2.Hardware.Evo.ZsdPentEvo).GetMethod(
+                "RestoreConfiguredCard", flags);
+            var missing = Path.Combine(testRoot, "missing-source");
+            var document = new XmlDocument();
+            document.LoadXml("<Device sdSource='HostFolder' />");
+            document.DocumentElement.SetAttribute("sdPath", missing);
+            var device = new ZXMAK2.Hardware.Evo.ZsdPentEvo();
+            device.LoadConfigXml(document.DocumentElement);
+            restore.Invoke(device, null);
+            AssertHostFolderSd(!device.IsMediaMounted &&
+                string.IsNullOrEmpty(device.RestoreWarning) && !Directory.Exists(missing) &&
+                device.ConfiguredSourcePath == missing,
+                "missing folder did not silently leave an empty slot/retain its path");
+            Directory.CreateDirectory(missing);
+            File.WriteAllText(Path.Combine(missing, "now-present.txt"), "PC");
+            restore.Invoke(device, null);
+            AssertHostFolderSd(device.IsMediaMounted && string.IsNullOrEmpty(device.RestoreWarning),
+                "returned PC folder was not mounted on a later startup");
+            device.BusDisconnect();
+
+            // Existing internal sources are saved relatively, independent of CWD.
+            var appFolder = Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location);
+            var internalFolder = Path.Combine(appFolder, "sd-path-test-" + Guid.NewGuid().ToString("N"));
+            var previousCwd = Environment.CurrentDirectory;
+            Directory.CreateDirectory(internalFolder);
+            try
+            {
+                device.ConfigureSource(ZXMAK2.Hardware.Evo.SdSourceType.HostFolder, internalFolder);
+                document.LoadXml("<Device />");
+                device.SaveConfigXml(document.DocumentElement);
+                AssertHostFolderSd(!Path.IsPathRooted(document.DocumentElement.GetAttribute("sdPath")),
+                    "internal SD folder was saved as an absolute PC path");
+                Environment.CurrentDirectory = testRoot;
+                var relocated = new ZXMAK2.Hardware.Evo.ZsdPentEvo();
+                relocated.LoadConfigXml(document.DocumentElement);
+                restore.Invoke(relocated, null);
+                AssertHostFolderSd(relocated.ConfiguredSourcePath == internalFolder && relocated.IsMediaMounted,
+                    "portable source resolution depends on the current directory");
+                relocated.BusDisconnect();
+            }
+            finally
+            {
+                Environment.CurrentDirectory = previousCwd;
+                Directory.Delete(internalFolder);
             }
         }
 

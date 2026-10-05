@@ -371,8 +371,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
 
             // Complete every expensive read before touching the mounted folder.
-            var stage = Path.Combine(Path.GetTempPath(),
-                "ZXMAK2-SD-stage-" + Guid.NewGuid().ToString("N"));
+            var stage = Path.Combine(SdSessionStorage.GetDirectory("Staging"),
+                Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(stage);
             var staged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             try

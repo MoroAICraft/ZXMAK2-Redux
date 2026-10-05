@@ -129,6 +129,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 CloseJournal();
                 CloseCachedFile();
+                // A crashed journal is ignored; normal teardown removes its own.
+                try { DiscardChanges(); }
+                catch (IOException ex) { Logger.Warn("Cannot remove SD folder journal: {0}", ex.Message); }
+                catch (UnauthorizedAccessException ex) { Logger.Warn("Cannot remove SD folder journal: {0}", ex.Message); }
             }
             base.Dispose(disposing);
         }

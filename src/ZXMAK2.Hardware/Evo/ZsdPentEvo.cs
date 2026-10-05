@@ -247,15 +247,16 @@ namespace ZXMAK2.Hardware.Evo
         protected override void OnConfigSave(XmlNode itemNode)
         {
             base.OnConfigSave(itemNode);
+            var savedPath = SdSessionStorage.StoreSourcePath(configuredSourcePath);
             Utils.SetXmlAttribute(
                 itemNode,
                 "sdImage",
                 configuredSourceType == SdSourceType.Image ?
-                    configuredSourcePath ?? string.Empty : string.Empty);
+                    savedPath : string.Empty);
             Utils.SetXmlAttribute(
                 itemNode, "sdSource", configuredSourceType.ToString());
             Utils.SetXmlAttribute(
-                itemNode, "sdPath", configuredSourcePath ?? string.Empty);
+                itemNode, "sdPath", savedPath);
         }
 
 
@@ -574,7 +575,7 @@ namespace ZXMAK2.Hardware.Evo
             get
             {
                 return configuredSourceType == SdSourceType.Image ?
-                    configuredSourcePath ?? string.Empty : string.Empty;
+                    SdSessionStorage.ResolveSourcePath(configuredSourcePath) : string.Empty;
             }
         }
 
@@ -585,7 +586,7 @@ namespace ZXMAK2.Hardware.Evo
 
         public string ConfiguredSourcePath
         {
-            get { return configuredSourcePath ?? string.Empty; }
+            get { return SdSessionStorage.ResolveSourcePath(configuredSourcePath); }
         }
 
         /// <summary>
@@ -728,6 +729,7 @@ namespace ZXMAK2.Hardware.Evo
 
         private void RestoreConfiguredCard()
         {
+            m_restoreWarning = null;
             var configured = configuredSourcePath;
             if (string.IsNullOrEmpty(configured))
             {
@@ -743,8 +745,13 @@ namespace ZXMAK2.Hardware.Evo
             catch (Exception ex)
             {
                 Logger.Error(ex, "Cannot restore configured SD source: {0}", configured);
-                m_restoreWarning = "The configured SD source could not be opened: " +
-                    ex.Message;
+                // A missing/unavailable folder is an empty slot, not a dialog.
+                // Keep the path so a later run can find the folder again.
+                var unavailableFolder = configuredSourceType == SdSourceType.HostFolder &&
+                    (ex is IOException || ex is UnauthorizedAccessException ||
+                     ex is System.Security.SecurityException);
+                m_restoreWarning = unavailableFolder ? null :
+                    "The configured SD source could not be opened: " + ex.Message;
                 lock (cardSync)
                 {
                     if (card != null)
@@ -762,7 +769,7 @@ namespace ZXMAK2.Hardware.Evo
             {
                 return string.Empty;
             }
-            var fullPath = Path.GetFullPath(fileName.Trim());
+            var fullPath = SdSessionStorage.ResolveSourcePath(fileName);
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException("SD Card image not found", fullPath);
@@ -774,7 +781,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             if (string.IsNullOrWhiteSpace(folderPath))
                 return string.Empty;
-            var fullPath = Path.GetFullPath(folderPath.Trim());
+            var fullPath = SdSessionStorage.ResolveSourcePath(folderPath);
             if (!Directory.Exists(fullPath))
                 throw new DirectoryNotFoundException(
                     "SD source folder not found: " + fullPath);

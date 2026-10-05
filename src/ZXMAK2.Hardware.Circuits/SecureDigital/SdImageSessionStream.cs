@@ -35,9 +35,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             m_source = source;
             m_imagePath = Path.GetFullPath(imagePath);
             m_fingerprint = Fingerprint();
-            var folder = Path.Combine(Environment.GetFolderPath(
-                Environment.SpecialFolder.LocalApplicationData),
-                "ZXMAK2", "SdImageSessions");
+            var folder = SdSessionStorage.GetDirectory("Images");
             Directory.CreateDirectory(folder);
             var name = Hash(m_imagePath.ToUpperInvariant());
             m_journalPath = Path.Combine(folder, name + ".journal");
