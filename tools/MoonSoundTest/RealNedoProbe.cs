@@ -7,6 +7,7 @@ using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Hardware.Evo;
 using ZXMAK2.Hardware.General;
+using ZXMAK2.Hardware.Circuits.SecureDigital;
 using ZXMAK2.Host.Entities;
 using ZXMAK2.Host.Interfaces;
 
@@ -138,7 +139,10 @@ internal static class RealNedoProbe
             cmos = spec.BusManager.FindDevice<CmosPentEvo>();
             // Sandbox avoids opening the original profile media. Mount only
             // our copied SD explicitly; guest firmware remains unchanged.
-            spec.BusManager.FindDevice<ZsdPentEvo>().MountHostFolder(Path.GetFullPath(args[1]));
+            if (File.Exists(args[1]))
+                spec.BusManager.FindDevice<ZsdPentEvo>().MountCard(Path.GetFullPath(args[1]));
+            else
+                spec.BusManager.FindDevice<ZsdPentEvo>().MountHostFolder(Path.GetFullPath(args[1]));
             trace = new StreamWriter(Path.Combine(output, "ports.csv"));
             trace.WriteLine("phase,op,port,PC,DOSEN,available,handled_before,handled_after,value,rejected,clock");
             TracePorts(); foreach (byte[] page in memory.RamPages) Array.Clear(page, 0, page.Length);
@@ -174,7 +178,12 @@ internal static class RealNedoProbe
                 else Command(phase);
                 Frames(120); Screen(Path.Combine(output, i.ToString("D2") + ".png"));
             }
-            trace.Dispose(); spec.BusManager.Disconnect(); return 0;
+            trace.Dispose();
+            // This harness uses disposable copied media, never user sources.
+            var imageSession = (SdCard)typeof(ZsdPentEvo).GetField("card", flags)
+                .GetValue(spec.BusManager.FindDevice<ZsdPentEvo>());
+            if (imageSession.ImageSessionStream != null) imageSession.ImageSessionStream.DiscardChanges();
+            spec.BusManager.Disconnect(); return 0;
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
     }

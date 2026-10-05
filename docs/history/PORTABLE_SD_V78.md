@@ -26,8 +26,16 @@ Changes staged:
 First build and Test.exe /hostfoldersd passed (2026-10-05). Includes stale journal
 with modified PC folder, folder save/delete/rename, PC conflict protection,
 image recovery/discard, missing-folder retry and relative-path/CWD tests.
-Remaining: lifecycle confirmation/export/close probes, sound regressions,
-package verification and final report.
+Lifecycle probe passed 22 assertions: Yes/No/Cancel, folder and image,
+Refresh/Eject/replacement, clean/dirty close, failed-save resumption and export
+with/without writes. An actual copied runtime process passed relative source
+and journal rebasing with a different CWD.
+MoonSound, OmniSound, MultiSound Max, Omni/Max OPL and full benchmark passed.
+Real NedoOS + diagnostic gp cold boot from fresh host-folder snapshot passed:
+OPL3/OPL4 found, ROM reads Copyright, PCM RAM inversion succeeds.
+The same SD fixture exported as a 512 MiB image also cold-booted real NedoOS/gp
+with the same MoonSound ROM/RAM results. Full 58 / Clean 55 archive entries
+passed size + SHA256 verification. Final report: diagnostics/REPORT.md.
 
 Output: L:\Work_two\ZX\ZXMAK2-v78-ZXEVO-BC-Portable-SD-Folder-Test-20261005.
 Its rollback-v77 copy preserves the original published v77 runtime.
