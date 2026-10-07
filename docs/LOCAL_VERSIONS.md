@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Рабочая ветка оптимизации: `codex/optimization-v81`, основа — контрольная v80.
+Актуальная ветка звука: `codex/audio-v82`, основа — контрольная v81.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
 
 | Версия | Исходники | Пакет в L:\Work_two\ZX | Назначение |
@@ -11,10 +11,19 @@
 | v77 | `d984e2c` | ZXMAK2-v77-ZXEVO-BC-MoonSound-NedoOS-ENDOS-Test-20261004 | Исправление физического ENDOS MoonSound |
 | v80 | ветка `codex/optimization-v80`, метка `zxmak2-v80-optimized` | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука; отчёт OPTIMIZATION_V80_REPORT.md |
 | v81 | ветка `codex/optimization-v81`, метка `zxmak2-v81-optimized` | ZXMAK2-v81-ZXEVO-BC-Engine-Optimization-Test-20261007 | Второй проход движка: timing hooks / reuse routing tables; отчёт OPTIMIZATION_V81_REPORT.md |
+| v82 | ветка `codex/audio-v82`, метка `zxmak2-v82-common-audio` | ZXMAK2-v82-ZXEVO-BC-Common-Audio-Test-20261008 | Общий wide mixer / fixed headroom / 5 Hz DC, legacy-переключатель, Moon Volume; AUDIO_V82_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
 Не переименовывать/удалять пользовательские ROM, музыку и образы.
+
+v82: `release` — готовый runtime, Full/Clean ZIP в корне пакета; `baseline-v81`
+содержит сохранённый контроль, `diagnostics` — PCM/PNG/логи и отдельные probe,
+`source` — committed source + pinned OmniSound и полная локальная Git-история.
+Для полного отката использовать прежний полный v81 архив, не смесь DLL.
+UI-переключатель Legacy audio mix (v81) откатывает только mixer/DC; не ошибку
+игнорирования MoonSound.Volume. Четыре старых untracked engine-research файла
+не изменены; экспорт разрешает именно этот явный список, tracked edits запрещены.
 
 ## Архив перед обновлением основного checkout
 

@@ -1,7 +1,15 @@
 param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
-    [string]$Version='v80')
+    [string]$Version='v80',
+    [string[]]$PreservedUntracked = @())
 $ErrorActionPreference = 'Stop'
-if (@(& git status --porcelain).Count) {throw 'Commit final sources before exporting'}
+foreach ($taskStatus in @(& git status --porcelain --untracked-files=all)) {
+    # Explicitly named, preexisting research is preserved in the workspace;
+    # only committed source belongs in the release ZIP/bundles. Never ignore
+    # tracked edits, changed submodules, or unexpected untracked files.
+    if ($taskStatus.StartsWith('?? ') -and
+        $PreservedUntracked -contains $taskStatus.Substring(3)) {continue}
+    throw "Commit final sources before exporting: $taskStatus"
+}
 $taskSource = Join-Path $Package 'source'
 New-Item -ItemType Directory -Path $taskSource -Force | Out-Null
 $taskZip = Join-Path $taskSource "ZXMAK2-$Version-source-with-OmniSound.zip"

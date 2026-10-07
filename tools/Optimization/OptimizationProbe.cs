@@ -18,7 +18,24 @@ internal static class OptimizationProbe
     private static readonly Type Tests = Assembly.LoadFrom(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "Test.exe")).GetType("Test.Program");
     internal static Spectrum Create(string xml)
-    { return (Spectrum)Tests.GetMethod("GetTestMachine", Private).Invoke(null, new object[] { xml }); }
+    {
+        // Diagnostic-only: compare complete machine/PCM fingerprints while
+        // intentionally selecting the v81 final mixer on an audio candidate.
+        // Older control DLLs ignore the XML attribute, so both use identical
+        // test source without requiring the new BusManager property.
+        if (Environment.GetEnvironmentVariable("ZXMAK2_STATE_LEGACY") == "1") {
+            var doc = new XmlDocument(); doc.LoadXml(xml);
+            doc.DocumentElement.SetAttribute("legacyAudioMix", "true");
+            xml = doc.OuterXml;
+        }
+        return (Spectrum)Tests.GetMethod("GetTestMachine", Private).Invoke(null, new object[] { xml });
+    }
+    private static void Reload(Spectrum vm, XmlNode bus)
+    {
+        if (Environment.GetEnvironmentVariable("ZXMAK2_STATE_LEGACY") == "1")
+            ((XmlElement)bus).SetAttribute("legacyAudioMix", "true");
+        vm.BusManager.LoadConfigXml(bus);
+    }
     internal static XmlNode EvoBus(string path)
     {
         var config = new XmlDocument(); config.Load(path);
@@ -167,14 +184,14 @@ internal static class OptimizationProbe
                 var evoVm = Create(bus.OuterXml);
                 foreach (int rate in new[] { 1,2,4 })
                 {
-                    if (rate != 1) evoVm.BusManager.LoadConfigXml(bus);
+                    if (rate != 1) Reload(evoVm, bus);
                     Fingerprint(evoVm,"PentEvo-rate-" + rate,null,rate);
                 }
                 // Same bus now switches from optional timing interfaces to none,
                 // then back: catch stale cached references, not just fresh objects.
                 var plain = new XmlDocument(); plain.LoadXml(full);
-                evoVm.BusManager.LoadConfigXml(plain.DocumentElement); Fingerprint(evoVm,"switch-to-Pentagon",null,0);
-                evoVm.BusManager.LoadConfigXml(bus); Fingerprint(evoVm,"switch-back-Evo",null,2);
+                Reload(evoVm, plain.DocumentElement); Fingerprint(evoVm,"switch-to-Pentagon",null,0);
+                Reload(evoVm, bus); Fingerprint(evoVm,"switch-back-Evo",null,2);
                 evoVm.BusManager.Disconnect();
             }
             return 0;

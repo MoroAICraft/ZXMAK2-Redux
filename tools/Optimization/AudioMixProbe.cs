@@ -48,13 +48,13 @@ internal static class AudioMixProbe
             }
             var all = new uint[n * 5];
             for (int i = 0; i < all.Length; i++) all[i] = P((short)(9000 * Math.Sin(i * 0.4)), 0);
-            Check(collected.SequenceEqual(Modern(rate * 5, new[] { all }, 100, null).GetBuffer()) == false, "Sample-rate-aware coefficient");
-            // Compare frame chunks against one recurrent run at the SAME rate.
-            var continuous = Modern(rate, new[] { signal }, 100, null);
-            for (int frame = 0; frame < 5; frame++) {
-                Array.Copy(all, frame * n, signal, 0, n);
-                continuous.Refresh();
-                Check(continuous.GetBuffer().SequenceEqual(collected.Skip(frame * n).Take(n)), "Cross-frame state");
+            // Independent uninterrupted recurrence: no frame boundaries/cache.
+            double pole = Math.Exp(-2 * Math.PI * 5 / rate), previousInput = L(all[0]), previousOutput = 0;
+            for (int i = 0; i < all.Length; i++) {
+                double input = L(all[i]);
+                double output = (1 + pole) / 2 * (input - previousInput) + pole * previousOutput;
+                previousInput = input; previousOutput = output;
+                Check(L(collected[i]) == (short)Math.Round(output * 0.5) && R(collected[i]) == 0, "Cross-frame state");
             }
             foreach (int hz in new[] { 20, 50, 1000 }) {
                 var filter = Modern(rate, new[] { signal }, 100, null);

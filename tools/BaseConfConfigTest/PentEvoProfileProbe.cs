@@ -502,6 +502,16 @@ internal static class PentEvoProfileProbe
                 slider.Minimum == 0 && slider.Maximum == 200 &&
                 slider.Value == 100,
                 "Master volume is not at the bottom of the ULA page");
+            var legacy = GetField<CheckBox>(control, "chkLegacyAudio");
+            Assert(!legacy.Checked && !bus.UseLegacyAudioMix,
+                "New profiles did not use the modern audio mix");
+            legacy.Checked = true;
+            control.Apply();
+            Assert(bus.UseLegacyAudioMix && legacy.Checked,
+                "Legacy audio checkbox did not apply/reinitialize");
+            legacy.Checked = false;
+            control.Apply();
+            Assert(!bus.UseLegacyAudioMix, "Modern audio could not be restored");
             if (Environment.GetCommandLineArgs().Length > 2)
             {
                 using (var bitmap = new Bitmap(control.Width, control.Height))

@@ -10,6 +10,11 @@ single final master/soft limiter; UI/config legacy v81 mixer option.
 MoonSound's previously ignored Volume scales completed PCM, 100% unchanged.
 No chip/port/timing/native library/SD/keyboard modifications.
 
-Build completed; component regressions and original NedoOS/OmniPlayer 1.0.41
-playback, package/export/commit are still pending at this checkpoint.
+Implementation checkpoint: `f04bec8`. Build and full existing regressions passed.
+Component regression passed including Moon PCM 0/50/100 and unchanged v81 hash.
+Original NedoOS/OmniPlayer 1.0.41 Moon/Rev2/Omni MIDI and AY PT3 playback
+captured. Three full native WAV hashes exactly match v81. PT3 comparison,
+UI toggle, ten machine/PCM fingerprints, bounded timings passed. Full/Clean
+ZIPs (58/55 files) verified. Final commit/tag and source export remain;
+see AUDIO_V82_REPORT.md for complete evidence and unperformed checks.
 The four preexisting untracked engine research files remain untouched.
