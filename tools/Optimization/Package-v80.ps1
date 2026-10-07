@@ -1,16 +1,17 @@
-param([string]$PackageDirectory = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007')
+param([string]$PackageDirectory = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
+    [string]$Version='v80', [string]$BaselineName='baseline-v79', [string]$Flavor='Optimization')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $taskRelease = Join-Path $PackageDirectory 'release'
-$taskRuntimeNames = @(Get-ChildItem -LiteralPath "$PackageDirectory\baseline-v79" -File |
-    Where-Object {$_.Name -notlike 'OptimizationProbe*' -and $_.Name -ne 'README-v79.txt'} |
-    Select-Object -ExpandProperty Name) + @('README-v80.txt')
+$taskRuntimeNames = @(Get-ChildItem -LiteralPath "$PackageDirectory\$BaselineName" -File |
+    Where-Object {$_.Name -notmatch '^(OptimizationProbe|PhaseCostProbe|RealNedoProbe)' -and $_.Name -notlike 'README-v*.txt'} |
+    Select-Object -ExpandProperty Name) + @("README-$Version.txt")
 $taskFiles = @($taskRuntimeNames | ForEach-Object {Get-Item -LiteralPath (Join-Path $taskRelease $_)})
 $taskExcluded = @('ZXMAK2.vmz','ZXMAK2.vmide','ZXMAK2.cmos','YRW801-M - Yamaha - 1993.rom')
 foreach ($taskClean in @($false,$true)) {
     $taskSuffix = if ($taskClean) {'-Clean'} else {''}
-    $taskZipPath = Join-Path $PackageDirectory ("ZXMAK2-v80-ZXEVO-BC-Optimization-Test$taskSuffix.zip")
+    $taskZipPath = Join-Path $PackageDirectory ("ZXMAK2-$Version-ZXEVO-BC-$Flavor-Test$taskSuffix.zip")
     if (Test-Path -LiteralPath $taskZipPath) {throw "Archive already exists: $taskZipPath"}
     $taskSelected = @($taskFiles | Where-Object {!$taskClean -or $_.Name -notin $taskExcluded})
     $taskZipStream = [IO.File]::Open($taskZipPath,[IO.FileMode]::CreateNew)
@@ -33,7 +34,7 @@ foreach ($taskClean in @($false,$true)) {
             if ($taskActual -ne (Get-FileHash -LiteralPath $taskFile.FullName).Hash) {throw 'ZIP hash mismatch'}
         }
         foreach ($taskRequired in @('Test.exe','Test.exe.config','ROMS.PAK','GeneralUser-GS.sf2',
-            'ymfm_opl4.dll','omni_opn.dll','omni_midi.dll','README-v80.txt','HOTKEYS.md')) {
+            'ymfm_opl4.dll','omni_opn.dll','omni_midi.dll',"README-$Version.txt",'HOTKEYS.md')) {
             if (!$taskVerify.GetEntry('release/'+$taskRequired)) {throw "Required file omitted: $taskRequired"}
         }
         if ($taskClean) {

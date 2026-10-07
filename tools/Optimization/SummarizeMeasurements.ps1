@@ -1,4 +1,5 @@
-param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007')
+param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
+    [string]$BaselineName = 'baseline-v79')
 $ErrorActionPreference = 'Stop'
 function Median($values) {
     $sorted = @($values | Sort-Object)
@@ -8,7 +9,7 @@ function Median($values) {
     return ($sorted[$middle - 1] + $sorted[$middle]) / 2
 }
 $samples = @()
-foreach ($variant in @('baseline-v79','release')) {
+foreach ($variant in @($BaselineName,'release')) {
     foreach ($round in 0,1) {
         foreach ($kind in @('bench','evo-bench')) {
             $path = "$Package\diagnostics\paired-$round-$variant-$kind.txt"
@@ -23,7 +24,7 @@ foreach ($variant in @('baseline-v79','release')) {
     }
 }
 $report = foreach ($test in @($samples.Test | Select-Object -Unique)) {
-    $before = @($samples | Where-Object {$_.Test -eq $test -and $_.Variant -eq 'baseline-v79'} | Select-Object -ExpandProperty Milliseconds)
+    $before = @($samples | Where-Object {$_.Test -eq $test -and $_.Variant -eq $BaselineName} | Select-Object -ExpandProperty Milliseconds)
     $after = @($samples | Where-Object {$_.Test -eq $test -and $_.Variant -eq 'release'} | Select-Object -ExpandProperty Milliseconds)
     $b = Median $before; $a = Median $after
     [pscustomobject]@{Test=$test; BaselineMedianMs=$b; OptimizedMedianMs=$a;

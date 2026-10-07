@@ -1,9 +1,9 @@
 param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
-    [string]$ProbeName = 'OptimizationProbe.exe')
+    [string]$ProbeName = 'OptimizationProbe.exe', [string]$BaselineName = 'baseline-v79')
 $ErrorActionPreference = 'Stop'
 # Reverse order on repeat, no profiling or concurrent probes during timings.
 foreach ($taskRound in 0,1) {
-    $taskOrder = if ($taskRound -eq 0) { @('release','baseline-v79') } else { @('baseline-v79','release') }
+    $taskOrder = if ($taskRound -eq 0) { @('release',$BaselineName) } else { @($BaselineName,'release') }
     foreach ($taskVariant in $taskOrder) {
         foreach ($taskMode in @('bench','evo-bench')) {
             $taskDir = Join-Path $Package $taskVariant

@@ -22,3 +22,12 @@ setup-v80: 20 same-profile reloads ~558-560ms, gc0=70/gc2=35.
 Candidates: fixed-capability timing hooks (BusManager), reuse fully cleared
 private 64K routing arrays (EventManager). Only engine source edited.
 Need build, differential and explicit stale-handler/gate tests before accepting.
+
+Build and existing 9 external+7 device+normal Test regressions PASS.
+RoutingSafetyProbe 458800 checks PASS, including max-rate then lower rate,
+legacy provider, clearing all maps, ordering/open bus. Candidate setup20x
+465-510ms; gc0 42-45/gc2 12-16 (initial, repeat reverse order still needed).
+MeasureFinal now running with BaselineName=baseline-v80; no concurrent probes.
+Generalized packaging/measurement scripts keep v80 defaults for reproducibility.
+RealNedoProbe adds no-trace bounded frame+mix benchmark; only copied SD may be
+used. Next: final differential, true OS/player/tune and packaging. No audio edits.

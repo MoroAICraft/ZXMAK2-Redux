@@ -1,4 +1,5 @@
-param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007')
+param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
+    [string]$BaselineName = 'baseline-v79')
 $ErrorActionPreference = 'Stop'
 # Apply affinity only to bounded child probes. No emulator/OS policy mutation.
 $taskPreviousAffinity = $env:ZXMAK2_BENCH_AFFINITY
@@ -9,7 +10,7 @@ if ($taskOldLogs.Count) {
     New-Item -ItemType Directory -Path $taskArchive | Out-Null
     $taskOldLogs | Move-Item -Destination $taskArchive
 }
-foreach ($taskVariant in @('baseline-v79','release')) {
+foreach ($taskVariant in @($BaselineName,'release')) {
     $taskDir = Join-Path $Package $taskVariant
     $taskRefs = @(Get-ChildItem -LiteralPath $taskDir -Filter 'ZXMAK2*.dll' |
         ForEach-Object {'/r:'+ $_.FullName})
@@ -19,6 +20,6 @@ foreach ($taskVariant in @('baseline-v79','release')) {
 }
 try {
     $env:ZXMAK2_BENCH_AFFINITY = '1'
-    & "$PSScriptRoot\MeasurePaired.ps1" -Package $Package -ProbeName 'OptimizationProbePinned.exe'
-    & "$PSScriptRoot\SummarizeMeasurements.ps1" -Package $Package
+    & "$PSScriptRoot\MeasurePaired.ps1" -Package $Package -ProbeName 'OptimizationProbePinned.exe' -BaselineName $BaselineName
+    & "$PSScriptRoot\SummarizeMeasurements.ps1" -Package $Package -BaselineName $BaselineName
 } finally { $env:ZXMAK2_BENCH_AFFINITY = $taskPreviousAffinity }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Xml;
 using System.Drawing;
 using System.Reflection;
+using System.Diagnostics;
 using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Hardware.Evo;
@@ -30,6 +31,7 @@ internal static class RealNedoProbe
     private static int rows;
     private static int audioPeak;
     private static string phase = "boot";
+    private static bool noTrace;
     private static readonly BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
 
     private static void Frames(int count)
@@ -145,12 +147,14 @@ internal static class RealNedoProbe
                 spec.BusManager.FindDevice<ZsdPentEvo>().MountHostFolder(Path.GetFullPath(args[1]));
             trace = new StreamWriter(Path.Combine(output, "ports.csv"));
             trace.WriteLine("phase,op,port,PC,DOSEN,available,handled_before,handled_after,value,rejected,clock");
-            TracePorts(); foreach (byte[] page in memory.RamPages) Array.Clear(page, 0, page.Length);
+            noTrace = Array.IndexOf(args, "no-trace") >= 0;
+            if (!noTrace) TracePorts(); foreach (byte[] page in memory.RamPages) Array.Clear(page, 0, page.Length);
             spec.DebugReset(); spec.CPU.Tact = 0; Frames(180); Screen(Path.Combine(output, "00-ers.png"));
             for (int i = 3; i < args.Length; i++)
             {
                 phase = args[i]; rows = 0; audioPeak = 0;
                 if (phase.StartsWith("board:")) continue;
+                if (phase == "no-trace") continue;
                 if (phase.StartsWith("key:")) Press((Key)Enum.Parse(typeof(Key), phase.Substring(4)));
                 else if (phase.StartsWith("keys:"))
                 {
@@ -170,6 +174,31 @@ internal static class RealNedoProbe
                     typeof(FddController).GetMethod("MountFloppy", flags).Invoke(
                         spec.BusManager.FindDevice<FddPentEvo>(),
                         new object[] { 0, Path.GetFullPath(phase.Substring(5)), true });
+                else if (phase.StartsWith("bench:"))
+                {
+                    // Genuine OS/player state, measured WITHOUT trace wrappers
+                    // or per-sample peak telemetry. No output algorithm changes.
+                    if (!noTrace) throw new Exception("Use no-trace for real workload benchmark");
+                    Process.GetCurrentProcess().ProcessorAffinity = new IntPtr(1);
+                    Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+                    int count = int.Parse(phase.Substring(6));
+                    for (int round=-1;round<3;round++) {
+                        var watch = Stopwatch.StartNew();
+                        for(int frame=0;frame<(round<0?50:count);frame++) {
+                            keyboard.KeyboardState=keys; if(cmos!=null)cmos.KeyboardState=keys;
+                            spec.ExecuteFrame();spec.BusManager.SoundFrame.GetBuffer();
+                        }
+                        watch.Stop();
+                        if(round>=0) Console.WriteLine("REAL NedoOS/player round={0} frames={1} time={2}ms clock={3}",
+                            round,count,watch.ElapsedMilliseconds,memory.CpuClockMultiplier);
+                    }
+                    int peak=0; ulong hash=14695981039346656037UL;
+                    foreach(uint sample in spec.BusManager.SoundFrame.GetBuffer()) {
+                        peak=Math.Max(peak,Math.Max(Math.Abs((int)(short)sample),Math.Abs((int)(short)(sample>>16))));
+                        unchecked {hash=(hash^sample)*1099511628211UL;}
+                    }
+                    Console.WriteLine("REAL PCM peak={0} hash={1:X16}",peak,hash);
+                }
                 else if (phase == "cold")
                 {
                     foreach (byte[] page in memory.RamPages) Array.Clear(page, 0, page.Length);

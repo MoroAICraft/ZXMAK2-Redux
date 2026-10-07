@@ -1,9 +1,10 @@
-param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007')
+param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007',
+    [string]$Version='v80')
 $ErrorActionPreference = 'Stop'
 if (@(& git status --porcelain).Count) {throw 'Commit final sources before exporting'}
 $taskSource = Join-Path $Package 'source'
 New-Item -ItemType Directory -Path $taskSource -Force | Out-Null
-$taskZip = Join-Path $taskSource 'ZXMAK2-v80-source-with-OmniSound.zip'
+$taskZip = Join-Path $taskSource "ZXMAK2-$Version-source-with-OmniSound.zip"
 $taskSubZip = Join-Path $taskSource 'ZX-OmniSound-0794d8d-source.zip'
 foreach ($taskTarget in @($taskZip,$taskSubZip)) {
     if (Test-Path -LiteralPath $taskTarget) {throw "Preserve existing archive: $taskTarget"}
@@ -41,7 +42,7 @@ try {
         } finally {$taskInput.Dispose(); $taskOutput.Dispose(); $taskHash.Dispose()}
     }
 } finally {$taskSub.Dispose(); $taskVerify.Dispose()}
-$taskBundle = Join-Path $taskSource 'ZXMAK2-v80-local-history.bundle'
+$taskBundle = Join-Path $taskSource "ZXMAK2-$Version-local-history.bundle"
 if (Test-Path -LiteralPath $taskBundle) {throw 'History bundle exists'}
 & git bundle create $taskBundle --all
 if ($LASTEXITCODE -ne 0) {throw 'History bundle create failed'}
