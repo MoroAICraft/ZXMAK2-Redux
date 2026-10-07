@@ -44,3 +44,17 @@ in archive/redundant-extractions; other backup/tmp/media/releases preserved.
 Initial unpinned paired results varied strongly on hybrid i7-14700KF; do not use
 as final claims. Prepare harness-only CPU affinity 1 and repeat after all other
 CPU work finishes. Production emulator affinity/priority/settings remain unchanged.
+
+Final pinned paired measurements completed: builtin full/light 7.9–9.7% less
+time, Evo2/4 1.7/2.8%; Evo1 and CPU-only differences <1%, within observed spread.
+Final 10 differential fingerprints exact match; real NedoOS gp 1.0.32 detects
+OPL3/OPL4/Yamaha ROM/1024KB RAM for MoonSound and OmniSound after cold/repeat.
+OmniSound reached player file UI. Full MoonService/menu/listening remain untested.
+Runtime delta exactly one DLL: Engine; other 56 v79 files unchanged (README
+version changes separately). Next: verified full/clean ZIP, source ZIP/bundles,
+final tag; do not redo measurements or replace preserved old data.
+Full/Clean ZIP created and every entry SHA256-verified (58/55 files). Diagnostic
+EXEs/configs and generated Data moved out of release into diagnostics, no user data.
+Packaged Clean smoke: hostfoldersd/moonsound/evo-display PASS after fresh extraction.
+Implementation and validation complete. Final source/tag/bundle export is the
+remaining packaging step; do not launch a new optimization/audio stage.

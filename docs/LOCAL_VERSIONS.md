@@ -9,7 +9,7 @@
 | v79 | `1993dd0`, метка `zxmak2-v79-control` | ZXMAK2-v79-ZXEVO-BC-F10-GuestOnly-Test-20261007 | Контроль до оптимизации: F10 только машине в главном окне |
 | v78 | `29248ad` | ZXMAK2-v78-ZXEVO-BC-Portable-SD-Folder-Test-20261005 | Предыдущий откат: портативные SD-сессии |
 | v77 | `d984e2c` | ZXMAK2-v77-ZXEVO-BC-MoonSound-NedoOS-ENDOS-Test-20261004 | Исправление физического ENDOS MoonSound |
-| v80 | ветка `codex/optimization-v80`, в работе | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука |
+| v80 | ветка `codex/optimization-v80`, метка `zxmak2-v80-optimized` | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука; отчёт OPTIMIZATION_V80_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
@@ -32,7 +32,12 @@
 Удалены только регистрации пяти уже отсутствующих worktree, после сохранения
 их HEAD в refs/archive и bundle. Реальные активные worktree не удалялись.
 `backup/` и исследовательские материалы `tmp/` остаются историческими данными,
-не текущими исходниками. Временные копии ZIP можно архивировать отдельно.
+не текущими исходниками. Пять лишних ZIP-verification распаковок уже архивированы
+с проверкой всех файлов, затем удалены. Восстановление: архив/redundant-extractions.
+
+Исходники v80 (содержимое submodule включено) и две полные local history bundle:
+`ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007/source/`.
+В runtime ZIP только release; контроль и диагностические материалы лежат отдельно.
 
 ## Сборка и контроль
 
