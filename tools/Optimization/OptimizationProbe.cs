@@ -17,9 +17,9 @@ internal static class OptimizationProbe
     private static readonly BindingFlags Private = BindingFlags.Static | BindingFlags.NonPublic;
     private static readonly Type Tests = Assembly.LoadFrom(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "Test.exe")).GetType("Test.Program");
-    private static Spectrum Create(string xml)
+    internal static Spectrum Create(string xml)
     { return (Spectrum)Tests.GetMethod("GetTestMachine", Private).Invoke(null, new object[] { xml }); }
-    private static XmlNode EvoBus(string path)
+    internal static XmlNode EvoBus(string path)
     {
         var config = new XmlDocument(); config.Load(path);
         var bus = config.SelectSingleNode("//Bus");
@@ -46,7 +46,7 @@ internal static class OptimizationProbe
         Buffer.BlockCopy(data, 0, bytes, 0, bytes.Length);
         sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
     }
-    private static IMemoryDevice Prepare(Spectrum vm, string snapshot, int rate)
+    internal static IMemoryDevice Prepare(Spectrum vm, string snapshot, int rate)
     {
         vm.IsRunning = true; vm.DebugReset();
         var memory = vm.BusManager.FindDevice<IMemoryDevice>();

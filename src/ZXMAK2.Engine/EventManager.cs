@@ -89,19 +89,30 @@ namespace ZXMAK2.Engine
         public void Clear()
         {
             m_preCycle = null;
-            m_mapReadMemoryM1 = new BusReadProc[0x10000];
-            m_mapReadMemory = new BusReadProc[0x10000];
-            m_mapReadPort = new BusReadIoProc[0x10000];
-            m_mapWriteMemory = new BusWriteProc[0x10000];
-            m_mapWritePort = new BusWriteIoProc[0x10000];
-            m_mapReadNoMreq = new Action<ushort>[0x10000];
-            m_mapWriteNoMreq = new Action<ushort>[0x10000];
+            ClearMap(ref m_mapReadMemoryM1);
+            ClearMap(ref m_mapReadMemory);
+            ClearMap(ref m_mapReadPort);
+            ClearMap(ref m_mapWriteMemory);
+            ClearMap(ref m_mapWritePort);
+            ClearMap(ref m_mapReadNoMreq);
+            ClearMap(ref m_mapWriteNoMreq);
             m_reset = null;
             m_nmiRq = null;
             m_nmiAck = null;
             m_intAck = null;
             m_beginFrame = null;
             m_endFrame = null;
+        }
+
+        private static void ClearMap<T>(ref T[] map)
+        {
+            // Same empty routing table after Clear, without allocating seven
+            // large arrays for every reconnect/profile change. Clear every
+            // entry so old device delegates cannot survive into the new bus.
+            if (map == null)
+                map = new T[0x10000];
+            else
+                Array.Clear(map, 0, map.Length);
         }
 
         public void BeginFrame()

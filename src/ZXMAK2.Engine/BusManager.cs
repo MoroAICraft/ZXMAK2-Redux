@@ -82,11 +82,7 @@ namespace ZXMAK2.Engine
             m_cpu = new CpuUnit();
             m_rzx = new RzxHandler(m_cpu);
             m_eventManager = new EventManager(m_cpu, m_rzx);
-            m_eventManager.SyncCpuClock = SynchronizeCpuClock;
-            m_eventManager.CompleteMemoryAccess = CompleteCpuMemoryAccess;
-            m_eventManager.InvalidateMemoryBuffer = InvalidateCpuMemoryBuffer;
-            m_eventManager.ApplyPortTiming = ApplyCpuPortTiming;
-            m_cpu.REFRESH = RefreshCpuClock;
+            ConfigureCpuTimingHandlers();
             SampleRate = 44100;
             MasterVolume = 100;
             m_eventManager.ScanSig += EventManager_ScanSig;
@@ -330,6 +326,7 @@ namespace ZXMAK2.Engine
             m_cpuMemoryTiming = m_cpuClock as ICpuMemoryTiming;
             m_cpuPortTiming = m_cpuClock as ICpuPortTiming;
             m_hasCpuClockBusSync = m_cpuClock is ICpuClockBusSync;
+            ConfigureCpuTimingHandlers();
             m_lastCpuClockMultiplier = 1;
             m_lastMaxCpuClockMultiplier = 1;
             m_cpuClockRemainder = 0;
@@ -388,6 +385,7 @@ namespace ZXMAK2.Engine
             m_cpuMemoryTiming = null;
             m_cpuPortTiming = null;
             m_hasCpuClockBusSync = false;
+            ConfigureCpuTimingHandlers();
             m_cpuClockRemainder = 0;
             OnEndFrame();
             OnBusDisconnect();
@@ -580,6 +578,23 @@ namespace ZXMAK2.Engine
                 try { SynchronizeCpuClock(); }
                 finally { m_cpuClockBusActive = false; }
             }
+        }
+
+        private void ConfigureCpuTimingHandlers()
+        {
+            // Only omit callbacks that are identity operations for this fixed
+            // controller type. Do NOT detach at a particular current rate:
+            // a live clock (e.g. Evo) can switch ratios inside a bus access.
+            m_eventManager.SyncCpuClock = m_hasCpuClockBusSync
+                ? (Action)SynchronizeCpuClock : null;
+            m_eventManager.CompleteMemoryAccess = m_hasCpuClockBusSync && m_cpuMemoryTiming != null
+                ? (EventManager.CompleteMemoryProc)CompleteCpuMemoryAccess : null;
+            m_eventManager.InvalidateMemoryBuffer = m_hasCpuClockBusSync && m_cpuMemoryTiming != null
+                ? (Action)InvalidateCpuMemoryBuffer : null;
+            m_eventManager.ApplyPortTiming = m_hasCpuClockBusSync && m_cpuPortTiming != null
+                ? (Action<ushort>)ApplyCpuPortTiming : null;
+            m_cpu.REFRESH = m_hasCpuClockBusSync && m_cpuRefreshClock != null
+                ? (Action)RefreshCpuClock : null;
         }
 
         private void RefreshCpuClock()
