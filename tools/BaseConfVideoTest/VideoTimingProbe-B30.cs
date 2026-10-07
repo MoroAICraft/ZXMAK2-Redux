@@ -231,6 +231,10 @@ public static class VideoTimingProbeB30
         bt.GetMethod("OnEndFrame", F).Invoke(bus, null);
         var legacy = Activator.CreateInstance(hardware.GetType("ZXMAK2.Hardware.Atm.UlaAtm450", true));
         bt.GetField("m_ula", F).SetValue(bus, legacy);
+        // This structural probe bypasses Add/RemoveDevice, so mirror their
+        // optional interface-cache update when testing newer engines.
+        FieldInfo legacyTiming = bt.GetField("m_ulaFrameTiming", F);
+        if (legacyTiming != null) legacyTiming.SetValue(bus, null);
         bt.GetField("m_frameTactCount", F).SetValue(bus, 69888);
         Time(69888 * 2L + 3);
         Check((int)bt.GetMethod("GetFrameTact").Invoke(bus, null) == 3 &&
@@ -278,6 +282,8 @@ public static class VideoTimingProbeB30
             var devices = (IList)bt.GetField("m_deviceList", F).GetValue(bus); devices.Add(memory); devices.Add(ula);
             cmos = Activator.CreateInstance(ct); devices.Add(cmos); ct.GetProperty("KeyboardState").SetValue(cmos, keys, null);
             bt.GetField("m_ula", F).SetValue(bus, ula); bt.GetField("m_frameTactCount", F).SetValue(bus, Period[0]);
+            FieldInfo timingCache = bt.GetField("m_ulaFrameTiming", F);
+            if (timingCache != null) timingCache.SetValue(bus, ula);
             mt.GetMethod("BusInit").Invoke(memory, new object[] { bus });
             ct.GetMethod("BusInit").Invoke(cmos, new object[] { bus });
             mt.GetMethod("UpdateMapping", F).Invoke(memory, null);

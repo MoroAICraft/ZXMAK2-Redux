@@ -440,10 +440,7 @@ namespace ZXMAK2.Hardware
             return (uint)((ushort)left | ((ushort)right << 16));
         }
 
-        // Each queued DAC event is independent and never mutated after enqueue.
-        // Store the same fields by value instead of allocating an object per
-        // transition. FIFO order, timestamps and rendering arithmetic are unchanged.
-        private struct SndOut
+        private class SndOut
         {
             public int Timestamp; // in 'system clock' ticks
             public uint Left;

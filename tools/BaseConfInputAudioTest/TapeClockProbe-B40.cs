@@ -26,12 +26,16 @@ internal static class TapeClockProbeB40
         public void Play() { }
         public void Stop() { }
         public void Rewind() { }
+        public void Eject() { Blocks.Clear(); }
         public void Reset() { }
         public bool IsPlay { get { return false; } }
+        public bool HasTape { get { return Blocks.Count != 0; } }
+        public ZXMAK2.Mvvm.ICommand ViewCommand { get { return null; } }
         public int TactsPerSecond { get { return 3500000; } }
         public int TapePulseClockMultiplier { get; private set; }
         public List<ITapeBlock> Blocks { get; private set; }
         public event EventHandler TapeStateChanged { add { } remove { } }
+        public event EventHandler TapeEjected { add { } remove { } }
         public int CurrentBlock { get; set; }
         public int Position { get { return 0; } }
         public bool UseTraps { get; set; }
@@ -78,7 +82,10 @@ internal static class TapeClockProbeB40
     private static void CheckProfileIsolation()
     {
         var config = new XmlDocument();
-        config.Load(Path.Combine(Directory.GetCurrentDirectory(), "src", "ZXMAK2", "machines.config"));
+        string profile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machines.config");
+        if (!File.Exists(profile))
+            profile = Path.Combine(Directory.GetCurrentDirectory(), "src", "ZXMAK2", "machines.config");
+        config.Load(profile);
 
         var baseConfTape = config.SelectSingleNode(
             "/Machines/Bus[@name='ZX-Evo BSconf']/Device[@type='ZXMAK2.Hardware.General.TapeDevice']") as XmlElement;

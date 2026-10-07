@@ -114,6 +114,14 @@ internal static class OptimizationProbe
     {
         try
         {
+            // Optional harness-only pinning avoids P/E-core migration on hybrid
+            // CPUs. Never applied to the released emulator or functional probes.
+            string affinity = Environment.GetEnvironmentVariable("ZXMAK2_BENCH_AFFINITY");
+            if ((args[0] == "bench" || args[0] == "evo-bench") && !String.IsNullOrEmpty(affinity))
+            {
+                Process.GetCurrentProcess().ProcessorAffinity = new IntPtr(Convert.ToInt64(affinity, 16));
+                Console.WriteLine("HARNESS CPU affinity=0x{0}", affinity);
+            }
             if (args[0] == "bench")
             {
                 Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;

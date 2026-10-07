@@ -31,3 +31,16 @@ clock-value caching. Pinned OmniSound submodule initialized locally; full build
 works from the now-current primary checkout.
 Next: repeat paired performance, Evo CPU+audio workloads and complete regressions;
 safe cleanup/archive of redundant extraction folders, final packaging.
+
+Continuation: all 9 external regressions and all 7 built-in device tests PASS;
+ordinary Test.exe/ULA/benchmark PASS. Tape mock updated for current ITapeDevice,
+VideoTiming reflection setup mirrors Add's new cache (including legacy switch).
+No production workaround for a failing test. Build PASS; candidate Engine DLL
+equals rebuild SHA256 530D4D088E511710168F033B8F4EAF82D14E9A89EFB51EA2EB61FE6D7E9D434E.
+SndOut struct experiment REJECTED: no stable benefit, Evo1 slowdown. Hardware
+source restored; candidate Hardware DLL is byte-for-byte v79. Only Engine changes.
+Five redundant verification extractions archived/verified then removed, recoverable
+in archive/redundant-extractions; other backup/tmp/media/releases preserved.
+Initial unpinned paired results varied strongly on hybrid i7-14700KF; do not use
+as final claims. Prepare harness-only CPU affinity 1 and repeat after all other
+CPU work finishes. Production emulator affinity/priority/settings remain unchanged.
