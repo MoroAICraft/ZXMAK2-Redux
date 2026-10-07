@@ -1,5 +1,9 @@
 # ZXMAK2 Fork — ZX Evo BaseConf RC1
 
+Local working versions, control sources and build archives:
+[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Current optimization starts from v79;
+unpublished historical audio experiments are preserved separately.
+
 ZXMAK2 Fork is a Windows emulator focused on ZX Evolution BaseConf. It models
 the machine as a configurable virtual system: processor, memory, firmware,
 storage, display modes and expansion hardware can be changed without leaving

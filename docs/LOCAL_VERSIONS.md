@@ -1,0 +1,45 @@
+# Локальные версии — единая точка входа
+
+Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
+Рабочая ветка оптимизации: `codex/optimization-v80`, основа — контрольная v79.
+Не путать с историческими рабочими копиями в `.codex/worktrees`.
+
+| Версия | Исходники | Пакет в L:\Work_two\ZX | Назначение |
+| --- | --- | --- | --- |
+| v79 | `1993dd0`, метка `zxmak2-v79-control` | ZXMAK2-v79-ZXEVO-BC-F10-GuestOnly-Test-20261007 | Контроль до оптимизации: F10 только машине в главном окне |
+| v78 | `29248ad` | ZXMAK2-v78-ZXEVO-BC-Portable-SD-Folder-Test-20261005 | Предыдущий откат: портативные SD-сессии |
+| v77 | `d984e2c` | ZXMAK2-v77-ZXEVO-BC-MoonSound-NedoOS-ENDOS-Test-20261004 | Исправление физического ENDOS MoonSound |
+| v80 | ветка `codex/optimization-v80`, в работе | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука |
+
+Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
+изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
+Не переименовывать/удалять пользовательские ROM, музыку и образы.
+
+## Архив перед обновлением основного checkout
+
+`L:\Work_two\ZX\ZXMAK2-Local-Archive-20261007` содержит:
+- `control-v79/ZXMAK2-v79-source.zip`: полный tracked source основной части.
+- `control-v79/ZX-OmniSound-submodule-0794d8d.zip`: содержимое закреплённого
+  submodule; Git archive основной части сам не включает gitlink contents.
+- `ZXMAK2-local-history.bundle`: все локальные ветки/метки/история, включая
+  сохранённые HEAD старых рабочих копий; bundle verify прошёл.
+- `primary-wip/source-with-wip.zip`, patch и точные исходные файлы незавершённой
+  adaptive audio правки; её ветка `codex/archive-primary-audio-wip-20261007`,
+  commit `cdb6fca`. Это НЕ часть контрольной v79 и НЕ часть оптимизации.
+- `primary-wip/unpublished-runtime`: бывшая `.codex-build`, перенесённая целиком.
+- manifest и SHA256. Существующие выпущенные архивы не перезаписаны.
+
+Удалены только регистрации пяти уже отсутствующих worktree, после сохранения
+их HEAD в refs/archive и bundle. Реальные активные worktree не удалялись.
+`backup/` и исследовательские материалы `tmp/` остаются историческими данными,
+не текущими исходниками. Временные копии ZIP можно архивировать отдельно.
+
+## Сборка и контроль
+
+VS 2022 BuildTools MSBuild: src/ZXVM.sln, Release, Any CPU, /m:1.
+Утилиты/эмулятор используют x86 runtime; для Test.exe включить CorFlags /32BIT+.
+Не запускать Test /perf или /cpu без ограничения: оба режима бесконечны.
+Для замеров использовать ограниченный OptimizationProbe и обычный Test.exe.
+Native DLL, ROMS.PAK, конфиги и музыкальные зависимости брать из контрольной
+v79; не заменять их случайными файлами из старых временных папок.
+Встроенный Test — benchmark движка, не измерение оконного/GPU backend целиком.
