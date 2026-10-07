@@ -17,6 +17,17 @@ was stopped deliberately after obtaining warm-up data (not a regression failure)
 Early warm zexall 500-frame values ~343–360ms on this PC, not controlled paired
 before/after measurements yet. Do not claim an improvement from these alone.
 
-Next: bounded repeatable benchmark + deterministic state/video/PCM/I/O traces;
-evaluate caching invariant interface references in BusManager. No timing/event
-skipping, CPU opcode edits, audio algorithm changes or mutable clock-value caching.
+Part 2: only BusManager interface references/capabilities are cached. Rates,
+mapping, time and hardware results remain live. Invalidation at add/remove/clear
+and clock connect/disconnect preserves profile switching.
+First bounded tests: ~12% gain in full/light Pentagon, CPU-only control unchanged.
+Initial fingerprint differences were caused by production randomized power-on
+RAM, present even with two identical v79 DLLs. Only disposable probe RAM is now
+seeded deterministically; production power-on behavior is NOT changed.
+All 10 state/video/PCM/I-O/tact fingerprints now match the v79 control, including
+Spectrum48/128, Pentagon snapshots and same-bus Evo 3.5/7/14/switch-away/back.
+No timing/event skipping, CPU opcode edits, audio algorithm changes or mutable
+clock-value caching. Pinned OmniSound submodule initialized locally; full build
+works from the now-current primary checkout.
+Next: repeat paired performance, Evo CPU+audio workloads and complete regressions;
+safe cleanup/archive of redundant extraction folders, final packaging.

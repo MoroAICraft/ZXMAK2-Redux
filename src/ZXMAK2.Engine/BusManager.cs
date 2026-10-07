@@ -24,6 +24,12 @@ namespace ZXMAK2.Engine
         private String m_machineFile = null;
         private readonly CpuUnit m_cpu;
         private ICpuClock m_cpuClock;
+        // Device types cannot change while connected. Cache only interface
+        // references/capabilities, never mutable clock rates or timing results.
+        private ICpuRefreshClock m_cpuRefreshClock;
+        private ICpuMemoryTiming m_cpuMemoryTiming;
+        private ICpuPortTiming m_cpuPortTiming;
+        private bool m_hasCpuClockBusSync;
         private int m_lastCpuClockMultiplier = 1;
         private int m_lastMaxCpuClockMultiplier = 1;
         private long m_cpuClockRemainder;
@@ -31,6 +37,7 @@ namespace ZXMAK2.Engine
         private long m_cpuClockBusLastTact;
         private bool m_cpuMemoryReadSeen;
         private IUlaDevice m_ula;
+        private IUlaFrameTiming m_ulaFrameTiming;
         private IDebuggable m_debuggable;
         private List<BusDeviceBase> m_deviceList = new List<BusDeviceBase>();
         private readonly EventManager m_eventManager;
@@ -222,7 +229,10 @@ namespace ZXMAK2.Engine
                 if (m_ula != null)
                     throw new InvalidOperationException("Cannot add second ULA device!");
                 else
+                {
                     m_ula = ula;
+                    m_ulaFrameTiming = ula as IUlaFrameTiming;
+                }
             }
             device.BusOrder = m_deviceList.Count;
             m_deviceList.Add(device);
@@ -237,7 +247,10 @@ namespace ZXMAK2.Engine
                 if (m_ula != device)
                     throw new InvalidOperationException("Cannot remove non-existing ULA device!");
                 else
+                {
                     m_ula = null;
+                    m_ulaFrameTiming = null;
+                }
             }
             m_deviceList.Remove(device);
         }
@@ -247,6 +260,7 @@ namespace ZXMAK2.Engine
             if (m_connected)
                 throw new InvalidOperationException("Cannot remove device from connected bus!");
             m_ula = null;
+            m_ulaFrameTiming = null;
             m_soundFrame = null;
 
             m_eventManager.Clear();
@@ -312,6 +326,10 @@ namespace ZXMAK2.Engine
             {
                 m_cpuClock = cpuClockDevices.FirstOrDefault();
             }
+            m_cpuRefreshClock = m_cpuClock as ICpuRefreshClock;
+            m_cpuMemoryTiming = m_cpuClock as ICpuMemoryTiming;
+            m_cpuPortTiming = m_cpuClock as ICpuPortTiming;
+            m_hasCpuClockBusSync = m_cpuClock is ICpuClockBusSync;
             m_lastCpuClockMultiplier = 1;
             m_lastMaxCpuClockMultiplier = 1;
             m_cpuClockRemainder = 0;
@@ -366,6 +384,10 @@ namespace ZXMAK2.Engine
                 return;
             m_connected = false;
             m_cpuClock = null;
+            m_cpuRefreshClock = null;
+            m_cpuMemoryTiming = null;
+            m_cpuPortTiming = null;
+            m_hasCpuClockBusSync = false;
             m_cpuClockRemainder = 0;
             OnEndFrame();
             OnBusDisconnect();
@@ -443,7 +465,7 @@ namespace ZXMAK2.Engine
         private int m_frameTactCount;
         public int GetFrameTact()
         {
-            var timing = m_ula as IUlaFrameTiming;
+            var timing = m_ulaFrameTiming;
             return timing != null ? timing.GetFrameTact(m_cpu.Tact) :
                 (int)(m_cpu.Tact % m_frameTactCount);
         }
@@ -459,7 +481,7 @@ namespace ZXMAK2.Engine
             }
             m_frameOpened = true;
 
-            var timing = m_ula as IUlaFrameTiming;
+            var timing = m_ulaFrameTiming;
             if (timing != null)
                 timing.BeginFrameTiming(m_cpu.Tact);
             m_eventManager.BeginFrame();
@@ -492,7 +514,7 @@ namespace ZXMAK2.Engine
         public void ExecCycle()
         {
             int frameTact = GetFrameTact();
-            var timing = m_ula as IUlaFrameTiming;
+            var timing = m_ulaFrameTiming;
             if (timing != null ? timing.IsFrameComplete(m_cpu.Tact) :
                 frameTact < m_lastFrameTact)
             {
@@ -535,7 +557,7 @@ namespace ZXMAK2.Engine
             }
 
             var startTact = m_cpu.Tact;
-            var synchronizeBus = m_cpuClock is ICpuClockBusSync;
+            var synchronizeBus = m_hasCpuClockBusSync;
             m_cpuClockBusActive = synchronizeBus && clockMultiplier < maxClockMultiplier;
             m_cpuClockBusLastTact = startTact;
             m_cpuMemoryReadSeen = false;
@@ -562,7 +584,7 @@ namespace ZXMAK2.Engine
 
         private void RefreshCpuClock()
         {
-            var clock = m_cpuClock as ICpuRefreshClock;
+            var clock = m_cpuRefreshClock;
             if (!m_cpuClockBusActive || clock == null)
                 return;
             // Settle all elapsed raw CPU tacts at the old applied rate.
@@ -587,7 +609,7 @@ namespace ZXMAK2.Engine
         private void CompleteCpuMemoryAccess(ushort address,
             CpuMemoryAccess access, ref byte value)
         {
-            var timing = m_cpuClock as ICpuMemoryTiming;
+            var timing = m_cpuMemoryTiming;
             if (!m_cpuClockBusActive || timing == null)
                 return;
             // The legacy core routes prefix continuation fetches through
@@ -609,7 +631,7 @@ namespace ZXMAK2.Engine
 
         private void ApplyCpuPortTiming(ushort address)
         {
-            var timing = m_cpuClock as ICpuPortTiming;
+            var timing = m_cpuPortTiming;
             if (!m_cpuClockBusActive || timing == null)
                 return;
             int delay = timing.GetPortWait(address);
@@ -621,7 +643,7 @@ namespace ZXMAK2.Engine
 
         private void InvalidateCpuMemoryBuffer()
         {
-            var timing = m_cpuClock as ICpuMemoryTiming;
+            var timing = m_cpuMemoryTiming;
             if (m_cpuClockBusActive && timing != null)
                 timing.InvalidateMemoryBuffer();
         }
@@ -656,7 +678,7 @@ namespace ZXMAK2.Engine
 
         public int FrameTactCount 
         { 
-            get { return m_ula is IUlaFrameTiming ? m_ula.FrameTactCount : m_frameTactCount; }
+            get { return m_ulaFrameTiming != null ? m_ula.FrameTactCount : m_frameTactCount; }
         }
 
         public void LoadConfigXml(XmlNode busNode)
