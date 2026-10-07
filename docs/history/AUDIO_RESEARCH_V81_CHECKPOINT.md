@@ -52,8 +52,49 @@ All58 original runtime files still byte-identical to published v81 after probes.
 Full report AUDIO_RESEARCH_V81.md and reusable RunAudioResearch.ps1 saved.
 New local research commit/branch will contain only audio research docs/harness;
 prior four untracked engine-research files remain preserved and uncommitted.
-NEXT REQUIRED: user's ordinary single-AY PT3 and optional ZXArt link/settings;
-for quiet MIDI, a MIDI file plus player/selected sound device. Do not claim a
-matched musical diagnosis or implement the audio plan until context is supplied
-and user approves/continues into implementation. Do not repeat component probes
-without a reason. No production sound, timing, input, media, or new release changes.
+Continuation: user supplied exact PT3 and MIDI, and screenshots of BOTH outputs.
+PT3 L:/Work_two/ZX/ZX_IMG/flash_pentevo/PT3/Lamer Pinky - Waiting 4 Robot (2023)
+(FOReVER 2023 - ROBOT, 3).pt3 SHA EDA58C848BF383D4900196CBFC9D298232BEF45C2C6A2F9062D1C32F23A0E3EF.
+MIDI .../MIDI_UNO/10.MID SHA E0E67D99AB2D1CC0749B6E403097EC2500CEBA53AEC7D3A329FDF7894C622C30.
+User confirms current OmniPlayer1.0.41. gp.com copied from bin has this version.
+Screenshots confirm UART AY2 on ORDINARY MultiSound Rev2 (NOT Max), AND MoonSound
+/ OPL4. User says both are quiet. Do not replace Rev2 with Max in this test.
+
+Media copied only bin/System/ini/root boot files, plus content-identical aliases
+research.pt3/10.mid into researchRoot/media-copy; originals not altered.
+ZXTune installed at L:/Work_two/ZX/ZX-Tune/zxtune123.exe r5100 May30 2025.
+Reference WAVs generated with explicit AY1773400,44100,ABC,HQ; matched-pan
+controlled-ay.conf uses ZXMAK2 coefficients100/10,66/66,10/100. No user config edit.
+
+RealNedoProbe.cs DIAGNOSTIC ONLY extended with audio:name:frames: records all
+raw source buffers and final mix, no production changes. Compiled in copied v81.
+Test profiles real-player/moon.vmz, multisound-r2.vmz, ay.vmz, all guest sandbox.
+Correct launch: no-trace key:D5 wait:300 key:F10 key:Return 'cd /'
+'/bin/gp.com' wait:300 keys:DownArrow:7 key:Return audio:midi-moon:1500.
+Root browser index7=10.mid, index8=research.pt3. Screenshot required to confirm.
+Wrong initial key:S boots TR-DOS/Neo-DOS, NOT NedoOS; moon-start artifacts INVALID.
+gp /10.mid in /bin opened browser, NOT music; moon-opl4 captures INVALID silence.
+keys:Down invalid enum; moon-midi-valid failed. Use DownArrow. No source bug inferred.
+moon-browser/root are navigation-only. Preserve/classify these, not music evidence.
+
+CONFIRMED moon-midi-playing/13.png actual10.MID MoonSound/OPL4 playing, 1500frames
+30sec recorded includes initial loading. Only Moon source audible, others silent:
+raw AC RMS419.163 peak6580; final RMS101.259 peak1399 -> ~-12.34dB.
+Cold real OS clock14MHz; no claim actual3.5/7MHz. media original preserved.
+FINAL continuation: Rev2 actual UART AY2 confirmed r2-midi-playing/13.png,
+9sources: MIDI AC1796.561 peak24935 -> mix194.591 peak2946, -19.307dB.
+Two silent PSGs have -32768 DC, AC0. Do not sum/clamp before handling this DC.
+Player SlowMidiUart changes actual CPU to3.5MHz, Moon test stays14MHz.
+AY actual PT3 confirmed ay-pt3-playing/13.png,1500frames/30sec. Four sources.
+Aligned28sec vs ZXTune: coarse20ms envelope offset2.600sec corr0.98603.
+AC ZXraw9157.412, ZXmix1820.642, reference4596.125; ZXfinal8.044dB quieter.
+Normalized FFT/Hann power <70Hz: raw26.26%, mix9.22%, ref25.73%. >15kHz
+differences do NOT by themselves establish aliasing or subjective quality.
+All details in AUDIO_RESEARCH_V81_REAL_PLAYER.md; generated WAVs/PNGs saved.
+No live Windows audio/listening or production patch. Next: discuss calibrated
+mix/DC fix and compatibility/rollback. Do not rerun completed cases without a
+reason or implement fixes until authorized. Preserve original media and prior
+four untracked engine-research files. Production src/submodule clean; all58
+published v81 files in research copy still byte-identical after real captures.
+Original music and gp.com hashes verified unchanged. Research-only source,
+report, WAV/PNG/logs and local history export saved; no release built.

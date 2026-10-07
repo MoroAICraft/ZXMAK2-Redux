@@ -4,6 +4,7 @@ using System.Xml;
 using System.Drawing;
 using System.Reflection;
 using System.Diagnostics;
+using System.Linq;
 using ZXMAK2.Engine;
 using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Hardware.Evo;
@@ -33,6 +34,50 @@ internal static class RealNedoProbe
     private static string phase = "boot";
     private static bool noTrace;
     private static readonly BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    private static void WriteWavHeader(BinaryWriter output,int rate,int samples)
+    {
+        output.Write(System.Text.Encoding.ASCII.GetBytes("RIFF")); output.Write(36+samples*4);
+        output.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt ")); output.Write(16);
+        output.Write((short)1); output.Write((short)2); output.Write(rate); output.Write(rate*4);
+        output.Write((short)4); output.Write((short)16);
+        output.Write(System.Text.Encoding.ASCII.GetBytes("data")); output.Write(samples*4);
+    }
+    private static void CaptureAudio(string output,string name,int count)
+    {
+        var bm=spec.BusManager;
+        var sources=bm.FindDevices<ISoundRenderer>()
+            .Concat(bm.FindDevices<IAdditionalSoundRenderers>().SelectMany(x=>x.SoundRenderers)).ToArray();
+        var writers=new BinaryWriter[sources.Length+1]; var sums=new double[writers.Length];
+        var squares=new double[writers.Length]; var peaks=new int[writers.Length];
+        int rate=bm.SoundFrame.SampleRate, samples=rate/50;
+        try {
+            for(int i=0;i<writers.Length;i++) {
+                string label=i==sources.Length ? "mixed" : i+"-"+sources[i].GetType().Name;
+                writers[i]=new BinaryWriter(File.Create(Path.Combine(output,name+"-"+label+".wav")));
+                WriteWavHeader(writers[i],rate,count*samples);
+            }
+            for(int frame=0;frame<count;frame++) {
+                keyboard.KeyboardState=keys; if(cmos!=null)cmos.KeyboardState=keys;
+                spec.ExecuteFrame();
+                for(int i=0;i<writers.Length;i++) {
+                    var buffer=i==sources.Length ? bm.SoundFrame.GetBuffer() : sources[i].AudioBuffer;
+                    if(buffer.Length!=samples) throw new Exception("Unexpected PCM length");
+                    foreach(uint packed in buffer) {
+                        writers[i].Write(packed); int l=(short)packed,r=(short)(packed>>16);
+                        sums[i]+=l+r; squares[i]+=(double)l*l+(double)r*r;
+                        peaks[i]=Math.Max(peaks[i],Math.Max(Math.Abs(l),Math.Abs(r)));
+                    }
+                }
+            }
+            for(int i=0;i<writers.Length;i++) {
+                double mean=sums[i]/(count*(double)samples*2), square=squares[i]/(count*(double)samples*2);
+                Console.WriteLine("CAPTURE {0} source={1} rate={2} frames={3} mean={4:F3} RMS={5:F3} ACrms={6:F3} peak={7}",
+                    name,i==sources.Length ? "mixed" : i+"-"+sources[i].GetType().Name,rate,count,mean,
+                    Math.Sqrt(square),Math.Sqrt(Math.Max(0,square-mean*mean)),peaks[i]);
+            }
+        } finally {foreach(var writer in writers) if(writer!=null) writer.Dispose();}
+    }
 
     private static void Frames(int count)
     {
@@ -180,6 +225,10 @@ internal static class RealNedoProbe
                     typeof(FddController).GetMethod("MountFloppy", flags).Invoke(
                         spec.BusManager.FindDevice<FddPentEvo>(),
                         new object[] { 0, Path.GetFullPath(phase.Substring(5)), true });
+                else if (phase.StartsWith("audio:"))
+                {
+                    var capture=phase.Split(':'); CaptureAudio(output,capture[1],int.Parse(capture[2]));
+                }
                 else if (phase.StartsWith("bench:"))
                 {
                     // Genuine OS/player state, measured WITHOUT trace wrappers
