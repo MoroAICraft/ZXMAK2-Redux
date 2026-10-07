@@ -33,6 +33,7 @@
             this.lblMasterVolume = new System.Windows.Forms.Label();
             this.lblMasterPercent = new System.Windows.Forms.Label();
             this.trkMasterVolume = new System.Windows.Forms.TrackBar();
+            this.chkLegacyAudio = new System.Windows.Forms.CheckBox();
             this.lblType = new System.Windows.Forms.Label();
             this.cbxType = new System.Windows.Forms.ComboBox();
             this.chkUlaPlus = new System.Windows.Forms.CheckBox();
@@ -64,9 +65,10 @@
             this.groupBoxAudio.Controls.Add(this.lblMasterVolume);
             this.groupBoxAudio.Controls.Add(this.lblMasterPercent);
             this.groupBoxAudio.Controls.Add(this.trkMasterVolume);
-            this.groupBoxAudio.Location = new System.Drawing.Point(0, 228);
+            this.groupBoxAudio.Controls.Add(this.chkLegacyAudio);
+            this.groupBoxAudio.Location = new System.Drawing.Point(0, 204);
             this.groupBoxAudio.Name = "groupBoxAudio";
-            this.groupBoxAudio.Size = new System.Drawing.Size(300, 104);
+            this.groupBoxAudio.Size = new System.Drawing.Size(300, 128);
             this.groupBoxAudio.TabIndex = 2;
             this.groupBoxAudio.TabStop = false;
             this.groupBoxAudio.Text = "Audio Output:";
@@ -100,6 +102,12 @@
             this.trkMasterVolume.TickFrequency = 25;
             this.trkMasterVolume.Value = 100;
             this.trkMasterVolume.ValueChanged += new System.EventHandler(this.trkMasterVolume_ValueChanged);
+            this.chkLegacyAudio.Location = new System.Drawing.Point(10, 91);
+            this.chkLegacyAudio.Size = new System.Drawing.Size(260, 24);
+            this.chkLegacyAudio.Name = "chkLegacyAudio";
+            this.chkLegacyAudio.TabIndex = 1;
+            this.chkLegacyAudio.Text = "Legacy audio mix (v81)";
+            this.chkLegacyAudio.UseVisualStyleBackColor = true;
             // 
             // lblType
             // 
@@ -161,6 +169,7 @@
 		private System.Windows.Forms.Label lblMasterVolume;
 		private System.Windows.Forms.Label lblMasterPercent;
 		private System.Windows.Forms.TrackBar trkMasterVolume;
+        private System.Windows.Forms.CheckBox chkLegacyAudio;
 		private System.Windows.Forms.Label lblType;
         private System.Windows.Forms.ComboBox cbxType;
         private System.Windows.Forms.CheckBox chkUlaPlus;

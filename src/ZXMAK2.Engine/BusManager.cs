@@ -64,6 +64,7 @@ namespace ZXMAK2.Engine
         public string Name { get; set; }
         public int SampleRate { get; set; }
         public int MasterVolume { get; set; }
+        public bool UseLegacyAudioMix { get; set; }
 
         public RzxHandler RzxHandler 
         {
@@ -370,7 +371,8 @@ namespace ZXMAK2.Engine
                     .OfType<ISoundMixerConfiguration>()
                     .Any(configuration => configuration.RejectDc),
                 MasterVolume,
-                sourceGains);
+                sourceGains,
+                !UseLegacyAudioMix);
             OnBusConnected();
             return success;
         }
@@ -707,6 +709,8 @@ namespace ZXMAK2.Engine
                 Name = busNode.Attributes["name"].InnerText;
             }
             MasterVolume = 100;
+            bool legacyAudio;
+            UseLegacyAudioMix = bool.TryParse(GetAttrString(busNode, "legacyAudioMix"), out legacyAudio) && legacyAudio;
             int masterVolume;
             if (int.TryParse(GetAttrString(busNode, "masterVolume"), out masterVolume) &&
                 masterVolume >= 0 && masterVolume <= 200)
@@ -878,6 +882,9 @@ namespace ZXMAK2.Engine
                 var el = (XmlElement)busNode;
                 el.SetAttribute("masterVolume", MasterVolume.ToString());
             }
+            ((XmlElement)busNode).RemoveAttribute("legacyAudioMix");
+            if (UseLegacyAudioMix)
+                ((XmlElement)busNode).SetAttribute("legacyAudioMix", "true");
             foreach (var device in m_deviceList)
             {
                 try

@@ -41,6 +41,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 trkMasterVolume.Minimum,
                 Math.Min(trkMasterVolume.Maximum, m_bmgr.MasterVolume));
             UpdateMasterVolumeLabel();
+            chkLegacyAudio.Checked = m_bmgr.UseLegacyAudioMix;
 
             cbxType.SelectedIndex = -1;
             if (m_device != null)
@@ -68,6 +69,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         public override void Apply()
         {
             m_bmgr.MasterVolume = trkMasterVolume.Value;
+            m_bmgr.UseLegacyAudioMix = chkLegacyAudio.Checked;
             var bdd = (BusDeviceDescriptor)cbxType.SelectedItem;
 
             var ula = (IUlaDevice)Activator.CreateInstance(bdd.Type);

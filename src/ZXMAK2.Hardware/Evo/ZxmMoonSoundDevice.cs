@@ -119,6 +119,19 @@ namespace ZXMAK2.Hardware.Evo
             RenderTo(m_frameSamples);
             m_rendering = false;
             base.OnEndFrame();
+            // The native core bypasses the DAC devices' volume scaling.
+            // Scale only completed PCM: chip registers and filter state stay
+            // unchanged; 100% remains bit-identical to the previous release.
+            if (Volume != 100)
+            {
+                var buffer = AudioBuffer;
+                for (var i = 0; i < buffer.Length; i++)
+                {
+                    var left = unchecked((short)buffer[i]) * Volume / 100;
+                    var right = unchecked((short)(buffer[i] >> 16)) * Volume / 100;
+                    buffer[i] = (uint)(ushort)(short)left | ((uint)(ushort)(short)right << 16);
+                }
+            }
         }
 
         private void InitializeCore()

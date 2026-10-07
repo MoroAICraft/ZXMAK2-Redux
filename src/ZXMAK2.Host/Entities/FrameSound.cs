@@ -13,6 +13,11 @@ namespace ZXMAK2.Host.Entities
         private readonly int _masterVolume;
         private readonly int[] _sourceGains;
         private readonly bool _hasSourceGain;
+        private readonly bool _useModernMix;
+        private readonly double _dcPole;
+        private double _wideInputLeft, _wideInputRight;
+        private double _wideOutputLeft, _wideOutputRight;
+        private bool _widePrimed;
         private uint[] _buffer;
         private uint[][] _sources;
         private short _dcPreviousInputLeft;
@@ -49,6 +54,17 @@ namespace ZXMAK2.Host.Entities
             bool rejectDc,
             int masterVolume,
             IEnumerable<int> sourceGains)
+            : this(sampleRate, sources, rejectDc, masterVolume, sourceGains, false)
+        {
+        }
+
+        public FrameSound(
+            int sampleRate,
+            IEnumerable<uint[]> sources,
+            bool rejectDc,
+            int masterVolume,
+            IEnumerable<int> sourceGains,
+            bool useModernMix)
         {
             _mixBuffer = new uint[(int)(sampleRate / 50D + 0.5D)];
             SampleRate = sampleRate;
@@ -61,6 +77,8 @@ namespace ZXMAK2.Host.Entities
             if (_sourceGains.Length != _sources.Length)
                 throw new ArgumentException("One gain is required for each source", "sourceGains");
             _hasSourceGain = _sourceGains.Any(gain => gain != 100);
+            _useModernMix = useModernMix;
+            _dcPole = Math.Exp(-2.0 * Math.PI * 5.0 / sampleRate);
         }
 
         #region ISoundFrame
@@ -79,6 +97,11 @@ namespace ZXMAK2.Host.Entities
                 return _buffer;
             }
             _buffer = _mixBuffer;
+            if (_useModernMix)
+            {
+                MixModern(_buffer);
+                return _buffer;
+            }
             Mix(_buffer, _sources);
             if (_rejectDc)
             {
@@ -95,6 +118,53 @@ namespace ZXMAK2.Host.Entities
 
 
         #region Private
+
+        private void MixModern(uint[] dst)
+        {
+            // Fixed -6 dB headroom, not a divisor dependent on installed chips.
+            // Sum and reject DC before narrowing: an idle PSG can emit -32768.
+            // One sample-rate-aware 5 Hz blocker preserves musical bass. Its
+            // state spans frames; the first input primes the DC offset quietly.
+            var dcFeed = (1.0 + _dcPole) / 2.0;
+            var outputGain = 0.5 * _masterVolume / 100.0;
+            for (var i = 0; i < dst.Length; i++)
+            {
+                double left = 0, right = 0;
+                for (var j = 0; j < _sources.Length; j++)
+                {
+                    var packed = _sources[j][i];
+                    var gain = _sourceGains[j] / 100.0;
+                    left += unchecked((short)packed) * gain;
+                    right += unchecked((short)(packed >> 16)) * gain;
+                }
+                if (!_widePrimed)
+                {
+                    _wideInputLeft = left;
+                    _wideInputRight = right;
+                    _widePrimed = true;
+                }
+                var filteredLeft = dcFeed * (left - _wideInputLeft) + _dcPole * _wideOutputLeft;
+                var filteredRight = dcFeed * (right - _wideInputRight) + _dcPole * _wideOutputRight;
+                _wideInputLeft = left;
+                _wideInputRight = right;
+                _wideOutputLeft = filteredLeft;
+                _wideOutputRight = filteredRight;
+                // Master gain and limiting happen once, at final PCM output.
+                var l = LimitWide(filteredLeft * outputGain);
+                var r = LimitWide(filteredRight * outputGain);
+                dst[i] = (uint)(ushort)l | ((uint)(ushort)r << 16);
+            }
+        }
+
+        private static short LimitWide(double value)
+        {
+            const double knee = 24576.0;
+            const double headroom = short.MaxValue - knee;
+            var magnitude = Math.Abs(value);
+            if (magnitude > knee)
+                magnitude = knee + headroom * (magnitude - knee) / (headroom + magnitude - knee);
+            return (short)Math.Round(value < 0 ? -magnitude : magnitude);
+        }
 
         private unsafe void Mix(uint[] dst, uint[][] sources)
         {
