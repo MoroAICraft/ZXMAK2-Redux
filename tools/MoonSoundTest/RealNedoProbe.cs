@@ -131,6 +131,12 @@ internal static class RealNedoProbe
             {
                 config.SelectSingleNode("//Device[contains(@type,'UlaPentEvo')]")
                     .Attributes["zxBusSlot1Device"].Value = "OmniSound";
+                // Mirror the UI's board transition, not an invalid XML mix:
+                // Omni owns YM; an explicit internal AY/TSFM node must go too.
+                ((XmlElement)config.SelectSingleNode("//Device[contains(@type,'UlaPentEvo')]"))
+                    .SetAttribute("internalSound", "None");
+                foreach (XmlNode internalMusic in config.SelectNodes("//Device[contains(@type,'TurboSoundFmPro') or contains(@type,'AYCHRV') or contains(@type,'AY8910')]"))
+                    internalMusic.ParentNode.RemoveChild(internalMusic);
                 config.SelectSingleNode("//Device[contains(@type,'ZxmMoonSoundDevice')]")
                     .Attributes["type"].Value = typeof(ZxOmniSoundDevice).AssemblyQualifiedName;
             }

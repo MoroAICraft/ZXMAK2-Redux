@@ -31,3 +31,20 @@ MeasureFinal now running with BaselineName=baseline-v80; no concurrent probes.
 Generalized packaging/measurement scripts keep v80 defaults for reproducibility.
 RealNedoProbe adds no-trace bounded frame+mix benchmark; only copied SD may be
 used. Next: final differential, true OS/player/tune and packaging. No audio edits.
+
+Final: 10 fingerprints exact v80 match. Paired builtin full/light ~5.8–8.5%
+less time. No stable Evo speedup (small negatives up to1.6%, CPU-only control
+also shifted1%). setup median578->486.5ms (~16%), gc2 35->14.
+Genuine NedoOS+OmniPlayer example.pt3 playing: peak606/hashA6C7A1A0BB664D0D
+and final PNG identical v80/v81; benchmark6074->5998ms, not confident speedup.
+Quiescent redraw/copy proxies measured; no rendering/audio production change.
+Omni harness invalidly retained internal TSFM; baseline v80 failed likewise.
+Fixed harness only to mirror UI internalNone/removal; valid Omni cold/repeat
+now detects OPL3/OPL4/ROM/RAM. Invalid logs retained and clearly classified.
+Engine SHA89C07730F1E54E8A6058F730E6E3566DD070925704ECB20517ACE14B980E02A2;
+only engine changed in runtime. Next: verified ZIP, packaged smoke, source/tag
+export. Do NOT rerun profiling/timing or start audio-quality work.
+Full/Clean ZIP 58/55 entries hash-verified, extracted Clean smoke SD/Moon/
+Omni/Max/Evo-display PASS. Working D: Engine hash still exactly v80 control.
+Implementation and validation complete; final commit/tag/source bundles export
+only remains. Do not redo experiments or merge archived audio WIP.

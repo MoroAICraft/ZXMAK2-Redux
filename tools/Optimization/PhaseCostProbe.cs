@@ -105,6 +105,23 @@ internal static class PhaseCostProbe
             Process.GetCurrentProcess().ProcessorAffinity=new IntPtr(1);
             Process.GetCurrentProcess().PriorityClass=ProcessPriorityClass.High;
             string full=File.ReadAllText(Path.Combine(args[0],"machines.test.config"));
+            if(args.Length>2 && args[2]=="buffers") {
+                foreach(string profile in new[] {full,OptimizationProbe.EvoBus(args[1]).OuterXml}) {
+                    var vm=Create(profile,null,4);vm.ExecuteFrame();
+                    var ula=vm.BusManager.FindDevice<IUlaDevice>();
+                    var redraw=ula.GetType().GetMethod("ForceRedrawFrame");
+                    redraw.Invoke(ula,null);var watch=Stopwatch.StartNew();
+                    for(int i=0;i<100;i++)redraw.Invoke(ula,null);
+                    watch.Stop();long render=watch.ElapsedTicks;
+                    var data=ula.VideoData.Buffer;var copy=new int[data.Length];
+                    watch.Restart();for(int i=0;i<100;i++)Buffer.BlockCopy(data,0,copy,0,data.Length*4);
+                    watch.Stop();Console.WriteLine("BUFFERS proxy {0} pixels={1} full-redraw100={2:F3}ms copy100={3:F3}ms",
+                        ula.GetType().Name,data.Length,render*1000.0/Stopwatch.Frequency,watch.Elapsed.TotalMilliseconds);
+                    vm.BusManager.Disconnect();
+                }
+                Console.WriteLine("LIMIT: quiescent full redraw/copy proxy, not in-frame incremental drawing or Windows/GPU backend.");
+                return 0;
+            }
             if (args.Length > 2 && args[2] == "setup") {
                 var vm=Create(full,"zexall.sna",0);
                 var config=new XmlDocument(); config.LoadXml(full);

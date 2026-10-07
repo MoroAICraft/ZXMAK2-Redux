@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Рабочая ветка оптимизации: `codex/optimization-v80`, основа — контрольная v79.
+Рабочая ветка оптимизации: `codex/optimization-v81`, основа — контрольная v80.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
 
 | Версия | Исходники | Пакет в L:\Work_two\ZX | Назначение |
@@ -10,6 +10,7 @@
 | v78 | `29248ad` | ZXMAK2-v78-ZXEVO-BC-Portable-SD-Folder-Test-20261005 | Предыдущий откат: портативные SD-сессии |
 | v77 | `d984e2c` | ZXMAK2-v77-ZXEVO-BC-MoonSound-NedoOS-ENDOS-Test-20261004 | Исправление физического ENDOS MoonSound |
 | v80 | ветка `codex/optimization-v80`, метка `zxmak2-v80-optimized` | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука; отчёт OPTIMIZATION_V80_REPORT.md |
+| v81 | ветка `codex/optimization-v81`, метка `zxmak2-v81-optimized` | ZXMAK2-v81-ZXEVO-BC-Engine-Optimization-Test-20261007 | Второй проход движка: timing hooks / reuse routing tables; отчёт OPTIMIZATION_V81_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
@@ -38,6 +39,9 @@
 Исходники v80 (содержимое submodule включено) и две полные local history bundle:
 `ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007/source/`.
 В runtime ZIP только release; контроль и диагностические материалы лежат отдельно.
+Для v81 полный source+submodule ZIP и две history bundle находятся в аналогичной
+папке v81/source; v80 и её архивы не изменены. Пользовательский D: runtime v80
+проверен по DLL/EXE/ROMS.PAK перед созданием независимой копии для v81.
 
 ## Сборка и контроль
 

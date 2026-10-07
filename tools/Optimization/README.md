@@ -1,5 +1,13 @@
 # Safe optimization workflow
 
+Current second-pass branch is `codex/optimization-v81`, control v80; see
+`docs/history/OPTIMIZATION_V81_REPORT.md`. Scripts preserve v80 defaults:
+pass the v81 package explicitly, `BaselineName=baseline-v80`, Version=v81,
+and packaging Flavor=Engine-Optimization. Never infer target paths from cwd.
+PhaseCostProbe is diagnostic-only; RoutingSafetyProbe checks hooks/stale maps.
+RealNedoProbe bench requires no-trace and copied SD; root tests have actual
+PT3 playback with equal output, not synthetic replacement of OS/player.
+
 Run from the primary checkout, `codex/optimization-v80`, on Windows/x86 .NET.
 Preserved control: `zxmak2-v79-control`; final runtime tag: `zxmak2-v80-optimized`.
 Read `docs/LOCAL_VERSIONS.md` and `docs/history/OPTIMIZATION_V80_REPORT.md` first.
