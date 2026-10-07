@@ -15,9 +15,23 @@ using ZXMAK2.Hardware.Evo;
 internal static class OptimizationProbe
 {
     private static readonly BindingFlags Private = BindingFlags.Static | BindingFlags.NonPublic;
-    private static readonly Type Tests = Assembly.LoadFrom("Test.exe").GetType("Test.Program");
+    private static readonly Type Tests = Assembly.LoadFrom(Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "Test.exe")).GetType("Test.Program");
     private static Spectrum Create(string xml)
     { return (Spectrum)Tests.GetMethod("GetTestMachine", Private).Invoke(null, new object[] { xml }); }
+    private static XmlNode EvoBus(string path)
+    {
+        var config = new XmlDocument(); config.Load(path);
+        var bus = config.SelectSingleNode("//Bus");
+        foreach (XmlElement node in bus.SelectNodes("Device").Cast<XmlElement>().ToArray())
+        {
+            if (node.GetAttribute("type").Contains("CmosPentEvo")) { bus.RemoveChild(node); continue; }
+            if (node.GetAttribute("type").Contains("ZsdPentEvo"))
+            { node.SetAttribute("sdImage", ""); node.SetAttribute("sdPath", ""); node.SetAttribute("sdSource", "Image"); }
+            if (node.HasAttribute("ideImage")) node.SetAttribute("ideImage", "");
+        }
+        return bus;
+    }
     private static ulong ioHash, reads, writes, fetches;
     private static void Trace(ushort addr, byte value, bool handled, long tact)
     {
@@ -119,9 +133,7 @@ internal static class OptimizationProbe
             else if (args[0] == "evo-bench")
             {
                 Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
-                var config = new XmlDocument(); config.Load(args[1]); var bus = config.SelectSingleNode("//Bus");
-                foreach (XmlNode node in bus.SelectNodes("Device").Cast<XmlNode>().ToArray())
-                    if (node.Attributes["type"].Value.Contains("CmosPentEvo")) bus.RemoveChild(node);
+                var bus = EvoBus(args[1]);
                 for (int round = -1; round < 3; round++) foreach (int rate in new[] { 1,2,4 })
                 {
                     var vm = Create(bus.OuterXml); Prepare(vm,null,rate);
@@ -143,10 +155,7 @@ internal static class OptimizationProbe
                     "<Bus><Device type='ZXMAK2.Hardware.Spectrum.UlaSpectrum48' /><Device type='ZXMAK2.Hardware.Spectrum.MemorySpectrum48' /></Bus>",
                     "<Bus><Device type='ZXMAK2.Hardware.Spectrum.UlaSpectrum128' /><Device type='ZXMAK2.Hardware.Spectrum.MemorySpectrum128' /></Bus>" })
                 { var vm = Create(profile); Fingerprint(vm,vm.BusManager.FindDevice<IUlaDevice>().GetType().Name,null,0); vm.BusManager.Disconnect(); }
-                var config = new XmlDocument(); config.Load(args[2]);
-                var bus = config.SelectSingleNode("//Bus");
-                foreach (XmlNode node in bus.SelectNodes("Device").Cast<XmlNode>().ToArray())
-                    if (node.Attributes["type"].Value.Contains("CmosPentEvo")) bus.RemoveChild(node);
+                var bus = EvoBus(args[2]);
                 var evoVm = Create(bus.OuterXml);
                 foreach (int rate in new[] { 1,2,4 })
                 {
