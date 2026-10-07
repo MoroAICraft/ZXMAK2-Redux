@@ -33,10 +33,11 @@ internal static class KeyboardRoutingProbe
         try
         {
             VerifyOwnership();
+            VerifyF10IsGuestOnly();
             VerifyMenuLifecycle();
             VerifyPhysicalRecovery();
             VerifyMaxApply();
-            Console.WriteLine("Keyboard/Max v76: PASS ({0} assertions)", _checks);
+            Console.WriteLine("Keyboard/F10/Max: PASS ({0} assertions)", _checks);
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -44,6 +45,62 @@ internal static class KeyboardRoutingProbe
     private static HostKeyboardRouter Router(MainView view)
     {
         return (HostKeyboardRouter)typeof(MainView).GetProperty("KeyboardRouter", Private).GetValue(view, null);
+    }
+    private static void VerifyF10IsGuestOnly()
+    {
+        using (var view = new MainView(null))
+        {
+            var router = Router(view);
+            var process = typeof(MainView).GetMethod("ProcessCmdKey", Private);
+            var strip = (MenuStrip)typeof(MainView).GetField("mnuStrip", Private).GetValue(view);
+            int activated = 0;
+            strip.MenuActivate += delegate { activated++; };
+            foreach (var modifiers in new[] { Keys.None, Keys.Shift, Keys.Control, Keys.Alt,
+                Keys.Control | Keys.Shift, Keys.Control | Keys.Alt })
+            {
+                var message = Message.Create(view.Handle, 0x100, (IntPtr)(int)Keys.F10, IntPtr.Zero);
+                Assert((bool)process.Invoke(view, new object[] { message, Keys.F10 | modifiers }),
+                    "F10 was passed to native menu preprocessing: " + modifiers);
+                Assert(!router.ExecuteShortcut(Keys.F10 | modifiers, false),
+                    "F10 is registered as an emulator shortcut: " + modifiers);
+                var physical = Physical(GuestKey.F10);
+                if ((modifiers & Keys.Shift) != 0) physical[(int)GuestKey.LeftShift] = true;
+                if ((modifiers & Keys.Control) != 0) physical[(int)GuestKey.LeftControl] = true;
+                if ((modifiers & Keys.Alt) != 0) physical[(int)GuestKey.LeftAlt] = true;
+                router.Scan(Physical()); router.Scan(physical);
+                Assert(router[GuestKey.F10], "F10 was blocked from the guest: " + modifiers);
+            }
+            Assert(activated == 0, "F10 selected the main menu");
+            foreach (ToolStripItem item in strip.Items) VerifyNoF10Shortcut(item);
+
+            var filter = (IMessageFilter)typeof(MainView).GetField("_keyboardMessages", Private).GetValue(view);
+            var filterType = filter.GetType();
+            var menu = (ToolStripDropDownItem)strip.Items[0];
+            filterType.GetMethod("OnOpened", Private).Invoke(filter, new object[] { menu, EventArgs.Empty });
+            foreach (int id in new[] { 0x100, 0x101, 0x104, 0x105 })
+            {
+                var message = Message.Create(menu.DropDown.Handle, id, (IntPtr)(int)Keys.F10, IntPtr.Zero);
+                Assert(filter.PreFilterMessage(ref message), "Menu received F10 message: " + id);
+            }
+            var escape = Message.Create(menu.DropDown.Handle, 0x100, (IntPtr)(int)Keys.Escape, IntPtr.Zero);
+            Assert(!filter.PreFilterMessage(ref escape), "F10 fix swallowed Escape menu navigation");
+            router.Scan(Physical(GuestKey.F10));
+            Assert(!router[GuestKey.F10], "An already open menu leaked guest input");
+            filterType.GetMethod("OnClosed", Private).Invoke(filter, new object[] { menu, EventArgs.Empty });
+            router.Scan(Physical()); router.Scan(Physical(GuestKey.F10));
+            Assert(router[GuestKey.F10], "F10 did not recover after menu close/release");
+            router.ClearState(); router.Scan(Physical()); router.Scan(Physical(GuestKey.F10));
+            Assert(router[GuestKey.F10], "F10 did not recover after reset");
+            var unrelated = Message.Create(IntPtr.Zero, 0x100, (IntPtr)(int)Keys.F10, IntPtr.Zero);
+            Assert(!filter.PreFilterMessage(ref unrelated), "Inactive main window stole another window's F10");
+        }
+    }
+    private static void VerifyNoF10Shortcut(ToolStripItem item)
+    {
+        var menu = item as ToolStripMenuItem;
+        if (menu == null) return;
+        Assert((menu.ShortcutKeys & Keys.KeyCode) != Keys.F10, "F10 bound to host menu: " + menu.Name);
+        foreach (ToolStripItem child in menu.DropDownItems) VerifyNoF10Shortcut(child);
     }
     private static void VerifyOwnership()
     {
@@ -168,7 +225,7 @@ internal static class KeyboardRoutingProbe
             var strip = typeof(MainView).GetField("mnuStrip", Private).GetValue(view);
             filterType.GetMethod("OnStripEntered", Private).Invoke(filter, new object[] { strip, EventArgs.Empty });
             router.Scan(Physical(GuestKey.Escape));
-            Assert(!router[GuestKey.Escape], "Alt/F10 menu mode leaked Escape");
+            Assert(!router[GuestKey.Escape], "Alt menu mode leaked Escape");
             filterType.GetMethod("OnDeactivate", Private).Invoke(filter, new object[] { view, EventArgs.Empty });
             router.Scan(Physical());
             router.Scan(Physical(GuestKey.LeftArrow));

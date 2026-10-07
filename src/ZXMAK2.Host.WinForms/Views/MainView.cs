@@ -931,6 +931,10 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            // Also cover direct WinForms preprocessing, before MenuStrip sees
+            // F10. Guest input is supplied independently by physical polling.
+            if ((keyData & Keys.KeyCode) == Keys.F10)
+                return true;
             if ((keyData & (Keys.Control | Keys.Alt)) == (Keys.Control | Keys.Alt) && _host != null)
                 _host.Uncapture();
             if (TryExecuteHostShortcut(keyData))

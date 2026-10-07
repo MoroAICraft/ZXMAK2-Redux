@@ -230,11 +230,18 @@ namespace ZXMAK2.Host.WinForms.Controls
 
         public bool PreFilterMessage(ref Message message)
         {
-            if (message.Msg != 0x100 && message.Msg != 0x104) return false; // WM_(SYS)KEYDOWN
+            var keyDown = message.Msg == 0x100 || message.Msg == 0x104; // WM_(SYS)KEYDOWN
+            var keyUp = message.Msg == 0x101 || message.Msg == 0x105; // WM_(SYS)KEYUP
+            if (!keyDown && !keyUp) return false;
             if (Form.ActiveForm != _form && _openMenus.Count == 0) return false;
+            // Windows uses F10 to select/toggle the menu, including on key-up.
+            // Suppress only its UI messages; physical polling still sends F10
+            // to the guest. Do not register it as a guest-blocking shortcut.
+            if ((Keys)message.WParam.ToInt32() == Keys.F10) return true;
+            if (!keyDown) return false;
             var control = Control.FromHandle(message.HWnd);
             var toolbar = control as ToolStrip;
-            // MenuActivate also covers Alt/F10 selection without an open dropdown.
+            // MenuActivate also covers Alt selection without an open dropdown.
             _router.SetUiOwnership(_openMenus.Count != 0 || _focusedStrips.Count != 0 ||
                 (toolbar != null && toolbar.ContainsFocus));
             _router.ObserveKeyDown((Keys)message.WParam.ToInt32() | Control.ModifierKeys,
