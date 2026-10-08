@@ -502,16 +502,13 @@ internal static class PentEvoProfileProbe
                 slider.Minimum == 0 && slider.Maximum == 200 &&
                 slider.Value == 100,
                 "Master volume is not at the bottom of the ULA page");
-            var legacy = GetField<CheckBox>(control, "chkLegacyAudio");
-            Assert(!legacy.Checked && !bus.UseLegacyAudioMix,
-                "New profiles did not use the modern audio mix");
-            legacy.Checked = true;
+            Assert(typeof(CtlSettingsUla).GetField("chkLegacyAudio", BindingFlags.Instance | BindingFlags.NonPublic) == null,
+                "Removed Legacy v81 checkbox is still present");
+            Assert(!bus.UseLegacyAudioMix, "New profiles did not use v82 audio");
+            bus.UseLegacyAudioMix = true; // old XML compatibility, not a UI mode
+            control.Init(bus, null, ula);
             control.Apply();
-            Assert(bus.UseLegacyAudioMix && legacy.Checked,
-                "Legacy audio checkbox did not apply/reinitialize");
-            legacy.Checked = false;
-            control.Apply();
-            Assert(!bus.UseLegacyAudioMix, "Modern audio could not be restored");
+            Assert(!bus.UseLegacyAudioMix, "Apply retained a hidden v81 audio mode");
             if (Environment.GetCommandLineArgs().Length > 2)
             {
                 using (var bitmap = new Bitmap(control.Width, control.Height))

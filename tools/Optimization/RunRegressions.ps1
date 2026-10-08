@@ -5,6 +5,7 @@ $taskCsc = 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe'
 $taskRefs = @(Get-ChildItem -LiteralPath $taskRelease -Filter 'ZXMAK2*.dll' | ForEach-Object { '/r:' + $_.FullName })
 $taskProbes = [ordered]@{
     KeyboardRouting = 'tools\BaseConfInputAudioTest\KeyboardRoutingProbe.cs'
+    PrintScreenNmiProbe = 'tools\BaseConfInputAudioTest\PrintScreenNmiProbe.cs'
     GoldenRenderer = 'tools\BaseConfVideoTest\GoldenRendererProbe-B40.cs'
     ContentionFloatingBus = 'tools\BaseConfVideoTest\ContentionFloatingBusProbe-B40.cs'
     InterruptNmi = 'tools\BaseConfInterruptTest\InterruptNmiProbe-B36.cs'
@@ -24,7 +25,7 @@ try {
     foreach ($taskEntry in $taskProbes.GetEnumerator()) {
         $taskExe = "$taskRelease\$($taskEntry.Key).exe"
         $taskLog = "$Package\diagnostics\regression-$($taskEntry.Key).txt"
-        if ($taskEntry.Key -in @('KeyboardRouting','TapeClock','SdLifecycleProbe','PentEvoProfile')) { & $taskExe *> $taskLog }
+        if ($taskEntry.Key -in @('KeyboardRouting','PrintScreenNmiProbe','TapeClock','SdLifecycleProbe','PentEvoProfile')) { & $taskExe *> $taskLog }
         else { & $taskExe $taskRelease *> $taskLog }
         if ($LASTEXITCODE -ne 0) { Get-Content $taskLog -Tail 15; throw "Regression failed: $($taskEntry.Key)" }
         Get-Content $taskLog -Tail 2

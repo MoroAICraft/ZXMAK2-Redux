@@ -41,7 +41,6 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 trkMasterVolume.Minimum,
                 Math.Min(trkMasterVolume.Maximum, m_bmgr.MasterVolume));
             UpdateMasterVolumeLabel();
-            chkLegacyAudio.Checked = m_bmgr.UseLegacyAudioMix;
 
             cbxType.SelectedIndex = -1;
             if (m_device != null)
@@ -69,7 +68,9 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         public override void Apply()
         {
             m_bmgr.MasterVolume = trkMasterVolume.Value;
-            m_bmgr.UseLegacyAudioMix = chkLegacyAudio.Checked;
+            // v84 uses the accepted v82 output. Old XML remains readable,
+            // but applying current settings must not retain a hidden v81 mode.
+            m_bmgr.UseLegacyAudioMix = false;
             var bdd = (BusDeviceDescriptor)cbxType.SelectedItem;
 
             var ula = (IUlaDevice)Activator.CreateInstance(bdd.Type);

@@ -1,10 +1,11 @@
+# Historical v82 BC/NMI frontend-only builder. Current work uses v84 / ZXVM.sln.
 param(
     [string]$Original = 'D:/release82_sound_fix',
     [string]$Destination = 'D:/release82_BC058_NMI',
     [string]$WorkDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Original = [IO.Path]::GetFullPath($Original)
 $Destination = [IO.Path]::GetFullPath($Destination)
 if (!$WorkDirectory) { $WorkDirectory = Join-Path $root 'src/_binrelease/v82-nmi-build' }

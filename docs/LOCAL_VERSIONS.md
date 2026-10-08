@@ -1,7 +1,8 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Актуальная ветка звука: `codex/audio-v82`, основа — контрольная v81.
+Рабочая версия: **v84**, ветка `codex/release-v84-bc-nmi`.
+Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
 
 | Версия | Исходники | Пакет в L:\Work_two\ZX | Назначение |
@@ -12,6 +13,9 @@
 | v80 | ветка `codex/optimization-v80`, метка `zxmak2-v80-optimized` | ZXMAK2-v80-ZXEVO-BC-Optimization-Test-20261007 | Оптимизация без изменения эмуляции/звука; отчёт OPTIMIZATION_V80_REPORT.md |
 | v81 | ветка `codex/optimization-v81`, метка `zxmak2-v81-optimized` | ZXMAK2-v81-ZXEVO-BC-Engine-Optimization-Test-20261007 | Второй проход движка: timing hooks / reuse routing tables; отчёт OPTIMIZATION_V81_REPORT.md |
 | v82 | ветка `codex/audio-v82`, метка `zxmak2-v82-common-audio` | ZXMAK2-v82-ZXEVO-BC-Common-Audio-Test-20261008 | Общий wide mixer / fixed headroom / 5 Hz DC, legacy-переключатель, Moon Volume; AUDIO_V82_REPORT.md |
+| v82 BC/NMI | исходная правка `654a891`, tag `backup/v82-printscreen-nmi` | D:\release82_BC058_NMI (пользовательская тестовая копия); контроль сохранён в v84/baseline-v82-bc-nmi | Принятый PrintScreen → штатный NMI; core/audio от v82 |
+| v83 | историческая `codex/audio-v83`, tag `zxmak2-v83-ay-hq` (`b91b8ad`) | ZXMAK2-v83-ZXEVO-BC-AY-HQ-Test-20261008 | **ОТМЕНЕНА пользователем**: нагрузка/задержки FIR. Архив эксперимента, не основа работы |
+| v84 | `codex/release-v84-bc-nmi`, tag `zxmak2-v84-bc-nmi` | ZXMAK2-v84-ZXEVO-BC-NMI-PrintScreen-20261008 | **ТЕКУЩАЯ**: v82 + принятый NMI/PrintScreen; Legacy v81 удалён из UI; V84_RELEASE_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
@@ -24,6 +28,28 @@ v82: `release` — готовый runtime, Full/Clean ZIP в корне паке
 UI-переключатель Legacy audio mix (v81) откатывает только mixer/DC; не ошибку
 игнорирования MoonSound.Volume. Четыре старых untracked engine-research файла
 не изменены; экспорт разрешает именно этот явный список, tracked edits запрещены.
+
+## Текущая структура v84
+
+`release` — runtime; Full/Clean ZIP — в корне пакета; `source` — исходники
+с закреплённым OmniSound и полная local Git history двух репозиториев.
+`baseline-v82-bc-nmi` — 58 runtime файлов принятой D:\release82_BC058_NMI,
+без диагностических exe и чужой SD-папки. `diagnostics` — проверки,
+снимок UI, SHA256, служебные программы и прежние README.
+Главный каталог всех версий: L:\Work_two\ZX\ZXMAK2-RELEASES.md.
+
+Движок/Hardware/звуковой mixer/native/ROM/SF2 v84 побайтно сохранены от v82;
+пересобран только WinForms frontend. В исходниках нет FIR/HQ из v83.
+Для полного отката использовать сохранённую v82, не смешивать DLL разных версий.
+Legacy v81 отсутствует в интерфейсе; старый XML читается для совместимости,
+Apply настроек ULA возвращает принятый v82 mixer. Master 0..200% сохранён.
+PrintScreen на отпускании вызывает VM → NMI; для окна BC нужен установленный
+NMI-резидент самого BC Commander. Репозиторий/Build BC Commander не изменены.
+
+v83 и её source/history/результаты не удалены: эксперимент отмечен отменённым
+в каталоге версий и RELEASE-STATUS.md. Новые работы начинать только от v84.
+Пользовательские D: каталоги не перезаписывались. Четыре preexisting untracked
+engine-research файла сохранены без правок. Удаления пользовательских данных нет.
 
 ## Архив перед обновлением основного checkout
 
