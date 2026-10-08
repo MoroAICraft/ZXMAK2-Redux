@@ -973,6 +973,8 @@ namespace ZXMAK2.Host.WinForms.Views
             _keyboardRouter.RegisterShortcut(Keys.Alt | Keys.Enter, () => ClickShortcut(menuViewFullScreen));
             _keyboardRouter.RegisterShortcut(Keys.Control | Keys.S, () => ClickShortcut(menuVmMaximumSpeed));
             _keyboardRouter.RegisterShortcut(Keys.Pause, () => OnCommand(CommandVmPause));
+            _keyboardRouter.RegisterShortcut(Keys.PrintScreen, () => ClickShortcut(menuVmNmi));
+            menuVmNmi.ShortcutKeyDisplayString = "PrintScreen";
             _keyboardRouter.RegisterShortcut(Keys.F12, () =>
             {
                 OnCommand(CommandVmWarmReset);

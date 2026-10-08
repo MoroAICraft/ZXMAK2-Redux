@@ -238,6 +238,14 @@ namespace ZXMAK2.Host.WinForms.Controls
             // Suppress only its UI messages; physical polling still sends F10
             // to the guest. Do not register it as a guest-blocking shortcut.
             if ((Keys)message.WParam.ToInt32() == Keys.F10) return true;
+            // Windows can deliver PrintScreen as KEYUP only. Trigger once
+            // on release and consume KEYDOWN so preprocessing cannot duplicate NMI.
+            if ((Keys)message.WParam.ToInt32() == Keys.PrintScreen &&
+                Control.ModifierKeys == Keys.None)
+            {
+                if (keyUp) _router.ExecuteShortcut(Keys.PrintScreen, false);
+                return true;
+            }
             if (!keyDown) return false;
             var control = Control.FromHandle(message.HWnd);
             var toolbar = control as ToolStrip;
