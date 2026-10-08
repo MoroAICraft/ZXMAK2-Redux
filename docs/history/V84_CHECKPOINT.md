@@ -20,6 +20,9 @@ PrintScreen release→VM/NMI + удалён Legacy v81 checkbox. Apply ULA setti
 Master volume/ULAplus сохранены. Движок/звук/native/ROM/SD не изменены.
 
 Сборка успешна; проверки PrintScreen keyup-only/down-up/hold/disabled label,
-F10/F12, keyboard, video, interrupts, SD и sound cards проходят.
-Завершить fingerprints/audio/packaging, сохранить source+history, поставить
-tag zxmak2-v84-bc-nmi. Конечный отчёт V84_RELEASE_REPORT.md.
+F10/F12, keyboard, video, interrupts, SD и sound cards прошли.
+583176 audio checks и десять полных machine/IO/video/PCM/tact fingerprints
+совпали с v82. Full/Clean ZIP (58/55 файлов) проверены по entry SHA256.
+Runtime/контроль очищены от диагностических программ переносом в diagnostics.
+Конечный отчёт V84_RELEASE_REPORT.md. Итоговый tag zxmak2-v84-bc-nmi;
+source+OmniSound и обе полные local histories экспортируются после commit.
