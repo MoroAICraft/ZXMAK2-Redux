@@ -535,7 +535,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                             writeAccepted = WriteDataBlock(wrPos);
 
 
-                            NextState = SdState.WR_DATA_RESP;
+                            // SPI has two CRC bytes before the data response.
+                            NextState = SdState.RD_CRC16_1;
                         }
                     }
                     break;
@@ -551,7 +552,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
                             writeAccepted = WriteDataBlock(wrPos);
                             wrPos += dataBlockLen;
-                            NextState = SdState.RD_DATA_SIG_MUL;
+                            NextState = SdState.RD_CRC16_1;
                         }
                     }
                     break;
@@ -595,9 +596,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         return SdState.R7;
 
                     case SdCommand.WRITE_BLOCK:
-                        return SdState.RD_DATA_SIG;
                     case SdCommand.WRITE_MULTIPLE_BLOCK:
-                        return SdState.RD_DATA_SIG_MUL;
+                        return SdState.R1;
                 }
             }
             else
@@ -906,7 +906,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     {
                         case SdState.R1:
                             currState = SdState.RD_DATA_SIG;
-                            return 0xFE;
+                            return 0x00; // R1 success, not a read start token
 
                         case SdState.WR_DATA_RESP:
                             {
@@ -924,7 +924,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     {
                         case SdState.R1:
                             currState = SdState.RD_DATA_SIG_MUL;
-                            return 0xFE;
+                            return 0x00;
                         case SdState.WR_DATA_RESP:
                             {
                                 currState = SdState.RD_DATA_SIG_MUL;
