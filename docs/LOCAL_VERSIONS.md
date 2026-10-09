@@ -1,7 +1,8 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Рабочая версия: **v84**, ветка `codex/release-v84-bc-nmi`.
+Новая сборка для проверки: **v85**, ветка `codex/sd-refresh-v85`.
+Принятая контрольная версия и полный откат: **v84**.
 Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
 
@@ -16,6 +17,7 @@
 | v82 BC/NMI | исходная правка `654a891`, tag `backup/v82-printscreen-nmi` | D:\release82_BC058_NMI (пользовательская тестовая копия); контроль сохранён в v84/baseline-v82-bc-nmi | Принятый PrintScreen → штатный NMI; core/audio от v82 |
 | v83 | историческая `codex/audio-v83`, tag `zxmak2-v83-ay-hq` (`b91b8ad`) | ZXMAK2-v83-ZXEVO-BC-AY-HQ-Test-20261008 | **ОТМЕНЕНА пользователем**: нагрузка/задержки FIR. Архив эксперимента, не основа работы |
 | v84 | `codex/release-v84-bc-nmi`, tag `zxmak2-v84-bc-nmi` | ZXMAK2-v84-ZXEVO-BC-NMI-PrintScreen-20261008 | **ТЕКУЩАЯ**: v82 + принятый NMI/PrintScreen; Legacy v81 удалён из UI; V84_RELEASE_REPORT.md |
+| v85 | `codex/sd-refresh-v85`, tag `zxmak2-v85-sd-refresh` | ZXMAK2-v85-ZXEVO-BC-SD-Refresh-Test-20261009 | Refresh с выборочным сохранением сессии, внешние PC-правки, штатный холодный старт; SD_REFRESH_V85.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
@@ -30,6 +32,11 @@ UI-переключатель Legacy audio mix (v81) откатывает тол
 не изменены; экспорт разрешает именно этот явный список, tracked edits запрещены.
 
 ## Текущая структура v84
+
+v85 имеет ту же структуру с `baseline-v84`. Архивы runtime, source с OmniSound
+и две истории Git сохранены отдельно. 157 проверок Refresh и реальный NedoOS
+проходят; 10 machine/PCM fingerprints совпадают с v84. Звук/CPU/NMI не изменены.
+Следующая проверка пользователя — v85; v84 остаётся принятой точкой отката.
 
 `release` — runtime; Full/Clean ZIP — в корне пакета; `source` — исходники
 с закреплённым OmniSound и полная local Git history двух репозиториев.

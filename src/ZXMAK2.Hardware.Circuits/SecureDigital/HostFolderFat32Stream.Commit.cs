@@ -259,33 +259,6 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             return true;
         }
 
-        private void CheckSourceUnchanged(Dictionary<string, Node> originals)
-        {
-            if (!Directory.Exists(m_sourceFolder) ||
-                (File.GetAttributes(m_sourceFolder) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("The mounted source folder has changed.");
-            foreach (var item in originals)
-            {
-                var node = item.Value;
-                var path = Path.Combine(m_sourceFolder, item.Key);
-                if (node.IsDirectory)
-                {
-                    if (!Directory.Exists(path) ||
-                        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                        throw new IOException("The source directory changed: " + path);
-                }
-                else
-                {
-                    var info = new FileInfo(path);
-                    if (!info.Exists || info.Length != node.Length ||
-                        SafeDate(info.LastWriteTime) != node.LastWriteTime ||
-                        (info.Attributes & FileAttributes.ReparsePoint) != 0)
-                        throw new IOException("The source file changed: " + path);
-                }
-            }
-            CheckForExternalAdditions(m_sourceFolder, string.Empty, originals);
-        }
-
         private static void CheckForExternalAdditions(string directory,
             string relative, Dictionary<string, Node> originals)
         {
@@ -307,6 +280,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private void StageGuestFile(GuestEntry entry, string path)
         {
+            var previousStrict = m_strictReads;
             m_strictReads = true;
             try
             {
@@ -333,7 +307,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     throw new InvalidDataException("Incomplete FAT file: " + entry.RelativePath);
             }
             }
-            finally { m_strictReads = false; }
+            finally { m_strictReads = previousStrict; }
         }
 
         private static int Depth(string path)
@@ -439,6 +413,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 var createdFiles = new List<string>();
                 var createdDirectories = new List<string>();
                 var removedDirectories = new List<string>();
+                var leases = new List<FileStream>();
                 var backupCanBeRemoved = false;
                 Directory.CreateDirectory(backup);
                 try
@@ -450,6 +425,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         Directory.CreateDirectory(Path.GetDirectoryName(target));
                         File.Move(Path.Combine(m_sourceFolder, path), target);
                         moved.Add(path);
+                        leases.Add(new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read));
+                        CheckOriginalFile(originals[path], target);
                     }
                     foreach (var path in oldDirectories)
                     {
@@ -476,6 +453,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                                 throw new IOException("Source path changed: " + target);
                             File.Move(temporary, target);
                             createdFiles.Add(item.Key);
+                            leases.Add(new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read));
+                            if (!HashFile(target).SequenceEqual(HashFile(item.Value)))
+                                throw new IOException("A PC process replaced a file during SD save: " + target);
                         }
                         finally
                         {
@@ -490,10 +470,18 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 catch
                 {
+                    foreach (var lease in leases) lease.Dispose();
+                    leases.Clear();
                     try
                     {
                         foreach (var path in createdFiles)
+                        {
+                            // Never delete a PC version that appeared during
+                            // a failed transaction. Leave the rollback backup.
+                            if (!HashFile(Path.Combine(m_sourceFolder, path)).SequenceEqual(HashFile(staged[path])))
+                                throw new IOException("A file changed during rollback: " + path);
                             File.Delete(Path.Combine(m_sourceFolder, path));
+                        }
                         foreach (var path in createdDirectories.OrderByDescending(Depth))
                             Directory.Delete(Path.Combine(m_sourceFolder, path));
                         foreach (var path in removedDirectories.OrderBy(Depth))
@@ -513,6 +501,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 finally
                 {
+                    foreach (var lease in leases) lease.Dispose();
                     if (backupCanBeRemoved)
                     {
                         try { Directory.Delete(backup, true); }
@@ -535,11 +524,27 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     StringComparison.OrdinalIgnoreCase))
                 throw new IOException(
                     "Save the SD image outside the mounted source folder.");
+            // Export must never quietly substitute zero-filled sectors when
+            // a PC edit made an uncaptured original unreadable/incompatible.
+            var originals = new Dictionary<string, Node>(StringComparer.OrdinalIgnoreCase);
+            AddSnapshotEntries(m_root, string.Empty, originals);
+            foreach (var node in originals.Values)
+            {
+                if (node.IsDirectory)
+                {
+                    if (Directory.Exists(node.FullPath) &&
+                        (File.GetAttributes(node.FullPath) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException("A source directory became a reparse point: " + node.FullPath);
+                }
+                else if (node.OriginalSnapshotPath == null) CheckOriginalFile(node);
+            }
             var previousPosition = m_position;
+            var previousStrict = m_strictReads;
             var temporary = target + ".zxmak2-new-" +
                 Guid.NewGuid().ToString("N");
             try
             {
+                m_strictReads = true;
                 using (var output = new FileStream(temporary, FileMode.CreateNew,
                     FileAccess.Write, FileShare.None))
                 {
@@ -563,6 +568,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             finally
             {
                 m_position = previousPosition;
+                m_strictReads = previousStrict;
                 if (File.Exists(temporary))
                     File.Delete(temporary);
             }

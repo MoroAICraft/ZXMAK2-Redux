@@ -120,7 +120,12 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public HostFolderFat32Stream OpenHostFolder(string folderPath)
         {
-            var newStream = new HostFolderFat32Stream(folderPath);
+            return OpenHostFolder(folderPath, null);
+        }
+
+        public HostFolderFat32Stream OpenHostFolder(string folderPath, string excludedDirectory)
+        {
+            var newStream = new HostFolderFat32Stream(folderPath, excludedDirectory);
             try
             {
                 ReplaceStream(newStream, newStream.SourceFolder);

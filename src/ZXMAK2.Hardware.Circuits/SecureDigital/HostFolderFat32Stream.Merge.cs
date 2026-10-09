@@ -16,13 +16,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             using (var hash = SHA256.Create()) return hash.ComputeHash(input);
         }
 
-        private static void CheckOriginalFile(Node node)
+        private static void CheckOriginalFile(Node node, string path = null)
         {
-            var file = new FileInfo(node.FullPath);
+            path = path ?? node.FullPath;
+            var file = new FileInfo(path);
             if (!file.Exists || file.Length != node.Length ||
                 SafeDate(file.LastWriteTime) != node.LastWriteTime ||
                 (file.Attributes & FileAttributes.ReparsePoint) != 0 ||
-                (node.OriginalHash != null && !node.OriginalHash.SequenceEqual(HashFile(node.FullPath))))
+                (node.OriginalHash != null && !node.OriginalHash.SequenceEqual(HashFile(path))))
                 throw new IOException("Both the SD session and the PC changed this file: " +
                     node.FullPath + "\nNo changes were overwritten. Cancel or refresh without saving to use the PC version.");
         }
@@ -41,18 +42,22 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             var folder = SdSessionStorage.GetDirectory("Originals");
             Directory.CreateDirectory(folder);
             var path = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".bin");
+            var created = false;
             try
             {
                 using (var input = new FileStream(node.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    created = true;
                     input.CopyTo(output);
+                }
                 CheckOriginalFile(node);
                 node.OriginalHash = HashFile(path);
                 node.OriginalSnapshotPath = path;
             }
             catch
             {
-                if (File.Exists(path)) File.Delete(path);
+                if (created && File.Exists(path)) File.Delete(path);
                 throw;
             }
         }

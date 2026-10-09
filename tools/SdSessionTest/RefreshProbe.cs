@@ -95,6 +95,13 @@ internal static class RefreshProbe
             bool rejected=false;try{sd.RefreshMountedFolder();}catch(IOException){rejected=true;}
             Check(rejected&&sd.HasPendingChanges&&Object.ReferenceEquals(old,Card(sd)),"same-file timestamp-preserved collision missed");
             Check(File.ReadAllText(Path.Combine(path,"TEST.TRD")).StartsWith("PCME"),"collision overwritten");
+            // A touched original has a private snapshot: export still contains
+            // guest data, not the conflicting newer PC payload.
+            var exported=Path.Combine(scratch,"conflict.img");Card(sd).HostFolderStream.ExportImage(exported);
+            using(var image=File.OpenRead(exported)) {
+                var root=Read(image,Data(image));uint c=Cluster(root,Entry(root,"TEST.TRD"));
+                Check(Read(image,Data(image)+(c-2)*Read(image,0)[13])[0]=='C',"export lost frozen guest original");
+            }
             q.Next=DlgResult.No;Check(sd.RefreshMountedFolder()>=0&&!sd.HasPendingChanges,"discard after conflict failed");
             // Metadata/FSInfo writes and reverted data writes need no save choice.
             var s=Card(sd).HostFolderStream;var info=Read(s,1);info[488]^=1;Write(s,1,info);before=q.Calls;
@@ -117,7 +124,11 @@ internal static class RefreshProbe
             // Build failure after host writes rolls back files and retains journal.
             Guest(sd,"RENAMED.TRD",(byte)'R');s=Card(sd).HostFolderStream;
             var original=File.ReadAllBytes(Path.Combine(path,"RENAMED.TRD"));rejected=false;
-            try{s.CommitChanges(delegate(string backup){throw new IOException("Injected snapshot build failure");});}catch(IOException){rejected=true;}
+            try{s.CommitChanges(delegate(string backup){
+                bool blocked=false;try{File.WriteAllText(Path.Combine(path,"RENAMED.TRD"),"PC DURING SAVE");}catch(IOException){blocked=true;}
+                Check(blocked,"installed guest file was writable during transaction");
+                throw new IOException("Injected snapshot build failure");
+            });}catch(IOException){rejected=true;}
             Check(rejected&&s.HasChanges&&original.SequenceEqual(File.ReadAllBytes(Path.Combine(path,"RENAMED.TRD"))),"build rollback lost file/session");
             q.Next=DlgResult.Yes;Check(sd.RefreshMountedFolder()>=0&&File.ReadAllBytes(Path.Combine(path,"RENAMED.TRD"))[0]=='R',"retry after rollback failed");
             // Failed rebuild on the discard path must not discard first.
@@ -131,6 +142,9 @@ internal static class RefreshProbe
             // Malformed filesystem still offers explicit discard rather than blocking all refreshes.
             s=Card(sd).HostFolderStream;var boot=Read(s,0);boot[3]^=1;Write(s,0,boot);q.Next=DlgResult.No;
             Check(sd.RefreshMountedFolder()>=0&&!sd.HasPendingChanges,"damaged-session discard blocked");
+            File.WriteAllText(Path.Combine(path,"RENAMED.TRD"),"CHANGED PC SIZE");
+            rejected=false;try{Card(sd).HostFolderStream.ExportImage(Path.Combine(scratch,"unsafe.img"));}catch(IOException){rejected=true;}
+            Check(rejected&&!File.Exists(Path.Combine(scratch,"unsafe.img")),"export silently mixed unreadable PC bytes");
         } finally {sd.BusDisconnect();}
     }
     private static void PowerCycle(string scratch,Query q)
@@ -154,6 +168,13 @@ internal static class RefreshProbe
             q.Next=DlgResult.No;model.ExecuteMediaChange(command,null);
             Check(mem.RamPages[page][1000]==0&&!sd.HasPendingChanges&&sd.IsMediaMounted,"success did not power cycle/keep SD");
             Check(!vm.IsRunning,"paused VM unexpectedly resumed");
+            Guest(sd,"TEST.TRD",(byte)'U');q.Next=DlgResult.Cancel;
+            vm.DoRun();model.ExecuteMediaChange(command,null);
+            Check(vm.IsRunning&&sd.HasPendingChanges,"running VM did not resume after cancel");
+            vm.DoStop();q.Next=DlgResult.No;
+            vm.DoRun();model.ExecuteMediaChange(command,null);
+            Check(vm.IsRunning&&!sd.HasPendingChanges&&sd.IsMediaMounted,"running VM did not resume after successful refresh");
+            vm.DoStop();
             q.BeforeShow=null;
         }
     }
@@ -166,7 +187,13 @@ internal static class RefreshProbe
             Check(buttons.Length==3&&buttons.Select(x=>x.Text).SequenceEqual(new[]{"Refresh (Save changes)","Refresh (Without saving)","Cancel"}),"dialog labels/count");
             Check(((Button)form.AcceptButton).DialogResult==DialogResult.Yes&&((Button)form.CancelButton).DialogResult==DialogResult.Cancel,"Enter/Escape wrong");
             foreach(var button in buttons)Check(button.Right<=button.Parent.ClientSize.Width&&button.Width>=TextRenderer.MeasureText(button.Text,button.Font).Width,"button clipped");
-            using(var bmp=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(bmp,form.ClientRectangle);bmp.Save(Path.Combine(output,"refresh-dialog.png"));}
+            // Render the dialog content without showing a desktop window.
+            using(var surface=new UserControl()) {
+                var content=form.Controls[0];form.Controls.Remove(content);content.Dock=DockStyle.Top;
+                surface.Controls.Add(content);surface.Size=content.GetPreferredSize(System.Drawing.Size.Empty);
+                surface.CreateControl();content.PerformLayout();surface.PerformLayout();
+                using(var bmp=new System.Drawing.Bitmap(surface.Width,surface.Height)){surface.DrawToBitmap(bmp,surface.ClientRectangle);bmp.Save(Path.Combine(output,"refresh-dialog.png"));}
+            }
         }
     }
     private static System.Collections.Generic.IEnumerable<Control> Find(Control root){foreach(Control child in root.Controls){yield return child;foreach(var nested in Find(child))yield return nested;}}
