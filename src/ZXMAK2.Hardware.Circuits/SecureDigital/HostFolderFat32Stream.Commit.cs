@@ -244,8 +244,16 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 {
                     var number = m_dataStartSector +
                         (long)(guest.Chain[index] - 2) * m_sectorsPerCluster + sector;
-                    if (m_changedSectors.ContainsKey(number))
-                        return false;
+                    byte[] changed;
+                    if (m_changedSectors.TryGetValue(number, out changed))
+                    {
+                        var baseline = new byte[SectorSize];
+                        FillSector(number, baseline);
+                        var offset = (long)index * m_clusterSize + sector * SectorSize;
+                        var used = (int)Math.Min(SectorSize, Math.Max(0, original.Length - offset));
+                        for (int b = 0; b < used; b++)
+                            if (changed[b] != baseline[b]) return false;
+                    }
                 }
             }
             return true;
@@ -299,6 +307,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private void StageGuestFile(GuestEntry entry, string path)
         {
+            m_strictReads = true;
+            try
+            {
             using (var output = new FileStream(path, FileMode.CreateNew,
                 FileAccess.Write, FileShare.None))
             {
@@ -321,6 +332,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 if (remaining != 0)
                     throw new InvalidDataException("Incomplete FAT file: " + entry.RelativePath);
             }
+            }
+            finally { m_strictReads = false; }
         }
 
         private static int Depth(string path)
@@ -330,13 +343,41 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public void CommitChanges()
         {
+            CommitChanges(null);
+        }
+
+        public bool HasFileChanges
+        {
+            get
+            {
+                if (!HasChanges) return false;
+                try
+                {
+                    var guest = ReadGuestTree();
+                    var originals = new Dictionary<string, Node>(StringComparer.OrdinalIgnoreCase);
+                    AddSnapshotEntries(m_root, string.Empty, originals);
+                    if (guest.Count != originals.Count) return true;
+                    return originals.Any(item => !guest.ContainsKey(item.Key) ||
+                        guest[item.Key].IsDirectory != item.Value.IsDirectory ||
+                        (!item.Value.IsDirectory && !IsUnchangedFile(guest[item.Key], item.Value)));
+                }
+                catch (IOException) { return true; } // Unknown/damaged sessions still get a discard/cancel choice.
+                catch (InvalidDataException) { return true; }
+                catch (UnauthorizedAccessException) { return true; }
+            }
+        }
+
+        public void CommitChanges(Action<string> afterSave)
+        {
             if (!HasChanges)
+            {
+                if (afterSave != null) afterSave(null);
                 return;
+            }
             var guest = ReadGuestTree();
             var originals = new Dictionary<string, Node>(
                 StringComparer.OrdinalIgnoreCase);
             AddSnapshotEntries(m_root, string.Empty, originals);
-            CheckSourceUnchanged(originals);
 
             var changedFiles = guest.Values.Where(entry => !entry.IsDirectory &&
                 (!originals.ContainsKey(entry.RelativePath) ||
@@ -355,6 +396,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                  !originals[entry.RelativePath].IsDirectory))
                 .Select(entry => entry.RelativePath).OrderBy(Depth).ToList();
 
+            CheckCommitInputs(originals, changedFiles, oldFiles, oldDirectories, newDirectories);
+            // PC and guest may have independently removed the same item.
+            oldFiles = oldFiles.Where(path => File.Exists(Path.Combine(m_sourceFolder, path))).ToList();
+            oldDirectories = oldDirectories.Where(path => Directory.Exists(Path.Combine(m_sourceFolder, path))).ToList();
+
             foreach (var entry in changedFiles)
             {
                 var target = Path.Combine(m_sourceFolder, entry.RelativePath);
@@ -365,8 +411,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             foreach (var directory in newDirectories)
             {
                 var target = Path.Combine(m_sourceFolder, directory);
-                if (!originals.ContainsKey(directory) &&
-                    (File.Exists(target) || Directory.Exists(target)))
+                if (!originals.ContainsKey(directory) && File.Exists(target))
                     throw new IOException("A folder was added outside the emulator: " + target);
             }
 
@@ -386,7 +431,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
                 // Files may have changed during the potentially long staging
                 // pass. Recheck immediately before moving any source file.
-                CheckSourceUnchanged(originals);
+                CheckCommitInputs(originals, changedFiles, oldFiles, oldDirectories, newDirectories);
 
                 var backup = Path.Combine(m_sourceFolder,
                     ".zxmak2-sd-backup-" + Guid.NewGuid().ToString("N"));
@@ -413,8 +458,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     }
                     foreach (var path in newDirectories)
                     {
-                        Directory.CreateDirectory(Path.Combine(m_sourceFolder, path));
-                        createdDirectories.Add(path);
+                        if (!Directory.Exists(Path.Combine(m_sourceFolder, path)))
+                        {
+                            Directory.CreateDirectory(Path.Combine(m_sourceFolder, path));
+                            createdDirectories.Add(path);
+                        }
                     }
                     foreach (var item in staged)
                     {
@@ -435,7 +483,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                                 File.Delete(temporary);
                         }
                     }
+                    if (afterSave != null) afterSave(backup);
                     DiscardChanges();
+                    RebaseCommittedMetadata(m_root);
                     backupCanBeRemoved = true;
                 }
                 catch

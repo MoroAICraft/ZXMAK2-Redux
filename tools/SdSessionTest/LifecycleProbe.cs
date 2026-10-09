@@ -199,7 +199,9 @@ internal static class LifecycleProbe
                 WriteGuest(device, (byte)'C'); vm.DoRun(); query.Next = DlgResult.Cancel;
                 Assert(!model.PrepareClose() && vm.IsRunning && device.HasPendingChanges,
                     "cancel close did not resume/preserve session");
-                File.WriteAllText(Path.Combine(folder, "conflict.txt"), "PC"); query.Next = DlgResult.Yes;
+                // An unrelated PC addition is not a conflict. A real collision
+                // is a PC edit to the same TEST.TRD that the guest changed.
+                File.WriteAllText(file, "PC CONFLICT"); query.Next = DlgResult.Yes;
                 Assert(!model.PrepareClose() && vm.IsRunning && device.HasPendingChanges && messages.Errors == 1,
                     "failed save did not abort close/resume/preserve session");
                 query.Next = DlgResult.No;

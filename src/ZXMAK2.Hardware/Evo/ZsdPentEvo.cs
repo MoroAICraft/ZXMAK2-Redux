@@ -525,7 +525,7 @@ namespace ZXMAK2.Hardware.Evo
                 return;
             try
             {
-                var warningCount = MountHostFolder(configuredSourcePath);
+                var warningCount = RefreshMountedFolder();
                 if (warningCount < 0)
                     return;
                 refreshFolderCommand.NotifyExecutedSuccessfully();
@@ -702,6 +702,54 @@ namespace ZXMAK2.Hardware.Evo
             {
                 if (replacement != null)
                     replacement.Close();
+            }
+        }
+
+        public int RefreshMountedFolder()
+        {
+            lock (cardSync)
+            {
+                var folder = card == null ? null : card.HostFolderStream;
+                if (folder == null) return -1;
+                var choice = DlgResult.No;
+                if (folder.HasFileChanges)
+                {
+                    var query = Locator.Resolve<IUserQuery>();
+                    var actions = query as IActionUserQuery;
+                    const string message = "The SD session has unsaved changes.\n\n" +
+                        "Save changes before rereading the PC folder, or discard the session changes.\n\n" +
+                        "The emulated machine will restart after a successful refresh.";
+                    choice = actions != null ? actions.ShowActions(message, "Refresh SD folder?",
+                        "Refresh (Save changes)", "Refresh (Without saving)", "Cancel") :
+                        query.Show(message, "Refresh SD folder?", DlgButtonSet.YesNoCancel, DlgIcon.Question);
+                    if (choice != DlgResult.Yes && choice != DlgResult.No) return -1;
+                }
+                SdCard replacement = null;
+                Action<string> build = excludedDirectory =>
+                {
+                    replacement = new SdCard();
+                    replacement.OpenHostFolder(folder.SourceFolder, excludedDirectory);
+                };
+                try
+                {
+                    // Saving and building the new snapshot are one transaction.
+                    // A failed build rolls back the host changes and keeps the
+                    // original card/journal. No discard happens before success.
+                    if (choice == DlgResult.Yes) folder.CommitChanges(build);
+                    else build(null);
+                    var warnings = replacement.HostFolderStream.Warnings.Count;
+                    var previous = card;
+                    card = replacement;
+                    replacement = null;
+                    card_cs = false;
+                    buf = 0xFF;
+                    previous.Close();
+                    return warnings;
+                }
+                finally
+                {
+                    if (replacement != null) replacement.Close();
+                }
             }
         }
 

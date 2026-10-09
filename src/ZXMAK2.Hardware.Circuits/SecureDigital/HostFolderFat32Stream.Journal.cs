@@ -68,6 +68,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             if (File.Exists(m_journalPath))
                 File.Delete(m_journalPath);
             m_changedSectors.Clear();
+            RemoveOriginalSnapshots(m_root);
         }
     }
 }

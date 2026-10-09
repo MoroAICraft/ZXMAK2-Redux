@@ -23,6 +23,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private const uint EndOfChain = 0x0FFFFFFF;
 
         private readonly string m_sourceFolder;
+        private readonly string m_excludedDirectory;
         private readonly List<string> m_warnings = new List<string>();
         private readonly HashSet<string> m_reportedReadErrors =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -39,6 +40,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private FileStream m_cachedFile;
 
         public HostFolderFat32Stream(string folderPath)
+            : this(folderPath, null)
+        {
+        }
+
+        public HostFolderFat32Stream(string folderPath, string excludedDirectory)
         {
             if (string.IsNullOrWhiteSpace(folderPath))
             {
@@ -46,6 +52,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
 
             m_sourceFolder = Path.GetFullPath(folderPath.Trim());
+            m_excludedDirectory = excludedDirectory;
             var rootInfo = new DirectoryInfo(m_sourceFolder);
             if (!rootInfo.Exists)
             {
@@ -133,6 +140,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 try { DiscardChanges(); }
                 catch (IOException ex) { Logger.Warn("Cannot remove SD folder journal: {0}", ex.Message); }
                 catch (UnauthorizedAccessException ex) { Logger.Warn("Cannot remove SD folder journal: {0}", ex.Message); }
+                RemoveOriginalSnapshots(m_root);
             }
             base.Dispose(disposing);
         }
@@ -216,6 +224,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 if (changed)
                 {
+                    CaptureOriginalForWrite(index);
                     Buffer.BlockCopy(buffer, offset, sector, within, take);
                     AppendJournalSector(index, sector);
                     m_changedSectors[index] = (byte[])sector.Clone();
@@ -284,6 +293,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
             foreach (var entry in entries)
             {
+                // The transaction's private rollback directory must not
+                // become visible on the freshly built SD card.
+                if (string.Equals(entry.FullName, m_excludedDirectory, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 if (IsWindowsJunk(entry.Name))
                     continue;
                 FileAttributes attributes;
@@ -887,11 +900,12 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 return;
             try
             {
-                if (!File.Exists(node.FullPath))
+                var path = node.OriginalSnapshotPath ?? node.FullPath;
+                if (!File.Exists(path))
                     throw new FileNotFoundException(
                         "The host file disappeared after the folder was mounted.",
                         node.FullPath);
-                var stream = GetCachedFile(node.FullPath);
+                var stream = GetCachedFile(path);
                 if (stream.Length != node.Length)
                     throw new IOException("The file size changed after the folder was mounted.");
                 stream.Position = fileOffset;
@@ -908,6 +922,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             catch (Exception ex)
             {
                 CloseCachedFile();
+                if (m_strictReads)
+                    throw new IOException("Cannot read the guest file safely: " + node.FullPath, ex);
                 lock (m_reportedReadErrors)
                 {
                     if (m_reportedReadErrors.Add(node.FullPath))
@@ -1040,6 +1056,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             public uint ClusterCount;
             public int DirectoryLength;
             public byte[] DirectoryData;
+            public string OriginalSnapshotPath;
+            public byte[] OriginalHash;
         }
 
         private sealed class Allocation

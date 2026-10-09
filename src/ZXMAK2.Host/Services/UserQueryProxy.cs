@@ -6,7 +6,7 @@ using ZXMAK2.Host.Entities;
 
 namespace ZXMAK2.Host.Services
 {
-    public class UserQueryProxy : IUserQuery
+    public class UserQueryProxy : IUserQuery, IActionUserQuery
     {
         private readonly IResolver m_resolver;
         
@@ -28,6 +28,18 @@ namespace ZXMAK2.Host.Services
                 return DlgResult.Cancel;
             }
             return service.Show(message, caption, buttonSet, icon);
+        }
+
+        public DlgResult ShowActions(string message, string caption,
+            string acceptText, string discardText, string cancelText)
+        {
+            var service = GetService();
+            var actions = service as IActionUserQuery;
+            if (actions != null)
+                return actions.ShowActions(message, caption, acceptText, discardText, cancelText);
+            return service == null ? DlgResult.Cancel : service.Show(message + "\n\nYes: " +
+                acceptText + "\nNo: " + discardText + "\nCancel: " + cancelText,
+                caption, DlgButtonSet.YesNoCancel, DlgIcon.Question);
         }
 
         public bool QueryText(

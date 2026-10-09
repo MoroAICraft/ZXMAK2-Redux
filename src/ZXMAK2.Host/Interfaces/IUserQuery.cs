@@ -3,6 +3,13 @@
 
 namespace ZXMAK2.Host.Interfaces
 {
+    /// <summary>Optional action-labelled choice; existing query services stay compatible.</summary>
+    public interface IActionUserQuery
+    {
+        DlgResult ShowActions(string message, string caption,
+            string acceptText, string discardText, string cancelText);
+    }
+
     public interface IUserQuery
     {
         DlgResult Show(

@@ -7,7 +7,7 @@ using ZXMAK2.Host.WinForms.Tools;
 
 namespace ZXMAK2.Host.WinForms.Services
 {
-    public class UserQuery : IUserQuery
+    public class UserQuery : IUserQuery, IActionUserQuery
     {
         public DlgResult Show(
             String message,
@@ -19,6 +19,48 @@ namespace ZXMAK2.Host.WinForms.Services
                 message, caption,
                 EnumMapper.GetMessageBoxButtons(buttonSet),
                 EnumMapper.GetMessageBoxIcons(icon)));
+        }
+
+        public DlgResult ShowActions(string message, string caption,
+            string acceptText, string discardText, string cancelText)
+        {
+            using (var form = new ActionChoiceDialog(message, caption, acceptText, discardText, cancelText))
+            {
+                var owner = Form.ActiveForm;
+                return EnumMapper.GetDlgResult(owner != null ? form.ShowDialog(owner) : form.ShowDialog());
+            }
+        }
+
+        private sealed class ActionChoiceDialog : Form
+        {
+            public ActionChoiceDialog(string message, string caption,
+                string acceptText, string discardText, string cancelText)
+            {
+                Text = caption;
+                FormBorderStyle = FormBorderStyle.FixedDialog;
+                MaximizeBox = MinimizeBox = ShowInTaskbar = ShowIcon = false;
+                StartPosition = FormStartPosition.CenterParent;
+                AutoScaleMode = AutoScaleMode.Font;
+                AutoSize = true;
+                AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                var layout = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,
+                    Padding = new Padding(16), ColumnCount = 1, RowCount = 2 };
+                layout.Controls.Add(new Label { AutoSize = true, Text = message,
+                    MaximumSize = new System.Drawing.Size(600, 0), Margin = new Padding(0, 0, 0, 16) });
+                var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false,
+                    Dock = DockStyle.Fill, Margin = new Padding(0) };
+                var save = new Button { Text = acceptText, AutoSize = true, DialogResult = DialogResult.Yes,
+                    Padding = new Padding(8, 4, 8, 4) };
+                var discard = new Button { Text = discardText, AutoSize = true, DialogResult = DialogResult.No,
+                    Padding = new Padding(8, 4, 8, 4) };
+                var cancel = new Button { Text = cancelText, AutoSize = true, DialogResult = DialogResult.Cancel,
+                    Padding = new Padding(8, 4, 8, 4) };
+                buttons.Controls.AddRange(new Control[] { save, discard, cancel });
+                layout.Controls.Add(buttons);
+                Controls.Add(layout);
+                AcceptButton = save;
+                CancelButton = cancel;
+            }
         }
 
         public object ObjectSelector(object[] objArray, string caption)

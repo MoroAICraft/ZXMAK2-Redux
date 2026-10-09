@@ -3233,15 +3233,13 @@ namespace Test
                     writable.Write(sector, 0, sector.Length);
                     File.WriteAllText(Path.Combine(root, "external-change.tap"),
                         "WINDOWS");
-                    var rejected = false;
-                    try { writable.CommitChanges(); }
-                    catch (IOException) { rejected = true; }
-                    AssertHostFolderSd(rejected && writable.HasChanges &&
+                    writable.CommitChanges();
+                    AssertHostFolderSd(!writable.HasChanges &&
                         File.ReadAllText(Path.Combine(root,
                             "external-change.tap")) == "WINDOWS" &&
                         File.ReadAllBytes(Path.Combine(root, "test.trd"))[0] ==
-                            (byte)'Q',
-                        "external folder change was not protected");
+                            (byte)'R',
+                        "saving a guest file lost an unrelated PC addition");
                     writable.DiscardChanges();
                 }
 
