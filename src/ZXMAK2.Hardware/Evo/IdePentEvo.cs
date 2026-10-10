@@ -287,7 +287,7 @@ namespace ZXMAK2.Hardware.Evo
 
         public bool IsMediaMounted
         {
-            get { return !string.IsNullOrEmpty(HardDisk.FileName); }
+            get { return m_ata.Devices[0].loaded(); }
         }
 
         #endregion

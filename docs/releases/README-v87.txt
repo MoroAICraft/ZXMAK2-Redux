@@ -18,8 +18,9 @@ Missing configured optional media means an empty slot. Internal paths are relati
 to EXE root, independent of drive letter, root name and working directory.
 
 Refresh save/discard/cancel and close/eject prompts remain required.
-After an unclean shutdown, current source contents are used; stale journals are
-not applied automatically. Unsaved changes can be lost after a crash.
+After an unclean shutdown, SD folders use current source contents without old
+journals. SD image recovery remains separate and asks the user when valid.
+Unsaved folder changes can be lost after a crash.
 
 F12 reset; Ctrl+F12 CMOS reset; Ctrl+Alt+F12 factory reset (confirmation).
 Print Screen = VM NMI. Guest/AVR/debugger keys are explained separately in Help.

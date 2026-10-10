@@ -68,6 +68,9 @@ namespace ZXMAK2.Engine
                 m_host.CancelPush();
             }
             Spectrum.BusManager.Disconnect();
+            // Media may have switched to an owned copy while disconnecting
+            // (floppy save), or on first HDD write. Persist the final paths.
+            SaveConfig();
             m_startedEvent.Dispose();
         }
 

@@ -70,12 +70,8 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
             if (pDllModule == IntPtr.Zero)
             {
                 Locator.Resolve<IUserMessage>()
-                    .Error("Cannot load Pasmo2.dll...\n\nTrying to download it again.\n\nIf problem persists please download it manually from: http://pasmo2.codeplex.com/ \n\nPress OK please.");
-
-                File.Delete(Path.Combine(PortablePaths.Root, "Lib", "Native", "Pasmo2.dll"));
-
-                TcpHelper client = new TcpHelper();
-                client.Show();
+                    .Error("Cannot load Pasmo2.dll. Install a compatible x86 library in Lib/Native. The existing file was not deleted.");
+                return false;
             }
             /*else
             {

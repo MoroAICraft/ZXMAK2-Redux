@@ -268,6 +268,7 @@ namespace ZXMAK2.Host.Presentation
                 // Stop before testing dirty state. After accepting close the
                 // guest must not write again between confirmation and disposal.
                 accepted = m_vm.Bus.FindDevices<IWritableSdSession>().All(sd => sd.PrepareForMediaChange());
+                if (accepted) m_vm.SaveConfig();
                 return accepted;
             }
             catch (Exception ex)

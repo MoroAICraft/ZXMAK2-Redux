@@ -13,12 +13,12 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
     public sealed class SdImageSessionStream : Stream
     {
         private const int SectorSize = 512;
-        private const string Magic = "ZXISD01";
+        private const string Magic = "ZXISD02";
         private Stream m_source;
         private string m_imagePath;
         public string ImagePath { get { return m_imagePath; } }
-        private readonly string m_journalPath;
-        private readonly string m_applyingPath;
+        private string m_journalPath;
+        private string m_applyingPath;
         private string m_fingerprint;
         private readonly Dictionary<long, byte[]> m_changed =
             new Dictionary<long, byte[]>();
@@ -36,10 +36,15 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             m_source = source;
             m_imagePath = Path.GetFullPath(imagePath);
             m_fingerprint = Fingerprint();
-            var folder = SdSessionStorage.GetDirectory("Images");
-            Directory.CreateDirectory(folder);
-            // A new run uses current source contents, never a stale relocated overlay.
-            var name = Guid.NewGuid().ToString("N");
+            SetJournalPaths();
+            if (File.Exists(m_journalPath)) Recover();
+            else if (File.Exists(m_applyingPath)) File.Delete(m_applyingPath);
+        }
+
+        private void SetJournalPaths()
+        {
+            var folder = PortablePaths.DataDirectory("SD-sessions\\Images");
+            var name = Hash(PortablePaths.Store(m_imagePath).ToUpperInvariant());
             m_journalPath = Path.Combine(folder, name + ".journal");
             m_applyingPath = Path.Combine(folder, name + ".applying");
         }
@@ -70,7 +75,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private string Fingerprint()
         {
             var info = new FileInfo(m_imagePath);
-            return Hash(m_imagePath.ToUpperInvariant() + "|" +
+            return Hash(PortablePaths.Store(m_imagePath).ToUpperInvariant() + "|" +
                 info.Length + "|" + info.LastWriteTimeUtc.Ticks);
         }
 
@@ -81,7 +86,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             using (var reader = new BinaryReader(file, Encoding.UTF8))
             {
                 if (reader.ReadString() != Magic ||
-                    reader.ReadString() != m_imagePath ||
+                    reader.ReadString() != PortablePaths.Store(m_imagePath) ||
                     reader.ReadString() != m_fingerprint &&
                         !File.Exists(m_applyingPath) ||
                     reader.ReadInt64() != Length)
@@ -99,7 +104,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 m_validJournalLength = file.Position;
             }
-            if (File.Exists(m_applyingPath))
+            if (File.Exists(m_applyingPath) && PortablePaths.IsInternal(m_imagePath))
             {
                 // An interrupted save is idempotent. Complete it before the
                 // guest can read the image again.
@@ -211,7 +216,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 {
                     var header = new BinaryWriter(m_journal, Encoding.UTF8);
                     header.Write(Magic);
-                    header.Write(m_imagePath);
+                    header.Write(PortablePaths.Store(m_imagePath));
                     header.Write(m_fingerprint);
                     header.Write(Length);
                     header.Flush();
@@ -266,8 +271,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 var replacement = File.Open(target, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
                 m_source.Dispose();
                 m_source = replacement;
-                m_imagePath = target;
                 ClearJournal();
+                m_imagePath = target;
+                SetJournalPaths();
                 m_fingerprint = Fingerprint();
                 Logger.Info("External SD image saved locally: {0}", target);
                 return;
@@ -325,7 +331,6 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     m_journal = null;
                 }
                 m_source.Dispose();
-                ClearJournal();
             }
             base.Dispose(disposing);
         }

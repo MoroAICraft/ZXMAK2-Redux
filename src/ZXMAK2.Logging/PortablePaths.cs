@@ -68,7 +68,9 @@ namespace ZXMAK2
         {
             var configured = Path.Combine(Root, "Config", name);
             // Flat developer/legacy runtime remains readable during migration.
-            return Directory.Exists(Path.Combine(Root, "Config")) ? configured : Path.Combine(Root, name);
+            var path = Directory.Exists(Path.Combine(Root, "Config")) ? configured : Path.Combine(Root, name);
+            RequireInternal(path);
+            return path;
         }
 
         public static string DataDirectory(string relative)
@@ -119,6 +121,7 @@ namespace ZXMAK2
 
         public static void WriteAtomic(string path, Action<Stream> write)
         {
+            path = Resolve(path);
             RequireInternal(path);
             Directory.CreateDirectory(Path.GetDirectoryName(Resolve(path)));
             var pending = Resolve(path) + "." + Guid.NewGuid().ToString("N") + ".tmp";

@@ -17,8 +17,8 @@ User acceptance is mandatory before using this release as the next work base.
 - Own configs/logs/cache/temp/flash/session writes remain inside the install.
 - External source media is not modified; no automatic full copy on mount.
 - Refresh save/discard/cancel and close/eject prompts must stay functional.
-- A saved external folder result needs a separate local destination; format
-  choice requested from user, no external overwrite fallback.
+- User confirmed: external folder Save creates a full independent folder under
+  Data/Saves/SD-Folders and switches to it, not on initial mount.
 - Firmware flash key is ROM content identity, not install path/user identity.
 - Help describes general commands separately from guest/model-specific keys.
 - No automatic deletion of old builds or sources; no GitHub publication.
@@ -41,3 +41,18 @@ User acceptance is mandatory before using this release as the next work base.
 2. Verify media lifecycle/external source protection and missing references.
 3. Update help, regression tools, packaging; preserve full baseline and sources.
 4. Publish a TEST package only after automated checks, enumerate manual checks.
+
+## Checkpoint 2
+
+Common paths, EXE bootstrap/probing, local UI XML, Moon flash and ROM/bank paths,
+external folder selective Save-copy/remount, external SD image Save-copy,
+external HDD copy on first guest write, missing media and HTML help implemented.
+Initial build succeeded. Previous regressions passed (565 keyboard, 22 lifecycle,
+157 refresh, 6184 SPI, 7 golden renderer, video/timing/audio/device checks).
+PortableProbe passed 47 checks of external originals, saves, conflict, rollback,
+settings and root paths. Remaining: final source audit, actual relocated runtime,
+model switching/reset tests, clean packaging and manifests. This is NOT acceptance.
+
+SD-folder crash policy remains fresh scan. SD-image recovery remains its existing
+separate workflow with relative internal source identities; do not generalize the
+folder crash policy to normal image sessions.

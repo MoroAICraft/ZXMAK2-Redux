@@ -153,7 +153,9 @@ namespace ZXMAK2.Engine
             extension = extension.Trim();
             if (!extension.StartsWith("."))
                 extension = "." + extension;
-            return Path.ChangeExtension(m_machineFile, extension);
+            var path = Path.ChangeExtension(m_machineFile, extension);
+            PortablePaths.RequireInternal(path);
+            return path;
         }
 
         public T FindDevice<T>()

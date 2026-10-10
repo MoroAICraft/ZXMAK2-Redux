@@ -116,7 +116,18 @@ namespace ZXMAK2.Hardware.Evo
         }
 
         public string RestoreWarning { get { return null; } }
-        public void PromptForRecoveredSession() { }
+        public void PromptForRecoveredSession()
+        {
+            lock (m_sdSync)
+            {
+                var session = m_sdCard == null ? null : m_sdCard.ImageSessionStream;
+                if (session == null || !session.WasRecovered) return;
+                var choice = Locator.Resolve<IUserQuery>().Show("An unfinished NeoGS SD image session was found. Keep its changes?",
+                    "Recover NeoGS SD changes?", DlgButtonSet.YesNo, DlgIcon.Question);
+                if (choice == DlgResult.No) session.DiscardChanges();
+                session.WasRecovered = false;
+            }
+        }
         public bool HasPendingChanges
         {
             get { lock (m_sdSync) return m_sdCard != null && m_sdCard.ImageSessionStream != null && m_sdCard.ImageSessionStream.HasChanges; }

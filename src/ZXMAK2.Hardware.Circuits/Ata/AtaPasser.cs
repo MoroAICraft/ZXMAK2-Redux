@@ -9,6 +9,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
         private FileStream _hDevice;
         private PhysicalDeviceInfo _deviceInfo;
         private bool _isReadOnly;
+        private bool _externalSource;
         public string ImagePath { get { return _deviceInfo == null ? string.Empty : _deviceInfo.filename; } }
 
 
@@ -24,10 +25,11 @@ namespace ZXMAK2.Hardware.Circuits.Ata
             {
                 _deviceInfo = deviceInfo;
                 _isReadOnly = isReadOnly;
+                _externalSource = !PortablePaths.IsInternal(_deviceInfo.filename);
                 _hDevice = new FileStream(
                     PortablePaths.Resolve(_deviceInfo.filename),
                     FileMode.Open,
-                    _isReadOnly || !PortablePaths.IsInternal(_deviceInfo.filename) ? FileAccess.Read : FileAccess.ReadWrite,
+                    _isReadOnly || _externalSource ? FileAccess.Read : FileAccess.ReadWrite,
                     FileShare.ReadWrite);
                 return true;
             }
@@ -132,7 +134,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
                 }
                 if (_hDevice != null)
                 {
-                    if (!PortablePaths.IsInternal(_deviceInfo.filename))
+                    if (_externalSource)
                     {
                         // First actual guest write, never on mount: retain a
                         // complete local writable image without touching source.
@@ -149,6 +151,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
                         _hDevice.Dispose();
                         _hDevice = replacement;
                         _deviceInfo.filename = target;
+                        _externalSource = false;
                         Logger.Info("External HDD saved locally on first guest write: {0}", target);
                     }
                     _hDevice.Write(src, offset, 512);

@@ -2353,8 +2353,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
             }
             catch(XmlException)
             {
-                Locator.Resolve<IUserMessage>().Error("Configuration file is corrupted and will be deleted.");
-                File.Delete(PortablePaths.ConfigFile(ConfigXmlFileName));
+                Locator.Resolve<IUserMessage>().Error("Debugger configuration is corrupted. Defaults are used; the original file is retained.");
                 return;
             }
 

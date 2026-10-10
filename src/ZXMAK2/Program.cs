@@ -33,6 +33,7 @@ namespace ZXMAK2
             catch (Exception ex)
             {
                 Logger.Error(ex);
+                PortableBootstrap.ShowError(ex.Message);
             }
             finally
             {

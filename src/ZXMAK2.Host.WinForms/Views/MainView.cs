@@ -851,6 +851,9 @@ namespace ZXMAK2.Host.WinForms.Views
         {
             base.OnShown(e);
             _isFormShown = true;
+            var available = Screen.FromControl(this).WorkingArea;
+            Location = new Point(Math.Max(available.Left, Math.Min(Left, available.Right - Width)),
+                Math.Max(available.Top, Math.Min(Top, available.Bottom - Height)));
         }
 
         protected override void OnClosing(CancelEventArgs e)
@@ -1231,9 +1234,10 @@ namespace ZXMAK2.Host.WinForms.Views
                 {
                     renderVideo.Location = pos;
                 }
-                if (renderVideo.Size != RenderSize)
+                var visibleRenderSize = new Size(ClientSize.Width, Math.Max(0, ClientSize.Height - shift));
+                if (renderVideo.Size != visibleRenderSize)
                 {
-                    renderVideo.Size = RenderSize;
+                    renderVideo.Size = visibleRenderSize;
                 }
                 if (notifyNeeded)
                 {

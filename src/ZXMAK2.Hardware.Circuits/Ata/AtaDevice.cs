@@ -49,6 +49,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
 
         public void Dispose()
         {
+            if (!atapi && ata_p.IsLoaded()) _deviceInfo.UseSavedImage(ata_p.ImagePath);
             ata_p.Dispose();
             atapi_p.Dispose();
         }

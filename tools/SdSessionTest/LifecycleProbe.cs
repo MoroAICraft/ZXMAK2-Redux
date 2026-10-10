@@ -101,7 +101,7 @@ internal static class LifecycleProbe
             var relocated = new ZsdPentEvo();
             relocated.LoadConfigXml(config.DocumentElement);
             typeof(ZsdPentEvo).GetMethod("RestoreConfiguredCard", Private).Invoke(relocated, null);
-            string expected = Path.Combine(Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location), "source");
+            string expected = Path.Combine(ZXMAK2.PortablePaths.Root, "source");
             Assert(relocated.IsMediaMounted && relocated.ConfiguredSourcePath == expected,
                 "copied runtime did not rebase its internal SD folder");
             WriteGuest(relocated, (byte)'P');
@@ -113,7 +113,7 @@ internal static class LifecycleProbe
             Console.WriteLine("Copied runtime + changed CWD + internal source/journal: PASS");
             return 0;
         }
-        string scratch = Path.Combine(Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location),
+        string scratch = Path.Combine(ZXMAK2.PortablePaths.Root,
             "sd-lifecycle-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(scratch);
         var device = new ZsdPentEvo();
@@ -164,9 +164,12 @@ internal static class LifecycleProbe
             // A second process loads assemblies from an actually copied runtime,
             // not a synthetic substitute for its application directory.
             string copied = Path.Combine(scratch, "copied-runtime"); Directory.CreateDirectory(copied);
-            string originalRuntime = Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location);
+            string originalRuntime = ZXMAK2.PortablePaths.Root;
             foreach (string runtimeFile in Directory.GetFiles(originalRuntime))
                 File.Copy(runtimeFile, Path.Combine(copied, Path.GetFileName(runtimeFile)));
+            foreach (var sub in new[] { "Lib", "Config" })
+                if (Directory.Exists(Path.Combine(originalRuntime, sub)))
+                    ZXMAK2.PortablePaths.CopyDirectory(Path.Combine(originalRuntime, sub), Path.Combine(copied, sub));
             Directory.CreateDirectory(Path.Combine(copied, "source"));
             File.WriteAllText(Path.Combine(copied, "source", "TEST.TRD"), "PORTABLE");
             var start = new System.Diagnostics.ProcessStartInfo(Path.Combine(copied, "SdLifecycleProbe.exe"), "relocated");

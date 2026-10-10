@@ -82,7 +82,7 @@ internal static class TapeClockProbeB40
     private static void CheckProfileIsolation()
     {
         var config = new XmlDocument();
-        string profile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machines.config");
+        string profile = ZXMAK2.PortablePaths.ConfigFile("machines.config");
         if (!File.Exists(profile))
             profile = Path.Combine(Directory.GetCurrentDirectory(), "src", "ZXMAK2", "machines.config");
         config.Load(profile);

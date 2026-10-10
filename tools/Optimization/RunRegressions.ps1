@@ -33,7 +33,7 @@ try {
         if ($taskEntry.Key -eq 'SdWriteProtocol') { & $taskExe "$taskManaged\ZXMAK2.Hardware.Circuits.dll" *> $taskLog }
         elseif ($taskEntry.Key -eq 'RefreshFolder') { & $taskExe "$taskRelease\Data\Temp" *> $taskLog }
         elseif ($taskEntry.Key -in @('KeyboardRouting','PrintScreenNmiProbe','TapeClock','SdLifecycleProbe','PentEvoProfile')) { & $taskExe *> $taskLog }
-        else { & $taskExe $taskRelease *> $taskLog }
+        else { & $taskExe $taskManaged *> $taskLog }
         if ($LASTEXITCODE -ne 0) { Get-Content $taskLog -Tail 15; throw "Regression failed: $($taskEntry.Key)" }
         Get-Content $taskLog -Tail 2
     }

@@ -20,7 +20,7 @@ internal static class PortableBootstrap
     {
         var root = AppDomain.CurrentDomain.BaseDirectory;
         var native = Path.Combine(root, "Lib", "Native");
-        if (Directory.Exists(native) && !SetDllDirectory(native))
+        if (!SetDllDirectory(Directory.Exists(native) ? native : root))
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         // Do not change CWD: command-line user paths retain their meaning.
     }

@@ -199,7 +199,7 @@ internal static class RefreshProbe
     private static System.Collections.Generic.IEnumerable<Control> Find(Control root){foreach(Control child in root.Controls){yield return child;foreach(var nested in Find(child))yield return nested;}}
     [STAThread] private static int Main(string[] args)
     {
-        string app=Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location),scratch=Path.Combine(app,"refresh-test-"+Guid.NewGuid().ToString("N"));
+        string app=ZXMAK2.PortablePaths.Root,scratch=Path.Combine(app,"refresh-test-"+Guid.NewGuid().ToString("N"));
         var names=new[]{"ZXMAK2.vmz","ZXMAK2.vmide","ZXMAK2.cmos"};var saved=names.Select(n=>File.Exists(Path.Combine(app,n))?File.ReadAllBytes(Path.Combine(app,n)):null).ToArray();
         try {
             Directory.CreateDirectory(scratch);var q=new Query();var messages=new Messages();
