@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Новая сборка для проверки: **v86**, ветка `codex/release-v86-tape-sd`.
+Новая сборка для проверки: **v87 Portable**, ветка `codex/portable-v87`.
 Принятая контрольная версия и полный откат: **v84**.
 Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
@@ -19,10 +19,18 @@
 | v84 | `codex/release-v84-bc-nmi`, tag `zxmak2-v84-bc-nmi` | ZXMAK2-v84-ZXEVO-BC-NMI-PrintScreen-20261008 | **ТЕКУЩАЯ**: v82 + принятый NMI/PrintScreen; Legacy v81 удалён из UI; V84_RELEASE_REPORT.md |
 | v85 | `codex/sd-refresh-v85`, tag `zxmak2-v85-sd-refresh` | ZXMAK2-v85-ZXEVO-BC-SD-Refresh-Test-20261009 | Refresh с выборочным сохранением сессии, внешние PC-правки, штатный холодный старт; SD_REFRESH_V85.md |
 | v86 | `codex/release-v86-tape-sd`, tag `zxmak2-v86-tape-sd` | ZXMAK2-v86-ZXEVO-BC-Tape-SD-Test-20261010 | Два патча BC: Tape для REAL, правильные R1/CRC/data response SD; CPU/NMI не изменены; TAPE_SD_V86.md |
+| v87 | `codex/portable-v87`, tag `zxmak2-v87-portable-test` | ZXMAK2-v87-Portable-Test-20261010 | **ТОЛЬКО ТЕСТ**: переносимая структура, локальные настройки/flash/сохранения, защита внешних оригиналов, новый Help; PORTABLE_V87_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
 Не переименовывать/удалять пользовательские ROM, музыку и образы.
+
+v87 НЕ принята автоматически: обязательны явное подтверждение пользователя,
+что сборка работает, и отдельное согласие продолжать работу на ней. Принятая
+v84 и полные откаты v85/v86 сохранены. Пакет содержит baseline-v86, Full/Clean ZIP,
+source с pinned OmniSound/Git bundles, checkpoints и отчёт V87_RELEASE_REPORT.md.
+Корневые boot.zip/ROMS.PAK/VMZ/VMIDE/CMOS/NVRAM остаются на месте. Нет набора SD
+или BC Commander в runtime. Новая аппаратная эмуляция и тяжёлый v83 звук не добавлены.
 
 v82: `release` — готовый runtime, Full/Clean ZIP в корне пакета; `baseline-v81`
 содержит сохранённый контроль, `diagnostics` — PCM/PNG/логи и отдельные probe,
