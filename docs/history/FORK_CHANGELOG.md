@@ -7,6 +7,16 @@
 Статус runtime указывается только там, где пользователь действительно провёл
 проверку. Успешная сборка или compiled-probe не заменяет runtime-приёмку.
 
+## 2026-10-10 — v89 Portable SD Folder Fix (локальная TEST)
+
+- Исправлены длинные пути при сохранении внешней SD-папки в локальную копию;
+  добавлена modal/background индикация копирования без reentry в guest.
+- Refresh: относительные пути разрешаются от EXE, wrapper menu enabled обновляется.
+- Ошибка сохранения VMZ при выходе не оставляет VM на паузе. Звук v88 сохранён.
+- Проверена настоящая коллекция 87549 файлов, путь 346 символов, background
+  Save/Refresh/PrepareClose и прежний regression suite; SD_FOLDER_V89_REPORT.md.
+- Старые сборки и пользовательская D: папка нетронуты; без GitHub, только TEST.
+
 ## 2026-10-10 — v88 Portable SoundCards (локальная TEST)
 
 - Общий native ymfm YM2203 для TSFM Pro, MultiSound A2/Max и OmniSound:

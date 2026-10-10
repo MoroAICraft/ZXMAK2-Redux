@@ -10,6 +10,27 @@
 
 ## Правила работы
 
+### Контрольная точка v89 (2026-10-10, TEST)
+
+Пользователь сообщил о паузе при Save/Exit и сером Refresh. В журнале его
+D:\release88_Portable_SoundCards подтверждён PathTooLongException при переносе
+внешней SD-папки в Data/Saves. Проверены 87549 файлов реальной flash_pentevo
+(3546001188 байтов); длинный saved path 346 символов теперь копируется и
+сохраняется. Реальный headless PrepareClose на большом дереве проходит,
+source L: и пользовательский D: runtime нетронуты. Первый полный перенос
+занимает ~90 с: добавлен background/modal progress без reentry в guest.
+
+Refresh исправляет resolve relative path от EXE и обновление menu Enabled.
+Ошибка VMZ-save при выходе возобновляет VM, а не оставляет паузу. Сохранены
+согласованная external-copy policy, Save/Discard/Cancel, cold refresh, SD SPI
+и звук v88. 29 новых core + 21 real-tree checks, все предыдущие regressions,
+portable/model/relocation и 10 fingerprints против v88 проходят.
+
+Ветка codex/sd-folder-v89, tag zxmak2-v89-sd-folder-test; промежуточные коммиты
+2261a17/7419aac. Пакет ZXMAK2-v89-Portable-SD-Folder-Fix-Test-20261010;
+точный протокол SD_FOLDER_V89_REPORT.md, Full/Clean/source/history/baseline-v88.
+GitHub не изменялся. Только пользователь может принять v89 как рабочую основу.
+
 ### Контрольная точка v88 (2026-10-10, TEST, без пользовательской приёмки)
 
 По отдельному подтверждению пользователя YM2203 TSFM Pro/MultiSound/Max переведены
