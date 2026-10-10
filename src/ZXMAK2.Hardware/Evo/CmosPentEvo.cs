@@ -296,7 +296,7 @@ namespace ZXMAK2.Hardware.Evo
 
         public override void BusConnect()
         {
-            if (!sandbox)
+            if (!sandbox && !string.IsNullOrEmpty(m_fileName))
             {
                 using (eepromFile = File.Open(m_fileName, FileMode.OpenOrCreate))
                 {

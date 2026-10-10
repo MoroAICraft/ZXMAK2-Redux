@@ -83,9 +83,9 @@ namespace ZXMAK2.Hardware.Profi
 
         public override void BusDisconnect()
         {
-            //if (!m_sandbox)
-            //{
-            //}
+            m_ata.Close();
+            if (!m_sandbox && !string.IsNullOrEmpty(m_ideFileName))
+                m_ata.Devices[0].DeviceInfo.Save(m_ideFileName);
         }
 
         protected override void OnConfigLoad(XmlNode itemNode)

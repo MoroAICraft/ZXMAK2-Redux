@@ -112,8 +112,11 @@ namespace ZXMAK2.Hardware.General
 
         public override void BusDisconnect()
         {
+            m_ata.Close();
             if (!m_sandbox)
             {
+                if (!string.IsNullOrEmpty(m_ideFileName))
+                    m_ata.Devices[0].DeviceInfo.Save(m_ideFileName);
                 if (m_rtcFileName != null)
                     m_rtc.Save(m_rtcFileName);
                 if (m_nvramFileName != null)
