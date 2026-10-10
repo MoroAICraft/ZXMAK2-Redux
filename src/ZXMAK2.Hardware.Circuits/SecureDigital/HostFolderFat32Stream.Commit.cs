@@ -353,11 +353,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public void CommitChanges(Action<string> afterSave, Action<string> progress)
         {
-            if (HasChanges && !PortablePaths.IsInternal(m_sourceFolder))
-            {
-                CommitExternalFolder(afterSave, progress);
-                return;
-            }
+            // A mounted host folder is an explicitly selected writable media
+            // source. Save its guest delta in place; never clone/switch the tree.
             if (!HasChanges)
             {
                 if (afterSave != null) afterSave(null);
@@ -462,8 +459,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     foreach (var item in staged)
                     {
                         var target = Path.Combine(m_sourceFolder, item.Key);
-                        var temporary = target + ".zxmak2-new-" +
-                            Guid.NewGuid().ToString("N");
+                        // Do not append to a potentially 255-character name.
+                        var temporary = Path.Combine(Path.GetDirectoryName(target),
+                            ".zxmak2-new-" + Guid.NewGuid().ToString("N"));
                         try
                         {
                             File.Copy(item.Value, temporary, false);
@@ -559,8 +557,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
             var previousPosition = m_position;
             var previousStrict = m_strictReads;
-            var temporary = target + ".zxmak2-new-" +
-                Guid.NewGuid().ToString("N");
+            var temporary = Path.Combine(Path.GetDirectoryName(target),
+                ".zxmak2-new-" + Guid.NewGuid().ToString("N"));
             try
             {
                 m_strictReads = true;
@@ -593,36 +591,5 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
         }
 
-        private void RebaseSourcePaths(Node node, string previous, string target)
-        {
-            node.FullPath = target + node.FullPath.Substring(previous.Length);
-            foreach (var child in node.Children) RebaseSourcePaths(child, previous, target);
-        }
-
-        private void CommitExternalFolder(Action<string> afterSave, Action<string> progress)
-        {
-            // Copy only on explicit Save. Start with the CURRENT PC tree, then
-            // apply the existing selective, conflict-checked guest transaction.
-            var previous = m_sourceFolder;
-            var target = PortablePaths.NewSavePath(previous, "SD-Folders");
-            Logger.Info("SD folder save: copying external source '{0}' to '{1}'", previous, target);
-            PortablePaths.CopyDirectory(previous, target, progress);
-            CloseCachedFile();
-            RebaseSourcePaths(m_root, previous, target);
-            m_sourceFolder = target;
-            try
-            {
-                CommitChanges(afterSave, progress);
-                Logger.Info("External SD folder saved locally: {0}", target);
-            }
-            catch
-            {
-                CloseCachedFile();
-                RebaseSourcePaths(m_root, target, previous);
-                m_sourceFolder = previous;
-                Logger.Warn("External SD save failed; source/session retained. Unused local copy: {0}", target);
-                throw;
-            }
-        }
     }
 }

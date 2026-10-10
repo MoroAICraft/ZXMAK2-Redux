@@ -115,11 +115,11 @@ internal static class PortableProbe
             File.WriteAllText(Path.Combine(source,"NV.EXT"),"PC NEW");File.WriteAllText(Path.Combine(source,"ADD.BIN"),"ADDED");
             Check(sd.RefreshMountedFolder() >= 0,"external save refresh failed");
             var saved = sd.ConfiguredSourcePath;
-            Check(PortablePaths.IsInternal(saved) && saved != source,"external folder did not switch locally");
-            Check(File.ReadAllText(Path.Combine(source,"TEST.TRD")) == "ORIGINAL DATA","external folder overwritten");
+            Check(saved == source,"mounted folder source changed after save");
+            Check(File.ReadAllText(Path.Combine(source,"TEST.TRD")) == "SRIGINAL DATA","external selected folder was not saved");
             Check(File.ReadAllText(Path.Combine(saved,"TEST.TRD")) == "SRIGINAL DATA","guest save missing");
             Check(File.ReadAllText(Path.Combine(saved,"NV.EXT")) == "PC NEW" && File.Exists(Path.Combine(saved,"ADD.BIN")),"independent PC edits missing");
-            var xml=Node("<Device/>");sd.SaveConfigXml(xml);Check(!Path.IsPathRooted(xml.GetAttribute("sdPath")),"saved folder descriptor absolute");
+            var xml=Node("<Device/>");sd.SaveConfigXml(xml);Check(Path.IsPathRooted(xml.GetAttribute("sdPath")),"external folder descriptor lost its absolute path");
             GuestWrite(Folder(sd),"TEST.TRD",(byte)'C');query.Result=DlgResult.Cancel;
             Check(sd.RefreshMountedFolder()<0 && sd.HasPendingChanges,"cancel lost local session");
             query.Result=DlgResult.No;Check(sd.RefreshMountedFolder()>=0 && File.ReadAllBytes(Path.Combine(saved,"TEST.TRD"))[0]=='S',"discard wrote data");

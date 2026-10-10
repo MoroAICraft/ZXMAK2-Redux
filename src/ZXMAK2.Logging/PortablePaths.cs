@@ -183,7 +183,8 @@ namespace ZXMAK2
             path = Resolve(path);
             RequireInternal(path);
             Directory.CreateDirectory(Path.GetDirectoryName(Resolve(path)));
-            var pending = Resolve(path) + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            var pending = Path.Combine(Path.GetDirectoryName(path),
+                ".zxmak2-write-" + Guid.NewGuid().ToString("N") + ".tmp");
             try
             {
                 using (var stream = new FileStream(IoPath(pending), FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -191,6 +192,12 @@ namespace ZXMAK2
                 if (File.Exists(path))
                 {
                     var relative = Store(path);
+                    // The backup suffix must not exceed the 255-char filename
+                    // component limit even with extended full-path support.
+                    if (Path.GetFileName(relative).Length > 251)
+                        using (var hash = System.Security.Cryptography.SHA256.Create())
+                            relative = Path.Combine(Path.GetDirectoryName(relative) ?? "",
+                                BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(relative.ToUpperInvariant()))).Replace("-", ""));
                     var backup = Path.Combine(DataDirectory("Backups"), relative + ".bak");
                     RequireInternal(backup);
                     Directory.CreateDirectory(Path.GetDirectoryName(backup));

@@ -23,7 +23,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private const long MaximumImageLength = 16L * 1024L * 1024L * 1024L;
         private const uint EndOfChain = 0x0FFFFFFF;
 
-        private string m_sourceFolder;
+        private readonly string m_sourceFolder;
         private readonly string m_excludedDirectory;
         private readonly List<string> m_warnings = new List<string>();
         private readonly HashSet<string> m_reportedReadErrors =

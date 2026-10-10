@@ -47,7 +47,7 @@ namespace ZXMAK2.Host.WinForms.Services
                 var bar = new ProgressBar { Left = 16, Top = 72, Width = 488, Height = 20,
                     Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 30 };
                 var note = new Label { Left = 16, Top = 104, Width = 488, Height = 34,
-                    Text = "Please wait. Large external folders are copied inside the emulator.\nThe emulated machine remains paused until the operation finishes." };
+                    Text = "Saving changes to the selected folder. No full folder copy is created.\nThe emulated machine remains paused until the operation finishes." };
                 Controls.Add(status); Controls.Add(bar); Controls.Add(note);
                 timer = new System.Windows.Forms.Timer { Interval = 100 };
                 timer.Tick += delegate {

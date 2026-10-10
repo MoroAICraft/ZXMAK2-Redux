@@ -95,14 +95,15 @@ namespace ZXMAK2.Hardware.Evo
             {
                 var folder = card == null ? null : card.HostFolderStream;
                 var image = card == null ? null : card.ImageSessionStream;
-                if ((folder == null || !folder.HasChanges) &&
+                if ((folder == null || !folder.HasFileChanges) &&
                     (image == null || !image.HasChanges))
                     return true;
 
                 var query = Locator.Resolve<IUserQuery>();
                 var choice = query.Show(
                     "The mounted SD card has unsaved changes.\n\n" +
-                    "Yes: save changes (external media is saved as a local copy).\n" +
+                    (folder != null ? "Yes: save changes to the mounted folder.\n" :
+                        "Yes: save changes (external image is saved as a local copy).\n") +
                     "No: discard them.\n" +
                     "Cancel: keep the SD card mounted.",
                     "Save SD changes?",
@@ -812,7 +813,7 @@ namespace ZXMAK2.Hardware.Evo
                 // Keep the path so a later run can find the folder again.
                 var unavailableSource = ex is FileNotFoundException || ex is DirectoryNotFoundException ||
                     ex is UnauthorizedAccessException || ex is System.Security.SecurityException;
-                m_restoreWarning = unavailableSource ? null :
+                m_restoreWarning = configuredSourceType == SdSourceType.HostFolder || unavailableSource ? null :
                     "The configured SD source could not be opened: " + ex.Message;
                 lock (cardSync)
                 {

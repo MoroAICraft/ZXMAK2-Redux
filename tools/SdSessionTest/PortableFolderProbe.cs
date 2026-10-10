@@ -22,7 +22,7 @@ using ZXMAK2.Host.Presentation;
 using ZXMAK2.Host.WinForms.Views;
 using ZXMAK2.Mvvm;
 
-static class PortableFolderProbe
+static partial class PortableFolderProbe
 {
     const BindingFlags F=BindingFlags.Instance|BindingFlags.NonPublic;
     static int checks;
@@ -106,10 +106,10 @@ static class PortableFolderProbe
         {
             Check(stream.Warnings.Count==0,"deep source skipped during scan");
             Guest(stream,"TEST.TRD",(byte)'S');int reports=0;stream.CommitChanges(null,text=>{reports++;});string saved=stream.SourceFolder;
-            Check(First(Path.Combine(source,"TEST.TRD"))=='O'&&First(Path.Combine(saved,"TEST.TRD"))=='S',"long save damaged source or lost guest");
+            Check(saved==source&&First(Path.Combine(source,"TEST.TRD"))=='S',"direct long-path folder save lost guest or switched source");
             Check(File.ReadAllText(PortablePaths.IoPath(Path.Combine(saved,deep.Substring(source.Length+1),"tail.bin")))=="DEEP","deep file lost");Check(reports>0,"no save progress");
             using(var remount=new HostFolderFat32Stream(saved))Check(remount.Warnings.Count==0,"saved deep tree skipped during remount");
-            Console.WriteLine("PASS long-path copy/save >260 chars, originals untouched, progress; {0}",saved);
+            Console.WriteLine("PASS direct long-path folder save >260 chars, unchanged source path; {0}",saved);
         }
         string imagePath=Path.Combine(deep,"image.img");var imageBytes=new byte[4096];imageBytes[510]=0x55;imageBytes[511]=0xAA;imageBytes[450]=6;imageBytes[454]=1;imageBytes[458]=7;
         File.WriteAllBytes(PortablePaths.IoPath(imagePath),imageBytes);
@@ -176,7 +176,11 @@ static class PortableFolderProbe
     [STAThread]static int Main(string[] args)
     {
         try {var query=new Query();Locator.Resolve<IResolver>().RegisterInstance<IUserQuery>(null,query);
-            if(args.Length>0&&args[0]=="real")RealFolder(args[1]);else {RelativeAndMenu();CloseConfigError(query);LongPaths();ProgressWorker();}
+            // v90 commits directly. Never run the old copy-policy write test
+            // against real user media; only purpose-created fixtures are writable.
+            if(args.Length>0&&args[0]=="real")throw new InvalidOperationException("Real-source write mode disabled. Use disposable direct-folder fixtures.");
+            else if(args.Length>0&&args[0]=="large")LargeDirectFixture(query);
+            else {RelativeAndMenu();CloseConfigError(query);LongPaths();ProgressWorker();DirectCases(query);}
             Console.WriteLine("PASS {0} assertions",checks);return 0;}catch(Exception e){Console.Error.WriteLine(e);return 1;}
     }
 }
