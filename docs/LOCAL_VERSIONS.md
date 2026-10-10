@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Новая сборка для проверки: **v85**, ветка `codex/sd-refresh-v85`.
+Новая сборка для проверки: **v86**, ветка `codex/release-v86-tape-sd`.
 Принятая контрольная версия и полный откат: **v84**.
 Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
@@ -18,6 +18,7 @@
 | v83 | историческая `codex/audio-v83`, tag `zxmak2-v83-ay-hq` (`b91b8ad`) | ZXMAK2-v83-ZXEVO-BC-AY-HQ-Test-20261008 | **ОТМЕНЕНА пользователем**: нагрузка/задержки FIR. Архив эксперимента, не основа работы |
 | v84 | `codex/release-v84-bc-nmi`, tag `zxmak2-v84-bc-nmi` | ZXMAK2-v84-ZXEVO-BC-NMI-PrintScreen-20261008 | **ТЕКУЩАЯ**: v82 + принятый NMI/PrintScreen; Legacy v81 удалён из UI; V84_RELEASE_REPORT.md |
 | v85 | `codex/sd-refresh-v85`, tag `zxmak2-v85-sd-refresh` | ZXMAK2-v85-ZXEVO-BC-SD-Refresh-Test-20261009 | Refresh с выборочным сохранением сессии, внешние PC-правки, штатный холодный старт; SD_REFRESH_V85.md |
+| v86 | `codex/release-v86-tape-sd`, tag `zxmak2-v86-tape-sd` | ZXMAK2-v86-ZXEVO-BC-Tape-SD-Test-20261010 | Два патча BC: Tape для REAL, правильные R1/CRC/data response SD; CPU/NMI не изменены; TAPE_SD_V86.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
@@ -37,6 +38,13 @@ v85 имеет ту же структуру с `baseline-v84`. Архивы runt
 и две истории Git сохранены отдельно. 157 проверок Refresh и реальный NedoOS
 проходят; 10 machine/PCM fingerprints совпадают с v84. Звук/CPU/NMI не изменены.
 Следующая проверка пользователя — v85; v84 остаётся принятой точкой отката.
+
+v86 продолжает актуальные исходники после v85 (`cea0ac7`, `f68d667`), не
+откатывает их. Runtime отличается от опубликованной v85 только Hardware и
+Circuits DLL плюс README; `baseline-v85` сохранён полностью. 6184 SPI checks,
+29 native BC tape/write сценариев, прежние Refresh/close/audio проверки проходят.
+Отдельный дефект CPU NMI на префиксе из входного документа пока не исправлен.
+Для новой проверки брать v86; v85 и v84 остаются сохранёнными откатами.
 
 `release` — runtime; Full/Clean ZIP — в корне пакета; `source` — исходники
 с закреплённым OmniSound и полная local Git history двух репозиториев.

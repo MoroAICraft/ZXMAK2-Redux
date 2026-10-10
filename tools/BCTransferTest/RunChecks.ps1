@@ -25,6 +25,9 @@ function Invoke-Native([string]$Name, [string]$Image, [string[]]$Options) {
 foreach ($taskVolume in @(0,20,60)) {
     Invoke-Native "tape-$taskVolume" $taskTape @('--manual-tape-menu','--real-tape','--bc-tape-volume',"$taskVolume")
 }
+foreach ($taskVolume in @(20,60)) {
+    Invoke-Native "tzx-$taskVolume" $taskTape @('--manual-tape-menu','--real-tape','--tape-tzx','--bc-tape-volume',"$taskVolume")
+}
 foreach ($taskCase in @('tzx','break','error','f12')) {
     $taskOptions = @('--manual-tape-menu','--real-tape','--bc-tape-volume','0')
     $taskOptions += switch ($taskCase) {
@@ -62,4 +65,4 @@ foreach ($taskCase in $taskCases) {
     TapePlugin = (Get-FileHash -LiteralPath "$taskFixture\Build\BCC\PLUGINS\TAPELOAD.BCP").Hash
     NativeCases = $taskPassed.ToArray()
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath "$taskDiagnostics\bc-verification.json" -Encoding UTF8
-Write-Output "PASS: $($taskPassed.Count) native BC cases (9 Tape/FAST + 18 SD writes); all independent FAT audits."
+Write-Output "PASS: $($taskPassed.Count) native BC cases (11 Tape/FAST + 18 SD writes); all independent FAT audits."
