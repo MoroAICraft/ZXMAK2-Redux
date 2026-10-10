@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using File = ZXMAK2.PortableFile;
+using Directory = ZXMAK2.PortableDirectory;
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
 {
@@ -12,14 +14,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private static byte[] HashFile(string path)
         {
-            using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var input = new FileStream(PortablePaths.IoPath(path), FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var hash = SHA256.Create()) return hash.ComputeHash(input);
         }
 
         private static void CheckOriginalFile(Node node, string path = null)
         {
             path = path ?? node.FullPath;
-            var file = new FileInfo(path);
+            var file = new FileInfo(PortablePaths.IoPath(path));
             if (!file.Exists || file.Length != node.Length ||
                 SafeDate(file.LastWriteTime) != node.LastWriteTime ||
                 (file.Attributes & FileAttributes.ReparsePoint) != 0 ||
@@ -45,8 +47,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             var created = false;
             try
             {
-                using (var input = new FileStream(node.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                using (var input = new FileStream(PortablePaths.IoPath(node.FullPath), FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var output = new FileStream(PortablePaths.IoPath(path), FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     created = true;
                     input.CopyTo(output);
@@ -76,7 +78,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         {
             foreach (var child in node.Children) RebaseCommittedMetadata(child);
             if (!node.IsDirectory && File.Exists(node.FullPath))
-                node.LastWriteTime = GetLastWriteTime(new FileInfo(node.FullPath));
+                node.LastWriteTime = GetLastWriteTime(new FileInfo(PortablePaths.IoPath(node.FullPath)));
         }
 
         private void CheckCommitInputs(Dictionary<string, Node> originals,

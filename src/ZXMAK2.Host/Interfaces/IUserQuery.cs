@@ -3,6 +3,12 @@
 
 namespace ZXMAK2.Host.Interfaces
 {
+    /// <summary>Optional modal progress for stopped-VM file operations.</summary>
+    public interface IUserOperation
+    {
+        void Run(string caption, System.Action<System.Action<string>> operation);
+    }
+
     /// <summary>Optional action-labelled choice; existing query services stay compatible.</summary>
     public interface IActionUserQuery
     {

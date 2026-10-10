@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Reflection;
+using File = ZXMAK2.PortableFile;
+using Directory = ZXMAK2.PortableDirectory;
 
 namespace ZXMAK2
 {
@@ -32,7 +34,18 @@ namespace ZXMAK2
         public static string Resolve(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            // Native extended prefixes are IO details, never saved descriptors.
+            if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) path = @"\\" + path.Substring(8);
+            else if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path.Substring(4);
             return Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(Root, path));
+        }
+
+        public static string IoPath(string path)
+        {
+            var full = Resolve(path);
+            if (full.Length < 248) return full;
+            return full.StartsWith(@"\\", StringComparison.Ordinal) ?
+                @"\\?\UNC\" + full.Substring(2) : @"\\?\" + full;
         }
 
         public static bool IsInternal(string path)
@@ -96,20 +109,61 @@ namespace ZXMAK2
 
         public static void CopyDirectory(string source, string target)
         {
-            source = Resolve(source).TrimEnd(Path.DirectorySeparatorChar);
-            target = Resolve(target).TrimEnd(Path.DirectorySeparatorChar);
+            CopyDirectory(source, target, null);
+        }
+
+        public static void CopyDirectory(string source, string target, Action<string> progress)
+        {
+            source = Resolve(source);
+            target = Resolve(target);
+            if (source.Length > Path.GetPathRoot(source).Length) source = source.TrimEnd(Path.DirectorySeparatorChar);
+            if (target.Length > Path.GetPathRoot(target).Length) target = target.TrimEnd(Path.DirectorySeparatorChar);
             if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase) ||
-                target.StartsWith(source + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                target.StartsWith(source.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new IOException("The saved copy cannot be inside its source folder.");
             RequireInternal(target);
+            if (progress != null) progress("Checking destination paths before copying...");
+            ValidateCopyPaths(source, target);
+            long files = 0, bytes = 0;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            CopyDirectoryContents(source, target, path => {
+                files++; bytes += new FileInfo(IoPath(path)).Length;
+                if (progress != null && (files == 1 || watch.ElapsedMilliseconds >= 200)) {
+                    progress(string.Format("Copying external folder: {0:N0} files, {1:N1} MB copied", files, bytes / 1048576D));
+                    watch.Restart();
+                }
+            });
+            if (progress != null) progress(string.Format("Copied {0:N0} files. Applying SD session changes...", files));
+        }
+
+        // Fail before a multi-GB copy if the runtime cannot normalize a deep
+        // destination, or a linked source would escape the mounted tree.
+        private static void ValidateCopyPaths(string source, string target)
+        {
+            RequireInternal(target);
+            if ((new DirectoryInfo(IoPath(source)).Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Cannot copy a linked media folder: " + source);
+            foreach (var entry in new DirectoryInfo(IoPath(source)).GetFileSystemInfos())
+            {
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Cannot copy a linked media entry: " + entry.FullName);
+                var destination = Resolve(Path.Combine(target, entry.Name));
+                RequireInternal(destination);
+                if (entry is DirectoryInfo) ValidateCopyPaths(entry.FullName, destination);
+            }
+        }
+
+        private static void CopyDirectoryContents(string source, string target, Action<string> copied)
+        {
+            RequireInternal(target);
             Directory.CreateDirectory(target);
-            foreach (var entry in new DirectoryInfo(source).GetFileSystemInfos())
+            foreach (var entry in new DirectoryInfo(IoPath(source)).GetFileSystemInfos())
             {
                 if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
                     throw new IOException("Cannot copy a linked media entry: " + entry.FullName);
                 var destination = Path.Combine(target, entry.Name);
-                if (entry is DirectoryInfo) CopyDirectory(entry.FullName, destination);
-                else { RequireInternal(destination); File.Copy(entry.FullName, destination, false); }
+                if (entry is DirectoryInfo) CopyDirectoryContents(entry.FullName, destination, copied);
+                else { RequireInternal(destination); File.Copy(entry.FullName, destination, false); copied(entry.FullName); }
             }
         }
 
@@ -132,7 +186,7 @@ namespace ZXMAK2
             var pending = Resolve(path) + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                using (var stream = new FileStream(pending, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                using (var stream = new FileStream(IoPath(pending), FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 { write(stream); stream.Flush(true); }
                 if (File.Exists(path))
                 {
@@ -146,5 +200,25 @@ namespace ZXMAK2
             }
             finally { if (File.Exists(pending)) File.Delete(pending); }
         }
+    }
+
+    // Narrow IO adapters used by portable storage and host-folder SD only.
+    // They do not authorize writes: callers retain RequireInternal/conflict
+    // checks. Extended paths avoid relying on a machine-wide Windows setting.
+    public static class PortableFile
+    {
+        public static bool Exists(string p) { return System.IO.File.Exists(PortablePaths.IoPath(p)); }
+        public static FileAttributes GetAttributes(string p) { return System.IO.File.GetAttributes(PortablePaths.IoPath(p)); }
+        public static void Delete(string p) { System.IO.File.Delete(PortablePaths.IoPath(p)); }
+        public static void Copy(string source, string target, bool overwrite) { System.IO.File.Copy(PortablePaths.IoPath(source), PortablePaths.IoPath(target), overwrite); }
+        public static void Move(string source, string target) { System.IO.File.Move(PortablePaths.IoPath(source), PortablePaths.IoPath(target)); }
+        public static void Replace(string source, string target, string backup) { System.IO.File.Replace(PortablePaths.IoPath(source), PortablePaths.IoPath(target), backup == null ? null : PortablePaths.IoPath(backup)); }
+    }
+    public static class PortableDirectory
+    {
+        public static bool Exists(string p) { return System.IO.Directory.Exists(PortablePaths.IoPath(p)); }
+        public static DirectoryInfo CreateDirectory(string p) { return System.IO.Directory.CreateDirectory(PortablePaths.IoPath(p)); }
+        public static void Delete(string p) { System.IO.Directory.Delete(PortablePaths.IoPath(p)); }
+        public static void Delete(string p, bool recursive) { System.IO.Directory.Delete(PortablePaths.IoPath(p), recursive); }
     }
 }

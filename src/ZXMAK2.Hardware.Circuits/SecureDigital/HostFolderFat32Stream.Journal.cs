@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using File = ZXMAK2.PortableFile;
+using Directory = ZXMAK2.PortableDirectory;
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
 {
@@ -39,7 +41,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             if (m_journal == null)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(m_journalPath));
-                m_journal = new FileStream(m_journalPath, FileMode.CreateNew,
+                m_journal = new FileStream(PortablePaths.IoPath(m_journalPath), FileMode.CreateNew,
                     FileAccess.ReadWrite, FileShare.Read);
                 var writer = new BinaryWriter(m_journal, Encoding.UTF8);
                 writer.Write(JournalMagic);

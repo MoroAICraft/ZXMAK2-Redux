@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
+using System.Drawing;
+using System.Threading;
 using ZXMAK2.Host.Entities;
 using ZXMAK2.Host.Interfaces;
 using ZXMAK2.Host.WinForms.Tools;
@@ -7,8 +9,78 @@ using ZXMAK2.Host.WinForms.Tools;
 
 namespace ZXMAK2.Host.WinForms.Services
 {
-    public class UserQuery : IUserQuery, IActionUserQuery
+    public class UserQuery : IUserQuery, IActionUserQuery, IUserOperation
     {
+        public void Run(string caption, Action<Action<string>> operation)
+        {
+            // Headless hosts keep the synchronous contract. GUI save runs
+            // off the UI thread; no DoEvents reentrancy into machine commands.
+            if (!Application.MessageLoop || Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            {
+                operation(message => { });
+                return;
+            }
+            using (var form = new OperationDialog(caption, operation))
+            {
+                var owner = Form.ActiveForm;
+                if (owner != null) form.ShowDialog(owner); else form.ShowDialog();
+                if (form.Failure != null)
+                    throw new System.IO.IOException(form.Failure.Message, form.Failure);
+            }
+        }
+
+        private sealed class OperationDialog : Form
+        {
+            private readonly Label status;
+            private readonly System.Windows.Forms.Timer timer;
+            private readonly ManualResetEvent completed = new ManualResetEvent(false);
+            private readonly object sync = new object();
+            private string message = "Preparing save...";
+            private Thread worker;
+            internal Exception Failure;
+            public OperationDialog(string caption, Action<Action<string>> operation)
+            {
+                Text = caption; FormBorderStyle = FormBorderStyle.FixedDialog;
+                ControlBox = false; ShowInTaskbar = false; StartPosition = FormStartPosition.CenterParent;
+                ClientSize = new Size(520, 145); AutoScaleMode = AutoScaleMode.Dpi;
+                status = new Label { Left = 16, Top = 16, Width = 488, Height = 50, Text = message };
+                var bar = new ProgressBar { Left = 16, Top = 72, Width = 488, Height = 20,
+                    Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 30 };
+                var note = new Label { Left = 16, Top = 104, Width = 488, Height = 34,
+                    Text = "Please wait. Large external folders are copied inside the emulator.\nThe emulated machine remains paused until the operation finishes." };
+                Controls.Add(status); Controls.Add(bar); Controls.Add(note);
+                timer = new System.Windows.Forms.Timer { Interval = 100 };
+                timer.Tick += delegate {
+                    lock (sync) status.Text = message;
+                    if (completed.WaitOne(0)) { timer.Stop(); DialogResult = DialogResult.OK; Close(); }
+                };
+                Shown += delegate {
+                    worker = new Thread(() => {
+                        try { operation(text => { lock(sync) message = text; }); }
+                        catch (Exception ex) { Failure = ex; }
+                        finally { completed.Set(); }
+                    });
+                    worker.IsBackground = true; worker.Name = "ZXMAK2 media save";
+                    worker.Start(); timer.Start();
+                };
+            }
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing) {
+                    timer.Dispose();
+                    if (worker != null) worker.Join();
+                    completed.Dispose();
+                }
+                base.Dispose(disposing);
+            }
+            protected override void OnFormClosing(FormClosingEventArgs e)
+            {
+                // Alt+F4 must not abandon a transaction or hide its progress.
+                if (!completed.WaitOne(0)) e.Cancel = true;
+                base.OnFormClosing(e);
+            }
+        }
+
         public DlgResult Show(
             String message,
             String caption,

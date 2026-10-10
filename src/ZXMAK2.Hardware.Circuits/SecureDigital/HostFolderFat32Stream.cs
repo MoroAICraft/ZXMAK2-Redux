@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using File = ZXMAK2.PortableFile;
 
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
@@ -53,7 +54,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
             m_sourceFolder = Path.GetFullPath(folderPath.Trim());
             m_excludedDirectory = excludedDirectory;
-            var rootInfo = new DirectoryInfo(m_sourceFolder);
+            var rootInfo = new DirectoryInfo(PortablePaths.IoPath(m_sourceFolder));
             if (!rootInfo.Exists)
             {
                 throw new DirectoryNotFoundException(
@@ -240,11 +241,12 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             Node parent,
             bool isRoot)
         {
+            directory = new DirectoryInfo(PortablePaths.IoPath(directory.FullName));
             var node = new Node();
             node.IsDirectory = true;
             node.Parent = parent;
             node.Name = isRoot ? string.Empty : directory.Name;
-            node.FullPath = directory.FullName;
+            node.FullPath = PortablePaths.Resolve(directory.FullName);
             node.LastWriteTime = GetLastWriteTime(directory);
             node.CreationTime = GetCreationTime(directory);
 
@@ -295,7 +297,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 // The transaction's private rollback directory must not
                 // become visible on the freshly built SD card.
-                if (string.Equals(entry.FullName, m_excludedDirectory, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(PortablePaths.Resolve(entry.FullName), m_excludedDirectory, StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (IsWindowsJunk(entry.Name))
                     continue;
@@ -354,7 +356,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 var child = new Node();
                 child.Parent = node;
                 child.Name = file.Name;
-                child.FullPath = file.FullName;
+                child.FullPath = PortablePaths.Resolve(file.FullName);
                 child.Length = length;
                 child.LastWriteTime = GetLastWriteTime(file);
                 child.CreationTime = GetCreationTime(file);
@@ -947,7 +949,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
             CloseCachedFile();
             m_cachedFile = new FileStream(
-                path,
+                PortablePaths.IoPath(path),
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete,

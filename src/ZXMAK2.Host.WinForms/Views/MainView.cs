@@ -53,6 +53,7 @@ namespace ZXMAK2.Host.WinForms.Views
         private ISuccessCommand _refreshFolderSdCommand;
         private ISuccessCommand _exportFolderSdCommand;
         private ToolStripMenuItem _exportSdMenuItem;
+        private ToolStripMenuItem _refreshSdMenuItem;
         private readonly ISuccessCommand[] _ejectSdCommands =
             new ISuccessCommand[2];
         private readonly ToolStripMenuItem[] _ejectSdMenuItems =
@@ -593,6 +594,7 @@ namespace ZXMAK2.Host.WinForms.Views
 
         private void ClearMediaToolbarMenus()
         {
+            _refreshSdMenuItem = null;
             _mediaItemAdapters.ForEach(adapter => adapter.Dispose());
             _mediaItemAdapters.Clear();
             foreach (var item in _ejectFddMenuItems)
@@ -647,7 +649,7 @@ namespace ZXMAK2.Host.WinForms.Views
                 "Mount folder as SD...",
                 _mountFolderSdCommand,
                 true);
-            AddMediaMenuItem(
+            _refreshSdMenuItem = AddMediaMenuItem(
                 MediaStatusKind.SecureDigital,
                 "Refresh mounted folder",
                 _refreshFolderSdCommand,
@@ -1602,6 +1604,9 @@ namespace ZXMAK2.Host.WinForms.Views
                 _exportSdMenuItem.Enabled =
                     _exportFolderSdCommand != null &&
                     _exportFolderSdCommand.CanExecute(this);
+            if (_refreshSdMenuItem != null)
+                _refreshSdMenuItem.Enabled = _refreshFolderSdCommand != null &&
+                    _refreshFolderSdCommand.CanExecute(this);
             ToolStripDropDownButton button;
             if (_mediaButtons.TryGetValue(MediaStatusKind.SecureDigital,
                     out button))

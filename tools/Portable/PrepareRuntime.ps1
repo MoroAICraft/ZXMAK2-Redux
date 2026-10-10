@@ -9,7 +9,7 @@ $taskRoot = [IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $taskRoot) { throw "Preserve existing runtime: $taskRoot" }
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
 $taskNative = @('ymfm_opl4.dll','omni_midi.dll','omni_opn.dll','SAASound.dll','Pasmo2.dll')
-$taskModified = @('ZXMAK2.exe','Test.exe','ZXMAK2.Logging.dll','ZXMAK2.Engine.dll',
+$taskModified = @('ZXMAK2.exe','Test.exe','ZXMAK2.Logging.dll','ZXMAK2.Engine.dll','ZXMAK2.Host.dll',
     'ZXMAK2.Hardware.Circuits.dll','ZXMAK2.Hardware.dll','ZXMAK2.Host.Presentation.dll',
     'ZXMAK2.Host.WinForms.dll','ZXMAK2.Hardware.Adlers.dll')
 if (Test-Path -LiteralPath (Join-Path $Baseline 'Lib\Managed')) {

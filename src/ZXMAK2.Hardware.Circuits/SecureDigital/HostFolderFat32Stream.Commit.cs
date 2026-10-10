@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using File = ZXMAK2.PortableFile;
+using Directory = ZXMAK2.PortableDirectory;
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
 {
@@ -30,9 +32,12 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private uint GuestFatValue(uint cluster)
         {
-            var sector = new byte[SectorSize];
-            ReadSector(ReservedSectors + (long)cluster / 128, sector);
-            return ReadDword(sector, (int)(cluster % 128) * 4) & 0x0FFFFFFF;
+            byte[] sector;
+            if (m_changedSectors.TryGetValue(ReservedSectors + (long)cluster / 128, out sector))
+                return ReadDword(sector, (int)(cluster % 128) * 4) & 0x0FFFFFFF;
+            // Same value as FillFatSector, without allocating and rebuilding
+            // 128 entries for each cluster. Guest-modified FAT still wins.
+            return GetFatValue(cluster);
         }
 
         private List<uint> ReadChain(uint firstCluster)
@@ -262,7 +267,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private static void CheckForExternalAdditions(string directory,
             string relative, Dictionary<string, Node> originals)
         {
-            foreach (var item in new DirectoryInfo(directory).GetFileSystemInfos())
+            foreach (var item in new DirectoryInfo(PortablePaths.IoPath(directory)).GetFileSystemInfos())
             {
                 if (IsWindowsJunk(item.Name))
                     continue;
@@ -284,7 +289,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             m_strictReads = true;
             try
             {
-            using (var output = new FileStream(path, FileMode.CreateNew,
+            using (var output = new FileStream(PortablePaths.IoPath(path), FileMode.CreateNew,
                 FileAccess.Write, FileShare.None))
             {
                 var remaining = (long)entry.Length;
@@ -343,9 +348,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public void CommitChanges(Action<string> afterSave)
         {
+            CommitChanges(afterSave, null);
+        }
+
+        public void CommitChanges(Action<string> afterSave, Action<string> progress)
+        {
             if (HasChanges && !PortablePaths.IsInternal(m_sourceFolder))
             {
-                CommitExternalFolder(afterSave);
+                CommitExternalFolder(afterSave, progress);
                 return;
             }
             if (!HasChanges)
@@ -353,6 +363,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 if (afterSave != null) afterSave(null);
                 return;
             }
+            if (progress != null) progress("Checking SD file changes...");
             var guest = ReadGuestTree();
             var originals = new Dictionary<string, Node>(
                 StringComparer.OrdinalIgnoreCase);
@@ -403,6 +414,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 foreach (var entry in changedFiles)
                 {
+                    if (progress != null) progress("Staging changed file: " + entry.RelativePath);
                     var path = Path.Combine(stage, staged.Count.ToString("D8") + ".bin");
                     StageGuestFile(entry, path);
                     staged.Add(entry.RelativePath, path);
@@ -410,6 +422,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
                 // Files may have changed during the potentially long staging
                 // pass. Recheck immediately before moving any source file.
+                if (progress != null) progress("Verifying and saving session changes...");
                 CheckCommitInputs(originals, changedFiles, oldFiles, oldDirectories, newDirectories);
 
                 var backup = Path.Combine(m_sourceFolder,
@@ -430,7 +443,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                         Directory.CreateDirectory(Path.GetDirectoryName(target));
                         File.Move(Path.Combine(m_sourceFolder, path), target);
                         moved.Add(path);
-                        leases.Add(new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read));
+                        leases.Add(new FileStream(PortablePaths.IoPath(target), FileMode.Open, FileAccess.Read, FileShare.Read));
                         CheckOriginalFile(originals[path], target);
                     }
                     foreach (var path in oldDirectories)
@@ -458,7 +471,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                                 throw new IOException("Source path changed: " + target);
                             File.Move(temporary, target);
                             createdFiles.Add(item.Key);
-                            leases.Add(new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read));
+                            leases.Add(new FileStream(PortablePaths.IoPath(target), FileMode.Open, FileAccess.Read, FileShare.Read));
                             if (!HashFile(target).SequenceEqual(HashFile(item.Value)))
                                 throw new IOException("A PC process replaced a file during SD save: " + target);
                         }
@@ -551,7 +564,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             try
             {
                 m_strictReads = true;
-                using (var output = new FileStream(temporary, FileMode.CreateNew,
+                using (var output = new FileStream(PortablePaths.IoPath(temporary), FileMode.CreateNew,
                     FileAccess.Write, FileShare.None))
                 {
                     m_position = 0;
@@ -586,19 +599,20 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             foreach (var child in node.Children) RebaseSourcePaths(child, previous, target);
         }
 
-        private void CommitExternalFolder(Action<string> afterSave)
+        private void CommitExternalFolder(Action<string> afterSave, Action<string> progress)
         {
             // Copy only on explicit Save. Start with the CURRENT PC tree, then
             // apply the existing selective, conflict-checked guest transaction.
             var previous = m_sourceFolder;
             var target = PortablePaths.NewSavePath(previous, "SD-Folders");
-            PortablePaths.CopyDirectory(previous, target);
+            Logger.Info("SD folder save: copying external source '{0}' to '{1}'", previous, target);
+            PortablePaths.CopyDirectory(previous, target, progress);
             CloseCachedFile();
             RebaseSourcePaths(m_root, previous, target);
             m_sourceFolder = target;
             try
             {
-                CommitChanges(afterSave);
+                CommitChanges(afterSave, progress);
                 Logger.Info("External SD folder saved locally: {0}", target);
             }
             catch

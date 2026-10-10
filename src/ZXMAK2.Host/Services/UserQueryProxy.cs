@@ -6,9 +6,16 @@ using ZXMAK2.Host.Entities;
 
 namespace ZXMAK2.Host.Services
 {
-    public class UserQueryProxy : IUserQuery, IActionUserQuery
+    public class UserQueryProxy : IUserQuery, IActionUserQuery, IUserOperation
     {
         private readonly IResolver m_resolver;
+
+        public void Run(string caption, Action<Action<string>> operation)
+        {
+            var progress = GetService() as IUserOperation;
+            if (progress != null) progress.Run(caption, operation);
+            else operation(message => { });
+        }
         
         public UserQueryProxy(IResolver resolver)
         {

@@ -113,7 +113,7 @@ namespace ZXMAK2.Hardware.Evo
                 if (choice == DlgResult.Yes)
                 {
                     if (folder != null)
-                        folder.CommitChanges();
+                        SaveFolderSession(folder, null);
                     else
                         image.CommitChanges();
                     configuredSourcePath = folder != null ? folder.SourceFolder : image.ImagePath;
@@ -384,7 +384,15 @@ namespace ZXMAK2.Hardware.Evo
         {
             return configuredSourceType == SdSourceType.HostFolder &&
                 !string.IsNullOrEmpty(configuredSourcePath) &&
-                Directory.Exists(configuredSourcePath);
+                PortableDirectory.Exists(ConfiguredSourcePath);
+        }
+
+        private static void SaveFolderSession(HostFolderFat32Stream folder, Action<string> afterSave)
+        {
+            var operation = Locator.Resolve<IUserQuery>() as IUserOperation;
+            if (operation != null)
+                operation.Run("Saving SD folder", report => folder.CommitChanges(afterSave, report));
+            else folder.CommitChanges(afterSave);
         }
 
         private bool ExportFolderCommandUi_OnCanExecute(Object arg)
@@ -736,7 +744,7 @@ namespace ZXMAK2.Hardware.Evo
                     // Saving and building the new snapshot are one transaction.
                     // A failed build rolls back the host changes and keeps the
                     // original card/journal. No discard happens before success.
-                    if (choice == DlgResult.Yes) folder.CommitChanges(build);
+                    if (choice == DlgResult.Yes) SaveFolderSession(folder, build);
                     else build(null);
                     var warnings = replacement.HostFolderStream.Warnings.Count;
                     var previous = card;
@@ -832,7 +840,7 @@ namespace ZXMAK2.Hardware.Evo
             if (string.IsNullOrWhiteSpace(folderPath))
                 return string.Empty;
             var fullPath = SdSessionStorage.ResolveSourcePath(folderPath);
-            if (!Directory.Exists(fullPath))
+            if (!PortableDirectory.Exists(fullPath))
                 throw new DirectoryNotFoundException(
                     "SD source folder not found: " + fullPath);
             return fullPath;
