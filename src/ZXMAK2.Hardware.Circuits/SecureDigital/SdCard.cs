@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using File = ZXMAK2.PortableFile;
 
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital

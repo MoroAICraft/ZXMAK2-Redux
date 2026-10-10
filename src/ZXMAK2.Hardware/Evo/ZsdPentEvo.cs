@@ -382,9 +382,13 @@ namespace ZXMAK2.Hardware.Evo
 
         private bool RefreshFolderCommandUi_OnCanExecute(Object arg)
         {
-            return configuredSourceType == SdSourceType.HostFolder &&
-                !string.IsNullOrEmpty(configuredSourcePath) &&
-                PortableDirectory.Exists(ConfiguredSourcePath);
+            if (configuredSourceType != SdSourceType.HostFolder ||
+                string.IsNullOrEmpty(configuredSourcePath)) return false;
+            try { return PortableDirectory.Exists(ConfiguredSourcePath); }
+            catch (ArgumentException) { return false; }
+            catch (NotSupportedException) { return false; }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
         }
 
         private static void SaveFolderSession(HostFolderFat32Stream folder, Action<string> afterSave)
@@ -828,7 +832,7 @@ namespace ZXMAK2.Hardware.Evo
                 return string.Empty;
             }
             var fullPath = SdSessionStorage.ResolveSourcePath(fileName);
-            if (!File.Exists(fullPath))
+            if (!PortableFile.Exists(fullPath))
             {
                 throw new FileNotFoundException("SD Card image not found", fullPath);
             }

@@ -27,7 +27,7 @@ static class PortableFolderProbe
     const BindingFlags F=BindingFlags.Instance|BindingFlags.NonPublic;
     static int checks;
     static void Check(bool ok,string message){checks++;if(!ok)throw new Exception(message);}
-    sealed class Query:IUserQuery,IActionUserQuery
+    sealed class Query:IUserQuery,IActionUserQuery,IUserOperation
     {
         public DlgResult Next=DlgResult.Yes;public int Calls;
         public DlgResult Show(string m,string c,DlgButtonSet b,DlgIcon i){Calls++;return Next;}
@@ -35,6 +35,7 @@ static class PortableFolderProbe
         public object ObjectSelector(object[] o,string c){return null;}
         public bool QueryText(string c,string t,ref string v){return false;}
         public bool QueryValue(string c,string t,string f,ref int v,int a,int b){return false;}
+        public void Run(string caption,Action<Action<string>> action){Exception error=null;var worker=new Thread(()=>{try{action(text=>{});}catch(Exception e){error=e;}});worker.Start();Check(worker.Join(30000),"stopped-VM save worker hung");if(error!=null)throw error;}
     }
     sealed class Host:IHostService
     {
@@ -79,6 +80,8 @@ static class PortableFolderProbe
         var update=typeof(MainView).GetMethod("UpdateSecureDigitalMenuIndicators",F);
         update.Invoke(view,new object[]{null});Check(!item.Enabled,"unmounted menu enabled");available=true;update.Invoke(view,new object[]{null});Check(item.Enabled,"Refresh wrapper stayed disabled");available=false;update.Invoke(view,new object[]{null});Check(!item.Enabled,"eject menu stayed enabled");
         item.Dispose();sd.BusDisconnect();GC.SuppressFinalize(view);
+        typeof(ZsdPentEvo).GetField("configuredSourcePath",F).SetValue(sd,"bad\0folder");
+        Check(!(bool)can.Invoke(sd,new object[]{null}),"invalid descriptor crashed Refresh availability");
         Console.WriteLine("PASS relative descriptor + foreign CWD + menu enable/disable refresh");
     }
     static void CloseConfigError(Query query)
@@ -108,6 +111,14 @@ static class PortableFolderProbe
             using(var remount=new HostFolderFat32Stream(saved))Check(remount.Warnings.Count==0,"saved deep tree skipped during remount");
             Console.WriteLine("PASS long-path copy/save >260 chars, originals untouched, progress; {0}",saved);
         }
+        string imagePath=Path.Combine(deep,"image.img");var imageBytes=new byte[4096];imageBytes[510]=0x55;imageBytes[511]=0xAA;imageBytes[450]=6;imageBytes[454]=1;imageBytes[458]=7;
+        File.WriteAllBytes(PortablePaths.IoPath(imagePath),imageBytes);
+        var sd=new ZsdPentEvo();Check(sd.MountCard(imagePath),"long image mount failed");
+        var image=Card(sd).ImageSessionStream;image.Position=7;image.WriteByte(0x55);image.CommitChanges();string ownImage=image.ImagePath;
+        sd.BusDisconnect();
+        Check(File.ReadAllBytes(PortablePaths.IoPath(imagePath))[7]==0&&File.ReadAllBytes(PortablePaths.IoPath(ownImage))[7]==0x55,"long image save damaged source");
+        sd.MountCard(ownImage);Check(sd.IsMediaMounted,"image copy remount failed");sd.BusDisconnect();
+        Console.WriteLine("PASS long-path image mount / local save / remount, original unchanged");
     }
     static void ProgressWorker()
     {
@@ -116,10 +127,13 @@ static class PortableFolderProbe
         using(var form=(Form)Activator.CreateInstance(type,new object[]{"Unit progress",(Action<Action<string>>)(report=>{worker=Thread.CurrentThread.ManagedThreadId;report("WORKING");Thread.Sleep(150);})}))
         {
             typeof(Form).GetMethod("OnShown",F).Invoke(form,new object[]{EventArgs.Empty});
+            var close=new FormClosingEventArgs(CloseReason.UserClosing,false);
+            type.GetMethod("OnFormClosing",F).Invoke(form,new object[]{close});Check(close.Cancel,"progress closed while worker active");
             var thread=(Thread)type.GetField("worker",F).GetValue(form);Check(thread.Join(5000),"worker hung");Check(worker!=caller,"operation used UI thread");
             Check(type.GetField("Failure",F|BindingFlags.Public).GetValue(form)==null,"worker failed");
             Check((string)type.GetField("message",F).GetValue(form)=="WORKING","progress report lost");
             Check(((WaitHandle)type.GetField("completed",F).GetValue(form)).WaitOne(0),"completion not signaled");
+            close=new FormClosingEventArgs(CloseReason.UserClosing,false);type.GetMethod("OnFormClosing",F).Invoke(form,new object[]{close});Check(!close.Cancel,"completed progress refused close");
         }
         using(var form=(Form)Activator.CreateInstance(type,new object[]{"Unit failure",(Action<Action<string>>)(report=>{throw new IOException("injected");})}))
         {
@@ -145,6 +159,18 @@ static class PortableFolderProbe
             string cwd=Environment.CurrentDirectory;Environment.CurrentDirectory=Environment.GetFolderPath(Environment.SpecialFolder.Windows);
             try {Check((bool)typeof(ZsdPentEvo).GetMethod("RefreshFolderCommandUi_OnCanExecute",F).Invoke(sd,new object[]{null}),"real internal Refresh gray");Check(sd.RefreshMountedFolder()>=0,"real internal refresh failed");}
             finally{Environment.CurrentDirectory=cwd;sd.BusDisconnect();}
+            using(var vm=new VirtualMachine(new Host(),null))
+            {
+                vm.Spectrum.BusManager.Init(vm.Spectrum,true);
+                var live=vm.Bus.FindDevice<ZsdPentEvo>();Check(live!=null,"large close fixture missing SD");live.MountHostFolder(saved);
+                string cfg=Path.Combine(PortablePaths.DataDirectory("Temp"),"large-close.vmz");vm.SaveConfigAs(cfg);
+                var model=(MainViewModel)FormatterServices.GetUninitializedObject(typeof(MainViewModel));typeof(MainViewModel).GetField("m_vm",F).SetValue(model,vm);var errors=new Messages();typeof(MainViewModel).GetField("m_userMessage",F).SetValue(model,errors);
+                byte next=(byte)(guest^0x40);Guest(Card(live).HostFolderStream,"1099test.trd",next);vm.DoRun();
+                Check(model.PrepareClose()&&!vm.IsRunning&&!live.HasPendingChanges&&errors.Errors==0,"large folder close/save failed");
+                Check(First(Path.Combine(saved,"1099test.trd"))==next&&First(file)==original,"large close lost save or touched original");
+                var config=new XmlDocument();config.Load(cfg);Check(!Path.IsPathRooted(((XmlElement)config.SelectSingleNode("//Device[contains(@type,'ZsdPentEvo')]")).GetAttribute("sdPath")),"large close stored absolute descriptor");
+            }
+            Console.WriteLine("PASS large-tree actual MainViewModel.PrepareClose/worker/save/config, VM stopped and source unchanged");
         }
     }
     [STAThread]static int Main(string[] args)

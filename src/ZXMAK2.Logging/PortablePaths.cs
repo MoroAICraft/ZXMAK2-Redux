@@ -213,6 +213,8 @@ namespace ZXMAK2
         public static void Copy(string source, string target, bool overwrite) { System.IO.File.Copy(PortablePaths.IoPath(source), PortablePaths.IoPath(target), overwrite); }
         public static void Move(string source, string target) { System.IO.File.Move(PortablePaths.IoPath(source), PortablePaths.IoPath(target)); }
         public static void Replace(string source, string target, string backup) { System.IO.File.Replace(PortablePaths.IoPath(source), PortablePaths.IoPath(target), backup == null ? null : PortablePaths.IoPath(backup)); }
+        public static FileStream Open(string p, FileMode mode, FileAccess access, FileShare share) { return System.IO.File.Open(PortablePaths.IoPath(p), mode, access, share); }
+        public static void WriteAllText(string p, string text) { System.IO.File.WriteAllText(PortablePaths.IoPath(p), text); }
     }
     public static class PortableDirectory
     {

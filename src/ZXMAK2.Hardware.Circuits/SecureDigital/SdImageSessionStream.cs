@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using File = ZXMAK2.PortableFile;
+using Directory = ZXMAK2.PortableDirectory;
 
 namespace ZXMAK2.Hardware.Circuits.SecureDigital
 {
@@ -76,14 +78,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private string Fingerprint()
         {
-            var info = new FileInfo(m_imagePath);
+            var info = new FileInfo(PortablePaths.IoPath(m_imagePath));
             return Hash(PortablePaths.Store(m_imagePath).ToUpperInvariant() + "|" +
                 info.Length + "|" + info.LastWriteTimeUtc.Ticks);
         }
 
         private void Recover()
         {
-            using (var file = new FileStream(m_journalPath, FileMode.Open,
+            using (var file = new FileStream(PortablePaths.IoPath(m_journalPath), FileMode.Open,
                 FileAccess.Read, FileShare.ReadWrite))
             using (var reader = new BinaryReader(file, Encoding.UTF8))
             {
@@ -211,7 +213,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             if (m_journal == null)
             {
                 var first = !File.Exists(m_journalPath);
-                m_journal = new FileStream(m_journalPath,
+                m_journal = new FileStream(PortablePaths.IoPath(m_journalPath),
                     first ? FileMode.CreateNew : FileMode.Open,
                     FileAccess.ReadWrite, FileShare.Read);
                 if (first)
