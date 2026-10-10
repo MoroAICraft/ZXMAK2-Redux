@@ -1,4 +1,5 @@
-param([string]$Package='L:\Work_two\ZX\ZXMAK2-v87-Portable-Test-20261010')
+param([string]$Package='L:\Work_two\ZX\ZXMAK2-v87-Portable-Test-20261010',
+    [string]$ArchiveName='ZXMAK2-v87-Portable-Test')
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -13,7 +14,7 @@ $taskManifest=foreach($taskFile in $taskFiles) {
 $taskManifest | Export-Csv -LiteralPath "$Package\diagnostics\runtime-sha256.csv" -NoTypeInformation -Encoding UTF8
 foreach($taskClean in @($false,$true)) {
     $taskSuffix=if($taskClean){'-Clean'}else{''}
-    $taskZipPath=Join-Path $Package "ZXMAK2-v87-Portable-Test$taskSuffix.zip"
+    $taskZipPath=Join-Path $Package "$ArchiveName$taskSuffix.zip"
     if(Test-Path -LiteralPath $taskZipPath){throw "Preserve previous archive: $taskZipPath"}
     $taskSelected=@($taskFiles | Where-Object {
         !$taskClean -or $_.FullName.Substring($taskRuntime.Length+1) -notin $taskRootState

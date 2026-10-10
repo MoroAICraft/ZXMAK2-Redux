@@ -318,8 +318,8 @@ namespace Test
 
             // FM enabled, register read disabled: #FFFD returns YM status.
             AddPortWrite(program, 0xFFFD, 0xF9);
-            AddAyWrite(program, 0xA0, 0x69);
             AddAyWrite(program, 0xA4, 0x22);
+            AddAyWrite(program, 0xA0, 0x69);
             AddAyWrite(program, 0xB0, 0x07);
             AddAyWrite(program, 0x30, 0x01);
             AddAyWrite(program, 0x34, 0x01);
@@ -424,7 +424,9 @@ namespace Test
             machine.Dispose();
 
             bool passed = chip0 == 0x20 && chip1 == 0x40 &&
-                status == 0x00 && hasAudio && gainPassed &&
+                // The native YM2203 now reports hardware BUSY after data
+                // writes; only timer/reserved flags must be clear here.
+                (status & 0x7F) == 0x00 && hasAudio && gainPassed &&
                 psgHeadroomPassed && saaCoveragePassed &&
                 multiSoundPortCompatibility;
             Console.ForegroundColor = passed ? ConsoleColor.Green : ConsoleColor.Red;

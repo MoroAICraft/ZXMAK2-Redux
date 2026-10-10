@@ -30,10 +30,11 @@ namespace ZXMAK2.Hardware.Evo
         private const int AyDataPort = 0x80FD;
 
         private readonly TsFmPsgRenderer[] m_psg = new TsFmPsgRenderer[2];
-        private readonly TsFmFmRenderer m_fm;
+        private readonly ITsFmRenderer m_fm;
         private readonly TsFmSaa1099Renderer m_saa;
         private readonly ISoundRenderer[] m_renderers;
         private readonly byte[] m_register = new byte[2];
+        private readonly byte[] m_ymPrescale = { 6, 6 };
         private readonly PsgPortState[] m_ira =
         {
             new PsgPortState(0xFF),
@@ -62,7 +63,7 @@ namespace ZXMAK2.Hardware.Evo
 
             m_psg[0] = new TsFmPsgRenderer("TSFM YM2203 D1 SSG", PanType.Abc);
             m_psg[1] = new TsFmPsgRenderer("TSFM YM2203 D2 SSG", PanType.Cba);
-            m_fm = new TsFmFmRenderer();
+            m_fm = new Ym2203FmRenderer();
             m_saa = new TsFmSaa1099Renderer();
             m_renderers = new ISoundRenderer[]
             {
@@ -205,6 +206,7 @@ namespace ZXMAK2.Hardware.Evo
             m_configuration = 0x0F;
             m_register[0] = 0;
             m_register[1] = 0;
+            m_ymPrescale[0] = m_ymPrescale[1] = 6;
             m_psg[0].ResetChip();
             m_psg[1].ResetChip();
             m_fm.ResetChip();
@@ -229,6 +231,9 @@ namespace ZXMAK2.Hardware.Evo
 
             m_register[ActiveChip] = value;
             m_psg[ActiveChip].RegAddr = value;
+            m_fm.SetAddress(ActiveChip, value);
+            m_ymPrescale[ActiveChip] = ApplyYmPrescaler(
+                value, m_ymPrescale[ActiveChip], m_psg[ActiveChip]);
         }
 
         private void WriteDataPort(ushort addr, byte value, ref bool handled)
@@ -241,6 +246,9 @@ namespace ZXMAK2.Hardware.Evo
 
             int chip = ActiveChip;
             int register = m_register[chip];
+            // The chip's data bus/BUSY also sees SSG writes. Native SSG is
+            // not mixed: the existing PSG renderer remains the sole owner.
+            m_fm.SetRegister(chip, register, value);
             if (register < 0x10)
             {
                 m_psg[chip].SetReg(register, value);
@@ -248,10 +256,6 @@ namespace ZXMAK2.Hardware.Evo
                     WriteIra(chip, value);
                 else if ((register & 0x0F) == PsgRegId.IRB)
                     WriteIrb(chip, value);
-            }
-            else
-            {
-                m_fm.SetRegister(chip, register, value);
             }
         }
 
@@ -280,9 +284,9 @@ namespace ZXMAK2.Hardware.Evo
             }
 
             int register = m_register[chip];
-            if ((register & 0x0F) == PsgRegId.IRA)
+            if (register == PsgRegId.IRA)
                 value = ReadIra(chip);
-            else if ((register & 0x0F) == PsgRegId.IRB)
+            else if (register == PsgRegId.IRB)
                 value = ReadIrb(chip);
             else if (register < 0x10)
                 value = m_psg[chip].GetReg(register);
@@ -363,6 +367,18 @@ namespace ZXMAK2.Hardware.Evo
                     (ushort)(short)boostedLeft |
                     ((uint)(ushort)(short)boostedRight << 16));
             }
+        }
+
+        internal static byte ApplyYmPrescaler(
+            byte address, byte current, TsFmPsgRenderer psg)
+        {
+            if (address < 0x2D || address > 0x2F) return current;
+            if (address == 0x2D) current = 6;
+            else if (address == 0x2E && current == 6) current = 3;
+            else if (address == 0x2F) current = 2;
+            // Equivalent YM2149 SSG clock: 3 * chip-clock / FM prescale.
+            psg.SetChipFrequency(10500000 / current);
+            return current;
         }
     }
 

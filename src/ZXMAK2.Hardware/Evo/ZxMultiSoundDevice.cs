@@ -98,8 +98,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             m_isMax = isMax;
             m_isOmni = isOmni;
-            m_fm = isOmni ? (ITsFmRenderer)new OmniOpnFmRenderer() :
-                new TsFmFmRenderer();
+            m_fm = new Ym2203FmRenderer();
             m_saa = new TsFmSaa1099Renderer();
             m_gsRam = new byte[isOmni ? 0 :
                 (isMax ? 2 * 1024 * 1024 : 1024 * 1024)];
@@ -379,12 +378,7 @@ namespace ZXMAK2.Hardware.Evo
             m_psg[1].ResetChip();
             m_fm.ResetChip();
             m_fm.Enabled = false;
-            if (m_isOmni)
-            {
-                m_ymPrescale[0] = m_ymPrescale[1] = 6;
-                m_psg[0].SetChipFrequency(1750000);
-                m_psg[1].SetChipFrequency(1750000);
-            }
+            m_ymPrescale[0] = m_ymPrescale[1] = 6;
             m_saa.ResetChip();
             m_midi.ResetChip();
             m_saa.ClockEnabled = false;
@@ -435,18 +429,8 @@ namespace ZXMAK2.Hardware.Evo
             m_ymRegister[m_ymChip] = value;
             m_psg[m_ymChip].RegAddr = value;
             m_fm.SetAddress(m_ymChip, value);
-            if (m_isOmni && value >= 0x2D && value <= 0x2F)
-            {
-                int prescale = m_ymPrescale[m_ymChip];
-                if (value == 0x2D)
-                    prescale = 6;
-                else if (value == 0x2E && prescale == 6)
-                    prescale = 3;
-                else if (value == 0x2F)
-                    prescale = 2;
-                m_ymPrescale[m_ymChip] = (byte)prescale;
-                m_psg[m_ymChip].SetChipFrequency(10500000 / prescale);
-            }
+            m_ymPrescale[m_ymChip] = TurboSoundFmPro.ApplyYmPrescaler(
+                value, m_ymPrescale[m_ymChip], m_psg[m_ymChip]);
         }
 
         private void WriteYmData(ushort address, byte value, ref bool handled)
@@ -461,6 +445,7 @@ namespace ZXMAK2.Hardware.Evo
                 return;
             var chip = m_ymChip;
             var register = m_ymRegister[chip];
+            m_fm.SetRegister(chip, register, value);
             if (register < 0x10)
             {
                 m_psg[chip].SetReg(register, value);
@@ -468,10 +453,6 @@ namespace ZXMAK2.Hardware.Evo
                     WriteIra(chip, value);
                 else if ((register & 0x0F) == PsgRegId.IRB)
                     WriteIrb(chip, value);
-            }
-            else
-            {
-                m_fm.SetRegister(chip, register, value);
             }
         }
 
@@ -489,9 +470,9 @@ namespace ZXMAK2.Hardware.Evo
                 return;
             }
             var register = m_ymRegister[chip];
-            if ((register & 0x0F) == PsgRegId.IRA)
+            if (register == PsgRegId.IRA)
                 value = ReadIra(chip);
-            else if ((register & 0x0F) == PsgRegId.IRB)
+            else if (register == PsgRegId.IRB)
                 value = ReadIrb(chip);
             else if (register < 0x10)
                 value = m_psg[chip].GetReg(register);

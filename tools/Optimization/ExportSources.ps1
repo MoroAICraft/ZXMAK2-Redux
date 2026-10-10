@@ -13,13 +13,13 @@ foreach ($taskStatus in @(& git status --porcelain --untracked-files=all)) {
 $taskSource = Join-Path $Package 'source'
 New-Item -ItemType Directory -Path $taskSource -Force | Out-Null
 $taskZip = Join-Path $taskSource "ZXMAK2-$Version-source-with-OmniSound.zip"
-$taskSubZip = Join-Path $taskSource 'ZX-OmniSound-0794d8d-source.zip'
+$taskPinned = (& git rev-parse HEAD:src/ZX-OmniSound).Trim()
+$taskSubZip = Join-Path $taskSource ('ZX-OmniSound-'+$taskPinned.Substring(0,7)+'-source.zip')
 foreach ($taskTarget in @($taskZip,$taskSubZip)) {
     if (Test-Path -LiteralPath $taskTarget) {throw "Preserve existing archive: $taskTarget"}
 }
 & git archive --format=zip "--output=$taskZip" HEAD
 if ($LASTEXITCODE -ne 0) {throw 'Main source archive failed'}
-$taskPinned = (& git rev-parse HEAD:src/ZX-OmniSound).Trim()
 if ((& git -C src/ZX-OmniSound rev-parse HEAD).Trim() -ne $taskPinned) {throw 'Submodule does not match gitlink'}
 & git -C src/ZX-OmniSound archive --format=zip "--output=$taskSubZip" $taskPinned
 if ($LASTEXITCODE -ne 0) {throw 'Submodule source archive failed'}

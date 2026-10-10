@@ -21,6 +21,10 @@ namespace ZXMAK2.Hardware.Evo
         private int m_renderSample;
         private bool m_rendering;
         private bool m_portsAvailable;
+        private double m_resamplePhase;
+        private int m_resampleRate;
+        private int m_previousLeft, m_previousRight;
+        private int m_currentLeft, m_currentRight;
 
         public ZxMaxOpl3Renderer()
         {
@@ -44,6 +48,7 @@ namespace ZXMAK2.Hardware.Evo
                 Logger.Error("ZX-MultiSound Max: ymfm OPL3 core unavailable");
             else
                 NativeMethods.Read(m_core, 0); // Consume YMF278B-only ID read.
+            ResetResampler();
             bmgr.Events.SubscribeReset(ResetChip);
         }
 
@@ -86,6 +91,7 @@ namespace ZXMAK2.Hardware.Evo
                 NativeMethods.Reset(m_core);
                 NativeMethods.Read(m_core, 0);
             }
+            ResetResampler();
         }
 
         private void WritePort(ushort address, byte value, ref bool handled)
@@ -122,7 +128,13 @@ namespace ZXMAK2.Hardware.Evo
                 target));
             if (target == m_renderSample)
                 return;
+            if (m_resampleRate != SampleRate) ResetResampler();
             var count = target - m_renderSample;
+            if (m_core != IntPtr.Zero && SampleRate != 44100)
+            {
+                RenderResampled(count);
+                return;
+            }
             if (m_core != IntPtr.Zero)
             {
                 var required = count * 2;
@@ -146,6 +158,46 @@ namespace ZXMAK2.Hardware.Evo
                         (int)(right * gain))));
             }
             m_renderSample = target;
+        }
+
+        private void ResetResampler()
+        {
+            m_resamplePhase = 0;
+            m_resampleRate = SampleRate;
+            m_previousLeft = m_previousRight = 0;
+            m_currentLeft = m_currentRight = 0;
+        }
+
+        private void RenderResampled(int count)
+        {
+            var ratio = 44100D / Math.Max(1, SampleRate);
+            var required = (int)Math.Floor(m_resamplePhase + count * ratio + 1e-10);
+            if (m_nativeBuffer.Length < required * 2)
+                m_nativeBuffer = new short[required * 2];
+            if (required > 0)
+                NativeMethods.Generate(m_core, m_nativeBuffer, (uint)required);
+            var nativeIndex = 0;
+            var gain = Volume / 100D;
+            for (var index = 0; index < count; index++)
+            {
+                m_resamplePhase += ratio;
+                while (m_resamplePhase >= 1D - 1e-10)
+                {
+                    m_resamplePhase = Math.Max(0D, m_resamplePhase - 1D);
+                    m_previousLeft = m_currentLeft;
+                    m_previousRight = m_currentRight;
+                    m_currentLeft = m_nativeBuffer[nativeIndex * 2];
+                    m_currentRight = m_nativeBuffer[nativeIndex * 2 + 1];
+                    nativeIndex++;
+                }
+                // Causal interpolation, preserving state across writes/frames.
+                var left = m_previousLeft + (m_currentLeft - m_previousLeft) * m_resamplePhase;
+                var right = m_previousRight + (m_currentRight - m_previousRight) * m_resamplePhase;
+                UpdateDac((double)m_renderSample / m_frameSamples,
+                    (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, (int)Math.Round(left * gain))),
+                    (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, (int)Math.Round(right * gain))));
+                m_renderSample++;
+            }
         }
 
         private static class NativeMethods
