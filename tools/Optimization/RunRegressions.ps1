@@ -14,6 +14,7 @@ $taskProbes = [ordered]@{
     TapeClock = 'tools\BaseConfInputAudioTest\TapeClockProbe-B40.cs'
     SdLifecycleProbe = 'tools\SdSessionTest\LifecycleProbe.cs'
     RefreshFolder = 'tools\SdSessionTest\RefreshProbe.cs'
+    SdWriteProtocol = 'tools\SdWriteProtocolProbe.cs'
     PentEvoProfile = 'tools\BaseConfConfigTest\PentEvoProfileProbe.cs'
 }
 foreach ($taskEntry in $taskProbes.GetEnumerator()) {
@@ -26,7 +27,8 @@ try {
     foreach ($taskEntry in $taskProbes.GetEnumerator()) {
         $taskExe = "$taskRelease\$($taskEntry.Key).exe"
         $taskLog = "$Package\diagnostics\regression-$($taskEntry.Key).txt"
-        if ($taskEntry.Key -eq 'RefreshFolder') { & $taskExe "$Package\diagnostics" *> $taskLog }
+        if ($taskEntry.Key -eq 'SdWriteProtocol') { & $taskExe "$taskRelease\ZXMAK2.Hardware.Circuits.dll" *> $taskLog }
+        elseif ($taskEntry.Key -eq 'RefreshFolder') { & $taskExe "$Package\diagnostics" *> $taskLog }
         elseif ($taskEntry.Key -in @('KeyboardRouting','PrintScreenNmiProbe','TapeClock','SdLifecycleProbe','PentEvoProfile')) { & $taskExe *> $taskLog }
         else { & $taskExe $taskRelease *> $taskLog }
         if ($LASTEXITCODE -ne 0) { Get-Content $taskLog -Tail 15; throw "Regression failed: $($taskEntry.Key)" }
