@@ -27,7 +27,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
         {
             treeZ80Resources.Nodes.Clear();
 
-            if (!File.Exists(Path.Combine(Utils.GetAppFolder(), _configFileName)))
+            if (!File.Exists(PortablePaths.ConfigFile(_configFileName)))
             {
                 System.Windows.Forms.Cursor.Current = System.Windows.Forms.Cursors.WaitCursor;
                 string errMessage;
@@ -35,7 +35,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
                 System.Windows.Forms.Cursor.Current = System.Windows.Forms.Cursors.Default;
                 if (fileContents != string.Empty)
                 {
-                    File.WriteAllText(_configFileName, fileContents);
+                    File.WriteAllText(PortablePaths.ConfigFile(_configFileName), fileContents);
                     this.Focus();
                 }
                 else
@@ -44,7 +44,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
             //ToDo: here must file check follow because server returns html back instead of erroneous HttpStatusCode response
 
             XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.Load(Path.Combine(Utils.GetAppFolder(), _configFileName));
+            xmlDoc.Load(PortablePaths.ConfigFile(_configFileName));
 
             //Add screen libs
             XmlNodeList nodes = xmlDoc.DocumentElement.SelectNodes("/Root/libs/item");

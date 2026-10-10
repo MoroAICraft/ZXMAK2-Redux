@@ -102,8 +102,7 @@ namespace ZXMAK2.Hardware.Evo
                 var query = Locator.Resolve<IUserQuery>();
                 var choice = query.Show(
                     "The mounted SD card has unsaved changes.\n\n" +
-                    "Yes: save them to the original " +
-                        (folder != null ? "Windows folder" : "SD image") + ".\n" +
+                    "Yes: save changes (external media is saved as a local copy).\n" +
                     "No: discard them.\n" +
                     "Cancel: keep the SD card mounted.",
                     "Save SD changes?",
@@ -117,6 +116,8 @@ namespace ZXMAK2.Hardware.Evo
                         folder.CommitChanges();
                     else
                         image.CommitChanges();
+                    configuredSourcePath = folder != null ? folder.SourceFolder : image.ImagePath;
+                    OnConfigChanged();
                 }
                 else if (choice == DlgResult.No)
                 {
@@ -744,6 +745,8 @@ namespace ZXMAK2.Hardware.Evo
                     card_cs = false;
                     buf = 0xFF;
                     previous.Close();
+                    configuredSourcePath = card.HostFolderStream.SourceFolder;
+                    OnConfigChanged();
                     return warnings;
                 }
                 finally
@@ -795,10 +798,9 @@ namespace ZXMAK2.Hardware.Evo
                 Logger.Error(ex, "Cannot restore configured SD source: {0}", configured);
                 // A missing/unavailable folder is an empty slot, not a dialog.
                 // Keep the path so a later run can find the folder again.
-                var unavailableFolder = configuredSourceType == SdSourceType.HostFolder &&
-                    (ex is IOException || ex is UnauthorizedAccessException ||
-                     ex is System.Security.SecurityException);
-                m_restoreWarning = unavailableFolder ? null :
+                var unavailableSource = ex is FileNotFoundException || ex is DirectoryNotFoundException ||
+                    ex is UnauthorizedAccessException || ex is System.Security.SecurityException;
+                m_restoreWarning = unavailableSource ? null :
                     "The configured SD source could not be opened: " + ex.Message;
                 lock (cardSync)
                 {

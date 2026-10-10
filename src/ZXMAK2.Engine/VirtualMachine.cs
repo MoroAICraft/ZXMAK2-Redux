@@ -147,6 +147,17 @@ namespace ZXMAK2.Engine
         public void OpenConfig(string fileName)
         {
             fileName = Path.GetFullPath(fileName);
+            if (!PortablePaths.IsInternal(fileName))
+            {
+                var target = PortablePaths.NewSavePath(fileName, "Imported-Configurations");
+                File.Copy(fileName, target);
+                foreach (var extension in new[] { ".cmos", ".vmide", ".nvram" })
+                {
+                    var satellite = Path.ChangeExtension(fileName, extension);
+                    if (File.Exists(satellite)) File.Copy(satellite, Path.ChangeExtension(target, extension));
+                }
+                fileName = target;
+            }
             using (var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 m_configFileName = fileName;
@@ -159,22 +170,17 @@ namespace ZXMAK2.Engine
         {
             if (!string.IsNullOrEmpty(m_configFileName))
             {
-                using (var stream = new FileStream(m_configFileName, FileMode.Create, FileAccess.Write, FileShare.Read))
-                {
-                    SaveConfig(stream);
-                }
+                PortablePaths.WriteAtomic(m_configFileName, SaveConfig);
             }
         }
 
         public void SaveConfigAs(string fileName)
         {
             fileName = Path.GetFullPath(fileName);
-            using (var stream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Read))
-            {
-                m_configFileName = fileName;
-                Spectrum.BusManager.MachineFile = m_configFileName;
-                SaveConfig(stream);
-            }
+            PortablePaths.RequireInternal(fileName);
+            PortablePaths.WriteAtomic(fileName, SaveConfig);
+            m_configFileName = fileName;
+            Spectrum.BusManager.MachineFile = m_configFileName;
         }
 
         public void OpenConfig(Stream stream)

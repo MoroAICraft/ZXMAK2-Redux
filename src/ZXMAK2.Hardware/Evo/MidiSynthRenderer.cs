@@ -36,7 +36,8 @@ namespace ZXMAK2.Hardware.Evo
         {
             base.BusInit(bmgr);
             string folder = Utils.GetAppFolder();
-            string path = Path.Combine(folder, BankName);
+            string path = Path.Combine(folder, "Resources", "SoundBanks", BankName);
+            if (!File.Exists(path)) path = Path.Combine(folder, BankName);
             if (!File.Exists(path))
                 path = Path.Combine(folder, "roms", BankName);
             if (!File.Exists(path))

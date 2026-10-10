@@ -13,6 +13,14 @@ namespace ZXMAK2
         [STAThread]
         static void Main(string[] args)
         {
+            try { PortableBootstrap.Initialize(); Run(args); }
+            catch (Exception ex) { PortableBootstrap.ShowError(ex.Message); }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void Run(string[] args)
+        {
+            PortablePaths.AcquireInstance();
             Logger.Start();
             try
             {
@@ -29,6 +37,7 @@ namespace ZXMAK2
             finally
             {
                 Logger.Finish();
+                PortablePaths.ReleaseInstance();
             }
         }
 

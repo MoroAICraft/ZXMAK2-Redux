@@ -14,8 +14,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
     {
         private const int SectorSize = 512;
         private const string Magic = "ZXISD01";
-        private readonly Stream m_source;
-        private readonly string m_imagePath;
+        private Stream m_source;
+        private string m_imagePath;
+        public string ImagePath { get { return m_imagePath; } }
         private readonly string m_journalPath;
         private readonly string m_applyingPath;
         private string m_fingerprint;
@@ -29,7 +30,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public SdImageSessionStream(Stream source, string imagePath)
         {
-            if (source == null || !source.CanRead || !source.CanWrite ||
+            if (source == null || !source.CanRead ||
                 !source.CanSeek || source.Length % SectorSize != 0)
                 throw new ArgumentException("The SD image stream is invalid.");
             m_source = source;
@@ -37,13 +38,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             m_fingerprint = Fingerprint();
             var folder = SdSessionStorage.GetDirectory("Images");
             Directory.CreateDirectory(folder);
-            var name = Hash(m_imagePath.ToUpperInvariant());
+            // A new run uses current source contents, never a stale relocated overlay.
+            var name = Guid.NewGuid().ToString("N");
             m_journalPath = Path.Combine(folder, name + ".journal");
             m_applyingPath = Path.Combine(folder, name + ".applying");
-            if (File.Exists(m_journalPath))
-                Recover();
-            else if (File.Exists(m_applyingPath))
-                File.Delete(m_applyingPath);
         }
 
         public bool HasChanges { get { return m_changed.Count != 0; } }
@@ -250,6 +248,30 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     StringComparison.Ordinal))
                 throw new IOException("The source SD image changed outside the emulator.");
             Flush();
+            if (!PortablePaths.IsInternal(m_imagePath))
+            {
+                var target = PortablePaths.NewSavePath(Path.ChangeExtension(m_imagePath, ".img"), "SD-Images");
+                var position = m_position;
+                try
+                {
+                    PortablePaths.WriteAtomic(target, output =>
+                    {
+                        m_position = 0;
+                        var buffer = new byte[65536];
+                        int count;
+                        while ((count = Read(buffer, 0, buffer.Length)) != 0) output.Write(buffer, 0, count);
+                    });
+                }
+                finally { m_position = position; }
+                var replacement = File.Open(target, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                m_source.Dispose();
+                m_source = replacement;
+                m_imagePath = target;
+                ClearJournal();
+                m_fingerprint = Fingerprint();
+                Logger.Info("External SD image saved locally: {0}", target);
+                return;
+            }
             File.WriteAllText(m_applyingPath, m_imagePath);
             ApplyChangedSectors();
             ClearJournal();
@@ -303,6 +325,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     m_journal = null;
                 }
                 m_source.Dispose();
+                ClearJournal();
             }
             base.Dispose(disposing);
         }

@@ -150,7 +150,7 @@ namespace ZXMAK2.Hardware.Evo
                 var sectors = Utils.GetXmlAttributeAsUInt32(itemNode, "ideSectors", 63);
                 var lba = Utils.GetXmlAttributeAsUInt32(itemNode, "ideLba", 20160);
                 m_ata.Devices[0].DeviceInfo.Configure(
-                    image, readOnly, cylinders, heads, sectors, lba);
+                    PortablePaths.Resolve(image), readOnly, cylinders, heads, sectors, lba);
             }
 
             // BusManager may reuse this device instance while applying a
@@ -189,7 +189,7 @@ namespace ZXMAK2.Hardware.Evo
             Utils.SetXmlAttribute(itemNode, "logIo", LogIo);
             var info = HardDisk;
             Utils.SetXmlAttribute(itemNode, "ideConfigured", true);
-            Utils.SetXmlAttribute(itemNode, "ideImage", info.FileName ?? string.Empty);
+            Utils.SetXmlAttribute(itemNode, "ideImage", PortablePaths.Store(info.FileName));
             Utils.SetXmlAttribute(itemNode, "ideReadOnly", info.ReadOnly);
             Utils.SetXmlAttribute(itemNode, "ideCylinders", info.Cylinders);
             Utils.SetXmlAttribute(itemNode, "ideHeads", info.Heads);

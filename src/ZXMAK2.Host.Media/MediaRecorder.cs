@@ -42,6 +42,7 @@ namespace ZXMAK2.Host.Media
             CheckUnmanagedReference("swscale-2.dll");
 
             _fileNameMP4 = Path.GetFullPath(fileName);
+            PortablePaths.RequireInternal(_fileNameMP4);
             _fileNameWAV = Path.ChangeExtension(_fileNameMP4, ".wav");
             _width = width;
             _height = height;
@@ -245,7 +246,7 @@ namespace ZXMAK2.Host.Media
 
         private static void CheckUnmanagedReference(string fileName)
         {
-            var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var path = Path.Combine(PortablePaths.Root, "Lib", "Native");
             if (!File.Exists(Path.Combine(path, fileName)))
             {
                 throw new FileNotFoundException(string.Format("{0} is missing!", fileName));

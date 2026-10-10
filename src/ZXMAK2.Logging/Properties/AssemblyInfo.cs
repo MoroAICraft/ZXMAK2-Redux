@@ -34,4 +34,4 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyVersion("0.0.0.0")]
 [assembly: AssemblyFileVersion("0.0.0.0")]
 
-[assembly: log4net.Config.XmlConfigurator(ConfigFile = "log4net.config", Watch = true)]
+// Logger configures the portable destination explicitly before first use.

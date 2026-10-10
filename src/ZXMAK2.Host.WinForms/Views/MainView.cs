@@ -1217,6 +1217,10 @@ namespace ZXMAK2.Host.WinForms.Views
                 else
                 {
                     var size = new Size(RenderSize.Width, RenderSize.Height + shift);
+                    var available = Screen.FromControl(this).WorkingArea;
+                    var frame = SizeFromClientSize(Size.Empty);
+                    size = new Size(Math.Min(size.Width, Math.Max(256, available.Width - frame.Width)),
+                        Math.Min(size.Height, Math.Max(192, available.Height - frame.Height)));
                     if (ClientSize != size)
                     {
                         ClientSize = size;
@@ -1720,6 +1724,7 @@ namespace ZXMAK2.Host.WinForms.Views
                 return;
             }
             RefreshMediaToolbarStates();
+            PortablePaths.ReleaseInstance();
             Application.Restart();
             Close();
         }

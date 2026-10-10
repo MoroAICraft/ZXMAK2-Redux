@@ -22,7 +22,7 @@ namespace ZXMAK2.Hardware.Evo
     /// conditions of the old, unused background-thread prototype.
     /// </summary>
     public sealed class NeoGsDevice : SoundDeviceBase, ISoundMixerConfiguration,
-        IMediaStatusDevice, ISecureDigitalMediaStatus
+        IMediaStatusDevice, ISecureDigitalMediaStatus, IWritableSdSession
     {
         private const string RomResourceName =
             "ZXMAK2.Hardware.Resources.NeoGS-1.11.rom";
@@ -108,9 +108,39 @@ namespace ZXMAK2.Hardware.Evo
             get { return m_sdImageFileName ?? string.Empty; }
             set
             {
+                if (!m_sandbox && m_sdCard != null && !PrepareForMediaChange()) return;
                 m_sdImageFileName = value ?? string.Empty;
                 if (!m_sandbox && m_sdCard != null)
                     RestoreConfiguredCard();
+            }
+        }
+
+        public string RestoreWarning { get { return null; } }
+        public void PromptForRecoveredSession() { }
+        public bool HasPendingChanges
+        {
+            get { lock (m_sdSync) return m_sdCard != null && m_sdCard.ImageSessionStream != null && m_sdCard.ImageSessionStream.HasChanges; }
+        }
+        public bool PrepareForMediaChange()
+        {
+            lock (m_sdSync)
+            {
+                var session = m_sdCard == null ? null : m_sdCard.ImageSessionStream;
+                if (session == null || !session.HasChanges) return true;
+                var query = Locator.Resolve<IUserQuery>();
+                var actions = query as IActionUserQuery;
+                const string message = "NeoGS SD has unsaved changes. External images are saved as local copies.";
+                var result = actions != null ? actions.ShowActions(message, "NeoGS SD changes", "Save", "Discard", "Cancel") :
+                    query.Show(message, "NeoGS SD changes", DlgButtonSet.YesNoCancel, DlgIcon.Question);
+                if (result == DlgResult.Yes)
+                {
+                    session.CommitChanges();
+                    m_sdImageFileName = session.ImagePath;
+                    OnConfigChanged();
+                }
+                else if (result == DlgResult.No) session.DiscardChanges();
+                else return false;
+                return true;
             }
         }
 
@@ -237,7 +267,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             base.OnConfigSave(itemNode);
             Utils.SetXmlAttribute(
-                itemNode, "sdImage", m_sdImageFileName ?? string.Empty);
+                itemNode, "sdImage", PortablePaths.Store(m_sdImageFileName));
         }
 
         private bool SdCommandCanExecute(object arg)
@@ -263,6 +293,7 @@ namespace ZXMAK2.Hardware.Evo
                 if (dialog.ShowDialog(arg) != DlgResult.OK)
                     return;
 
+                if (!PrepareForMediaChange()) return;
                 var previous = m_sdImageFileName;
                 m_sdImageFileName = Path.GetFullPath(dialog.FileName);
                 RestoreConfiguredCard();
@@ -287,6 +318,7 @@ namespace ZXMAK2.Hardware.Evo
         {
             try
             {
+                if (!PrepareForMediaChange()) return;
                 m_sdImageFileName = string.Empty;
                 RestoreConfiguredCard();
                 m_ejectSdCommand.NotifyExecutedSuccessfully();
@@ -964,11 +996,11 @@ namespace ZXMAK2.Hardware.Evo
                 m_sdCard.Close();
                 m_sdReceived = 0xFF;
                 if (string.IsNullOrEmpty(m_sdImageFileName) ||
-                    !File.Exists(m_sdImageFileName))
+                    !File.Exists(PortablePaths.Resolve(m_sdImageFileName)))
                     return;
                 try
                 {
-                    m_sdCard.Open(m_sdImageFileName);
+                    m_sdCard.Open(PortablePaths.Resolve(m_sdImageFileName));
                 }
                 catch (IOException)
                 {

@@ -139,9 +139,9 @@ namespace ZXMAK2.Hardware.General
                     fileName = Utils.GetXmlAttributeAsString(node, "fileName", fileName);
                 }
                 // will be opened on Connect
-                m_wd.FDD[i].FileName = fileName;
+                m_wd.FDD[i].FileName = PortablePaths.Resolve(fileName);
                 m_wd.FDD[i].IsWP = readOnly;
-                m_wd.FDD[i].Present = inserted;
+                m_wd.FDD[i].Present = inserted && (string.IsNullOrEmpty(fileName) || File.Exists(PortablePaths.Resolve(fileName)));
             }
         }
 
@@ -152,15 +152,15 @@ namespace ZXMAK2.Hardware.General
             Utils.SetXmlAttribute(itemNode, "logIo", LogIo);
             for (var i = 0; i < m_wd.FDD.Length; i++)
             {
-                if (m_wd.FDD[i].Present)
+                if (m_wd.FDD[i].Present || !string.IsNullOrEmpty(m_wd.FDD[i].FileName))
                 {
                     XmlNode xn = itemNode.AppendChild(itemNode.OwnerDocument.CreateElement("Drive"));
                     Utils.SetXmlAttribute(xn, "index", i);
-                    Utils.SetXmlAttribute(xn, "inserted", m_wd.FDD[i].Present);
+                    Utils.SetXmlAttribute(xn, "inserted", true);
                     Utils.SetXmlAttribute(xn, "readOnly", m_wd.FDD[i].IsWP);
                     if (!string.IsNullOrEmpty(m_wd.FDD[i].FileName))
                     {
-                        Utils.SetXmlAttribute(xn, "fileName", m_wd.FDD[i].FileName);
+                        Utils.SetXmlAttribute(xn, "fileName", PortablePaths.Store(m_wd.FDD[i].FileName));
                     }
                 }
             }

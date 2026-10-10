@@ -150,7 +150,7 @@ namespace ZXMAK2.Engine
 
         private static void PreLoadPlugins()
         {
-            var configName = Path.Combine(Utils.GetAppFolder(), "plugins.config");
+            var configName = PortablePaths.ConfigFile("plugins.config");
             if (!File.Exists(configName))
             {
                 return;
@@ -170,6 +170,14 @@ namespace ZXMAK2.Engine
                     continue;
                 }
                 var fileName = path.InnerXml;
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    fileName = PortablePaths.Resolve(fileName);
+                    if (!File.Exists(fileName))
+                        fileName = Path.Combine(PortablePaths.Root, "Lib", "Managed", Path.GetFileName(fileName));
+                    if (!PortablePaths.IsInternal(fileName))
+                        throw new InvalidDataException("Plugin must be inside the emulator folder: " + fileName);
+                }
                 if (string.IsNullOrEmpty(fileName) ||
                     !File.Exists(fileName))
                 {

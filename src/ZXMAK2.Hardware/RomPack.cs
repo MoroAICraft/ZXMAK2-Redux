@@ -12,17 +12,13 @@ namespace ZXMAK2.Hardware
     {
         private static long GetImageLength(string fileName)
         {
-            var folderName = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var folderName = PortablePaths.Root;
 
             // override
-            var romsFolderName = Path.Combine(folderName, "roms");
-            if (Directory.Exists(romsFolderName))
+            var overridePath = PortablePaths.FindRom(fileName);
+            if (!string.IsNullOrEmpty(overridePath))
             {
-                var romsFileName = Path.Combine(romsFolderName, fileName);
-                if (File.Exists(romsFileName))
-                {
-                    return new FileInfo(romsFileName).Length;
-                }
+                return new FileInfo(overridePath).Length;
             }
 
             var pakFileName = Path.Combine(folderName, "ROMS.PAK");
@@ -44,19 +40,15 @@ namespace ZXMAK2.Hardware
 
         private static Stream GetImageStream(string fileName)
         {
-            var folderName = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            var folderName = PortablePaths.Root;
 
             // override
-            var romsFolderName = Path.Combine(folderName, "roms");
-            if (Directory.Exists(romsFolderName))
+            var overridePath = PortablePaths.FindRom(fileName);
+            if (!string.IsNullOrEmpty(overridePath))
             {
-                var romsFileName = Path.Combine(romsFolderName, fileName);
-                if (File.Exists(romsFileName))
+                using (var fs = new FileStream(overridePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    using (var fs = new FileStream(romsFileName, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    {
-                        return CreateStream(fs, fs.Length);
-                    }
+                    return CreateStream(fs, fs.Length);
                 }
             }
 

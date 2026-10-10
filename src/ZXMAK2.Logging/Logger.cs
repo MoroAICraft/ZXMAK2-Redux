@@ -8,7 +8,21 @@ namespace ZXMAK2
 {
     public static class Logger
     {
-        private static readonly ILog _logger = LogManager.GetLogger("ZXMAK2");
+        private static readonly ILog _logger = Initialize();
+
+        private static ILog Initialize()
+        {
+            var config = PortablePaths.ConfigFile("log4net.config");
+            if (File.Exists(config))
+            {
+                var xml = new System.Xml.XmlDocument();
+                xml.Load(config);
+                foreach (System.Xml.XmlElement file in xml.SelectNodes("//appender/file"))
+                    file.SetAttribute("value", Path.Combine(PortablePaths.DataDirectory("Logs"), "ZXMAK2.log"));
+                log4net.Config.XmlConfigurator.Configure(xml.DocumentElement);
+            }
+            return LogManager.GetLogger("ZXMAK2");
+        }
         
         public static void Start()
         {

@@ -38,11 +38,11 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
         #region Load/Save settings
         private void LoadConfig()
         {
-            if (!File.Exists(Path.Combine(Utils.GetAppFolder(), FormCpu.ConfigXmlFileName)))
+            if (!File.Exists(PortablePaths.ConfigFile(FormCpu.ConfigXmlFileName)))
                 return;
 
             XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.Load(Path.Combine(Utils.GetAppFolder(), FormCpu.ConfigXmlFileName));
+            xmlDoc.Load(PortablePaths.ConfigFile(FormCpu.ConfigXmlFileName));
 
             //Tcp->Proxy enabled
             XmlNode node = xmlDoc.DocumentElement.SelectSingleNode("/Root/Assembler/Settings/Tcp");

@@ -331,7 +331,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
 
         private bool ValidateCompile()
         {
-            Directory.SetCurrentDirectory(Utils.GetAppFolder());
+            // Keep host CWD unchanged; resolve portable paths explicitly.
             if (!File.Exists(@"Pasmo2.dll"))
             {
                 Locator.Resolve<IUserMessage>().Error(
@@ -1009,7 +1009,8 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
             {
                 if (i_fileName == String.Empty)
                     i_fileName = "code_save.asm";
-                File.WriteAllText(Path.Combine(Utils.GetAppFolder(),i_fileName), this.txtAsm.Text);
+                PortablePaths.RequireInternal(PortablePaths.Resolve(i_fileName));
+                File.WriteAllText(PortablePaths.Resolve(i_fileName), this.txtAsm.Text);
 
                 //Locator.Resolve<IUserMessage>().Info("File " + i_fileName + " saved!");
                 this.richCompileMessages.AppendInfo("File " + i_fileName + " saved!");
@@ -1131,7 +1132,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
                 {
                     string newFileWithFullPath = GetFileDirectory() + i_newName;
                     if (File.Exists(_fileName))
-                        File.Move(_fileName, newFileWithFullPath);
+                        { PortablePaths.RequireInternal(_fileName); PortablePaths.RequireInternal(newFileWithFullPath); File.Move(_fileName, newFileWithFullPath); }
                     else
                         SetIsSaved(false);
                     _sourceName = i_newName;
@@ -1298,11 +1299,11 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
         }
         public void LoadConfig()
         {
-            if (!File.Exists(Path.Combine(Utils.GetAppFolder(), FormCpu.ConfigXmlFileName)))
+            if (!File.Exists(PortablePaths.ConfigFile(FormCpu.ConfigXmlFileName)))
                 return;
 
             XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.Load(Path.Combine(Utils.GetAppFolder(), FormCpu.ConfigXmlFileName));
+            xmlDoc.Load(PortablePaths.ConfigFile(FormCpu.ConfigXmlFileName));
 
             //comments
             XmlNode node = xmlDoc.DocumentElement.SelectSingleNode("/Root/Assembler/Colors/CommentStyle");

@@ -194,15 +194,10 @@ namespace ZXMAK2.Hardware.Evo
 
         private static string FindRomPath()
         {
-            string appFolder = Utils.GetAppFolder();
             foreach (string name in RomNames)
             {
-                string direct = Path.Combine(appFolder, name);
-                if (File.Exists(direct))
-                    return direct;
-                string inRoms = Path.Combine(appFolder, "roms", name);
-                if (File.Exists(inRoms))
-                    return inRoms;
+                var path = PortablePaths.FindRom(name);
+                if (!string.IsNullOrEmpty(path)) return path;
             }
             return string.Empty;
         }
@@ -231,17 +226,26 @@ namespace ZXMAK2.Hardware.Evo
 
         private static string GetFlashPath(byte[] rom)
         {
-            // Keep the supplied Yamaha image untouched. Each portable install
-            // and factory ROM has its own persistent virtual flash.
+            // Keep Yamaha ROM untouched; identity survives moving/renaming the install.
             using (var hash = SHA256.Create())
             {
                 var sourceId = BitConverter.ToString(hash.ComputeHash(rom)).Replace("-", "");
-                var installId = BitConverter.ToString(hash.ComputeHash(
-                    System.Text.Encoding.UTF8.GetBytes(Utils.GetAppFolder().ToUpperInvariant())))
-                    .Replace("-", "").Substring(0, 16);
-                return Path.Combine(Environment.GetFolderPath(
-                    Environment.SpecialFolder.LocalApplicationData), "ZXMAK2",
-                    "MoonSoundFlash", installId + "-" + sourceId + ".bin");
+                var target = Path.Combine(PortablePaths.DataDirectory("State\\MoonSound"), sourceId + ".bin");
+                if (!File.Exists(target))
+                {
+                    var installId = BitConverter.ToString(hash.ComputeHash(
+                        System.Text.Encoding.UTF8.GetBytes(PortablePaths.Root.ToUpperInvariant())))
+                        .Replace("-", "").Substring(0, 16);
+                    var legacy = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "ZXMAK2", "MoonSoundFlash", installId + "-" + sourceId + ".bin");
+                    if (File.Exists(legacy) && new FileInfo(legacy).Length == RomSize)
+                    {
+                        PortablePaths.WriteAtomic(target, output =>
+                        { using (var input = File.OpenRead(legacy)) input.CopyTo(output); });
+                        Logger.Info("Imported matching legacy MoonSound flash; original retained: {0}", legacy);
+                    }
+                }
+                return target;
             }
         }
 

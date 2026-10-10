@@ -267,8 +267,7 @@ namespace ZXMAK2.Host.Presentation
             {
                 // Stop before testing dirty state. After accepting close the
                 // guest must not write again between confirmation and disposal.
-                var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
-                accepted = sd == null || sd.PrepareForMediaChange();
+                accepted = m_vm.Bus.FindDevices<IWritableSdSession>().All(sd => sd.PrepareForMediaChange());
                 return accepted;
             }
             catch (Exception ex)
@@ -288,9 +287,7 @@ namespace ZXMAK2.Host.Presentation
         {
             get
             {
-                var sd = m_vm == null ? null :
-                    m_vm.Bus.FindDevice<IWritableSdSession>();
-                return sd != null && sd.HasPendingChanges;
+                return m_vm != null && m_vm.Bus.FindDevices<IWritableSdSession>().Any(sd => sd.HasPendingChanges);
             }
         }
 
@@ -622,8 +619,7 @@ namespace ZXMAK2.Host.Presentation
             {
                 m_vm.SaveConfigAs(fileName);
             }
-            var sdSession = m_vm.Bus.FindDevice<IWritableSdSession>();
-            if (sdSession != null)
+            foreach (var sdSession in m_vm.Bus.FindDevices<IWritableSdSession>())
             {
                 if (!string.IsNullOrEmpty(sdSession.RestoreWarning))
                     m_userMessage.Warning(sdSession.RestoreWarning);
@@ -1191,8 +1187,7 @@ namespace ZXMAK2.Host.Presentation
             m_vm.DoStop();
             try
             {
-                var sd = m_vm.Bus.FindDevice<IWritableSdSession>();
-                if (sd != null && !sd.PrepareForMediaChange())
+                if (!m_vm.Bus.FindDevices<IWritableSdSession>().All(sd => sd.PrepareForMediaChange()))
                     return;
                 m_vm.Bus.LoadConfigXml(busNode);
                 m_vm.DoReset();

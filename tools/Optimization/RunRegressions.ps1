@@ -2,7 +2,10 @@ param([string]$Package = 'L:\Work_two\ZX\ZXMAK2-v80-ZXEVO-BC-Optimization-Test-2
 $ErrorActionPreference = 'Stop'
 $taskRelease = "$Package\release"
 $taskCsc = 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe'
-$taskRefs = @(Get-ChildItem -LiteralPath $taskRelease -Filter 'ZXMAK2*.dll' | ForEach-Object { '/r:' + $_.FullName })
+$taskManaged = if (Test-Path "$taskRelease\Lib\Managed") { "$taskRelease\Lib\Managed" } else { $taskRelease }
+$taskRefs = @(Get-ChildItem -LiteralPath $taskManaged -Filter 'ZXMAK2*.dll' | ForEach-Object { '/r:' + $_.FullName })
+$taskPreviousPath = $env:PATH
+$env:PATH = "$taskRelease\Lib\Native;" + $env:PATH
 $taskProbes = [ordered]@{
     KeyboardRouting = 'tools\BaseConfInputAudioTest\KeyboardRoutingProbe.cs'
     PrintScreenNmiProbe = 'tools\BaseConfInputAudioTest\PrintScreenNmiProbe.cs'
@@ -27,8 +30,8 @@ try {
     foreach ($taskEntry in $taskProbes.GetEnumerator()) {
         $taskExe = "$taskRelease\$($taskEntry.Key).exe"
         $taskLog = "$Package\diagnostics\regression-$($taskEntry.Key).txt"
-        if ($taskEntry.Key -eq 'SdWriteProtocol') { & $taskExe "$taskRelease\ZXMAK2.Hardware.Circuits.dll" *> $taskLog }
-        elseif ($taskEntry.Key -eq 'RefreshFolder') { & $taskExe "$Package\diagnostics" *> $taskLog }
+        if ($taskEntry.Key -eq 'SdWriteProtocol') { & $taskExe "$taskManaged\ZXMAK2.Hardware.Circuits.dll" *> $taskLog }
+        elseif ($taskEntry.Key -eq 'RefreshFolder') { & $taskExe "$taskRelease\Data\Temp" *> $taskLog }
         elseif ($taskEntry.Key -in @('KeyboardRouting','PrintScreenNmiProbe','TapeClock','SdLifecycleProbe','PentEvoProfile')) { & $taskExe *> $taskLog }
         else { & $taskExe $taskRelease *> $taskLog }
         if ($LASTEXITCODE -ne 0) { Get-Content $taskLog -Tail 15; throw "Regression failed: $($taskEntry.Key)" }
@@ -43,4 +46,4 @@ try {
     & '.\Test.exe' *> "$Package\diagnostics\full-benchmark.txt"
     if ($LASTEXITCODE -ne 0) { throw 'Full Test/ULA/benchmark failed' }
     Write-Output 'PASS: full Test/ULA/benchmark.'
-} finally { Pop-Location }
+} finally { Pop-Location; $env:PATH = $taskPreviousPath }

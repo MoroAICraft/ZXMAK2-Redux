@@ -801,9 +801,7 @@ namespace ZXMAK2.Engine
 
         private static bool CheckIsLocalAssembly(Assembly asm)
         {
-            var asmPath = Path.GetDirectoryName(Path.GetFullPath(asm.Location));
-            var localPath = Path.GetDirectoryName(Path.GetFullPath(Assembly.GetExecutingAssembly().Location));
-            return string.Compare(asmPath, localPath, true) == 0;
+            return PortablePaths.IsInternal(asm.Location);
         }
 
         private static Type GetTypeByName(string fullTypeName, string oldAsmName)

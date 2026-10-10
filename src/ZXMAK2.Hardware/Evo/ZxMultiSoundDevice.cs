@@ -797,12 +797,7 @@ namespace ZXMAK2.Hardware.Evo
                 return;
             if (m_isMax)
             {
-                var appFolder = Utils.GetAppFolder();
-                var path = Path.Combine(appFolder, "roms",
-                    "ZX-MultiSound-Max-GS.bin");
-                if (!File.Exists(path))
-                    path = Path.Combine(appFolder,
-                        "ZX-MultiSound-Max-GS.bin");
+                var path = PortablePaths.FindRom("ZX-MultiSound-Max-GS.bin");
                 var firmware = File.Exists(path)
                     ? File.ReadAllBytes(path)
                     : RomPack.GetRomData("ZX-MultiSound-Max-GS.bin");

@@ -51,7 +51,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
                 return;
             }
 
-            var fullPath = Path.GetFullPath(fileName);
+            var fullPath = PortablePaths.Resolve(fileName);
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException("HDD image not found", fullPath);
@@ -81,7 +81,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
 
             var attributes = File.GetAttributes(fullPath);
             var effectiveReadOnly = readOnly || (attributes & FileAttributes.ReadOnly) != 0;
-            if (!effectiveReadOnly)
+            if (!effectiveReadOnly && PortablePaths.IsInternal(fullPath))
             {
                 try
                 {
@@ -256,15 +256,11 @@ namespace ZXMAK2.Hardware.Circuits.Ata
         
         public void Save(string fileName)
         {
+            PortablePaths.RequireInternal(fileName);
             XmlDocument xml = new XmlDocument();
             XmlNode root = xml.AppendChild(xml.CreateElement("IdeDiskDescriptor"));
             XmlNode imageNode = root.AppendChild(xml.CreateElement("Image"));
-            string imageFile = FileName ?? string.Empty;
-            if (imageFile != string.Empty &&
-                Path.GetDirectoryName(imageFile) == Path.GetDirectoryName(fileName))
-            {
-                imageFile = Path.GetFileName(imageFile);
-            }
+            string imageFile = IsCdrom ? FileName ?? string.Empty : PortablePaths.Store(FileName);
             Utils.SetXmlAttribute(imageNode, "fileName", imageFile);
             Utils.SetXmlAttribute(imageNode, "isReadOnly", ReadOnly);
             Utils.SetXmlAttribute(imageNode, "isCdrom", IsCdrom);
@@ -276,7 +272,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
             Utils.SetXmlAttribute(geometryNode, "heads", Heads);
             Utils.SetXmlAttribute(geometryNode, "sectors", Sectors);
             Utils.SetXmlAttribute(geometryNode, "lba", Lba);
-            xml.Save(fileName);
+            PortablePaths.WriteAtomic(fileName, stream => xml.Save(stream));
         }
 
         public void Load(string fileName)
@@ -288,7 +284,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
             XmlNode geometryNode = root["Geometry"];
             FileName = Utils.GetXmlAttributeAsString(imageNode, "fileName", FileName ?? string.Empty);
             if (FileName != string.Empty && !Path.IsPathRooted(FileName))
-                FileName = Utils.GetFullPathFromRelativePath(FileName, Path.GetDirectoryName(fileName));
+                FileName = PortablePaths.Resolve(FileName);
             SerialNumber = Utils.GetXmlAttributeAsString(imageNode, "serial", SerialNumber);
             FirmwareRevision = Utils.GetXmlAttributeAsString(imageNode, "revision", FirmwareRevision);
             ModelNumber = Utils.GetXmlAttributeAsString(imageNode, "model", ModelNumber);
@@ -304,5 +300,7 @@ namespace ZXMAK2.Hardware.Circuits.Ata
         {
             return Assembly.GetExecutingAssembly().GetName().Version.Revision.ToString();
         }
+
+        internal void UseSavedImage(string path) { FileName = path; }
     }
 }

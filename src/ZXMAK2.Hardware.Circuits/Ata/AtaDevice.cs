@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using System.IO;
 
 
 namespace ZXMAK2.Hardware.Circuits.Ata
@@ -59,7 +60,12 @@ namespace ZXMAK2.Hardware.Circuits.Ata
 
         public AtaDeviceInfo DeviceInfo
         {
-            get { return _deviceInfo; }
+            get
+            {
+                if (!atapi && ata_p.IsLoaded() && !string.IsNullOrEmpty(ata_p.ImagePath))
+                    _deviceInfo.UseSavedImage(ata_p.ImagePath);
+                return _deviceInfo;
+            }
         }
 
         public void Open()
@@ -105,7 +111,8 @@ namespace ZXMAK2.Hardware.Circuits.Ata
             }
 
             var filedev = new PhysicalDeviceInfo();
-            filedev.filename = cfg.FileName;
+            filedev.filename = PortablePaths.Resolve(cfg.FileName);
+            if (!File.Exists(filedev.filename)) return;
             filedev.type = DEVTYPE.ATA_FILEHDD;
 
             bool success = false;

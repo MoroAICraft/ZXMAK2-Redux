@@ -37,6 +37,7 @@ namespace ZXMAK2.Host.Media
             CheckUnmanagedReference("swscale-2.dll");
 
             _fileName = Path.GetFullPath(fileName);
+            PortablePaths.RequireInternal(_fileName);
             _width = width;
             _height = height;
             _writer = new VideoFileWriter();
@@ -210,7 +211,7 @@ namespace ZXMAK2.Host.Media
 
         private static void CheckUnmanagedReference(string fileName)
         {
-            var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var path = Path.Combine(PortablePaths.Root, "Lib", "Native");
             if (!File.Exists(Path.Combine(path, fileName)))
             {
                 throw new FileNotFoundException(string.Format("{0} is missing!", fileName));

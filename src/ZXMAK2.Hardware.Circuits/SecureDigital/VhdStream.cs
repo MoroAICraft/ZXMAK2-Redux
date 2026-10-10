@@ -62,7 +62,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public static Stream Open(string fileName)
         {
-            var stream = File.Open(fileName, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            var stream = File.Open(fileName, FileMode.Open,
+                PortablePaths.IsInternal(fileName) ? FileAccess.ReadWrite : FileAccess.Read, FileShare.Read);
             try
             {
                 if (stream.Length < SectorSize)

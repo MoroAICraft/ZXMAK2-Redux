@@ -509,7 +509,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.GraphicsEditorView
             }
             if (fileOut != String.Empty)
             {
-                File.WriteAllText(Path.Combine(Utils.GetAppFolder(), "screen_bytes.asm"), fileOut);
+                File.WriteAllText(Path.Combine(PortablePaths.DataDirectory("Saves\\Debugger"), "screen_bytes.asm"), fileOut);
                 Locator.Resolve<IUserMessage>().Info("Sprite saved in screen_bytes.asm file !");
             }
             return true;
@@ -546,7 +546,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.GraphicsEditorView
                 }
             }
 
-            string filePath = Path.Combine(Utils.GetAppFolder(), fileName);
+            string filePath = Path.Combine(PortablePaths.DataDirectory("Saves\\Debugger"), fileName);
 
             if (File.Exists(filePath))
                 File.Delete(filePath);

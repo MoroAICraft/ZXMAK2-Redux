@@ -65,14 +65,14 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
         {
             if (pDllModule == IntPtr.Zero)
             {
-                pDllModule = LoadLibrary(Path.Combine(Utils.GetAppFolder(), "Pasmo2.dll"));
+                pDllModule = LoadLibrary(Path.Combine(PortablePaths.Root, "Lib", "Native", "Pasmo2.dll"));
             }
             if (pDllModule == IntPtr.Zero)
             {
                 Locator.Resolve<IUserMessage>()
                     .Error("Cannot load Pasmo2.dll...\n\nTrying to download it again.\n\nIf problem persists please download it manually from: http://pasmo2.codeplex.com/ \n\nPress OK please.");
 
-                File.Delete(Path.Combine(Utils.GetAppFolder(), "Pasmo2.dll"));
+                File.Delete(Path.Combine(PortablePaths.Root, "Lib", "Native", "Pasmo2.dll"));
 
                 TcpHelper client = new TcpHelper();
                 client.Show();
@@ -97,7 +97,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.AssemblerView
 
                             //string user = System.IO.File.GetAccessControl("Pasmo2.dll").GetOwner(typeof(System.Security.Principal.NTAccount)).ToString();
 
-                            //File.Delete(Path.Combine(Utils.GetAppFolder(), "Pasmo2.dll"));
+                            //File.Delete(Path.Combine(PortablePaths.Root, "Lib", "Native", "Pasmo2.dll"));
                         }
 
                         //TcpHelper client = new TcpHelper();

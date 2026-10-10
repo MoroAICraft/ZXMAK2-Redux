@@ -30,7 +30,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         private readonly Label[] extraLabels=new Label[3];
         private bool libraryDirty;
         private bool controllerConnected;
-        public static string ProfileLibraryPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"joystick-profiles.xml");
+        public static string ProfileLibraryPath=PortablePaths.ConfigFile("joystick-profiles.xml");
         private ComboBox cbxType,directions,autoFire,emulates;
         private readonly Label[] bindingLabels=new Label[6];
         private Label rateLabel;

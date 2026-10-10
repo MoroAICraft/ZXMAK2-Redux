@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Diagnostics;
 using System.Windows.Forms;
 using ZXMAK2.Dependency;
 using ZXMAK2.Host.Interfaces;
@@ -24,7 +25,7 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return;
             }
-            Help.ShowHelp(control, s_url);
+            Process.Start(new ProcessStartInfo(s_url) { UseShellExecute = true });
         }
 
         public void ShowHelp(object uiControl, HelpNavigator navigator)
@@ -34,7 +35,7 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return;
             }
-            Help.ShowHelp(control, s_url, navigator);
+            ShowHelp(control);
         }
 
         public void ShowHelp(object uiControl, string keyword)
@@ -44,7 +45,7 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return;
             }
-            Help.ShowHelp(control, s_url, keyword);
+            ShowHelp(control);
         }
 
         public void ShowHelp(Object uiControl, HelpNavigator command, object parameter)
@@ -54,7 +55,7 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return;
             }
-            Help.ShowHelp(control, s_url, command, parameter);
+            ShowHelp(control);
         }
 
         private static bool CheckUrl()
@@ -63,22 +64,12 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return true;
             }
-            var appName = Path.GetFullPath(Assembly.GetEntryAssembly().Location);
-            var helpFile = Path.ChangeExtension(appName, ".chm");
+            var helpFile = Path.Combine(PortablePaths.Root, "Docs", "Help", "index.html");
             if (!File.Exists(helpFile))
             {
                 Locator.Resolve<IUserMessage>()
                     .Error("Help file is missing");
                 return false;
-            }
-            if (helpFile.Contains("#")) //Path to .chm file must not contain # - Microsoft bug
-            {
-                var fileName = Path.GetRandomFileName() + ".chm";
-                var tmpFile = Path.Combine(Path.GetTempPath(), fileName);
-                File.Copy(helpFile, tmpFile);
-                s_url = tmpFile;
-                Application.ApplicationExit += (s, e) => File.Delete(tmpFile);
-                return true;
             }
             s_url = helpFile;
             return true;

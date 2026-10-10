@@ -50,6 +50,8 @@ namespace ZXMAK2.Serializers
             }
 
             var fileName = image.FileName;
+            if (!string.IsNullOrEmpty(fileName) && !PortablePaths.IsInternal(fileName))
+                fileName = PortablePaths.NewSavePath(fileName, "Floppy");
             if (!string.IsNullOrEmpty(fileName))
             {
                 var serializer = GetSerializer(Path.GetExtension(fileName));
@@ -58,8 +60,7 @@ namespace ZXMAK2.Serializers
             }
             if (string.IsNullOrEmpty(fileName))
             {
-                string folderName = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                folderName = Path.Combine(folderName, "Images");
+                string folderName = PortablePaths.DataDirectory("Saves\\Floppy");
                 for (int i = 0; i < 10001; i++)
                 {
                     fileName = string.Format("zxmak2image{0:D3}{1}", i, GetDefaultExtension());

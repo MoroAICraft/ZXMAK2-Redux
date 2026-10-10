@@ -343,6 +343,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public void CommitChanges(Action<string> afterSave)
         {
+            if (HasChanges && !PortablePaths.IsInternal(m_sourceFolder))
+            {
+                CommitExternalFolder(afterSave);
+                return;
+            }
             if (!HasChanges)
             {
                 if (afterSave != null) afterSave(null);
@@ -519,6 +524,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         public void ExportImage(string imagePath)
         {
             var target = Path.GetFullPath(imagePath);
+            PortablePaths.RequireInternal(target);
             if (target.StartsWith(m_sourceFolder.TrimEnd(
                     Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
                     StringComparison.OrdinalIgnoreCase))
@@ -571,6 +577,37 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 m_strictReads = previousStrict;
                 if (File.Exists(temporary))
                     File.Delete(temporary);
+            }
+        }
+
+        private void RebaseSourcePaths(Node node, string previous, string target)
+        {
+            node.FullPath = target + node.FullPath.Substring(previous.Length);
+            foreach (var child in node.Children) RebaseSourcePaths(child, previous, target);
+        }
+
+        private void CommitExternalFolder(Action<string> afterSave)
+        {
+            // Copy only on explicit Save. Start with the CURRENT PC tree, then
+            // apply the existing selective, conflict-checked guest transaction.
+            var previous = m_sourceFolder;
+            var target = PortablePaths.NewSavePath(previous, "SD-Folders");
+            PortablePaths.CopyDirectory(previous, target);
+            CloseCachedFile();
+            RebaseSourcePaths(m_root, previous, target);
+            m_sourceFolder = target;
+            try
+            {
+                CommitChanges(afterSave);
+                Logger.Info("External SD folder saved locally: {0}", target);
+            }
+            catch
+            {
+                CloseCachedFile();
+                RebaseSourcePaths(m_root, target, previous);
+                m_sourceFolder = previous;
+                Logger.Warn("External SD save failed; source/session retained. Unused local copy: {0}", target);
+                throw;
             }
         }
     }

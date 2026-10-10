@@ -87,8 +87,7 @@ namespace ZXMAK2.Serializers
 
 		public string SaveFileName(string fileName)
 		{
-			using (FileStream stream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Read))
-				saveStream(stream, Path.GetExtension(fileName).ToUpper(), fileName);
+            PortablePaths.WriteAtomic(fileName, stream => saveStream(stream, Path.GetExtension(fileName).ToUpper(), fileName));
 			return Path.GetFileName(fileName);
 		}
 

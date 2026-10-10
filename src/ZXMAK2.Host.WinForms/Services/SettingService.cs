@@ -1,5 +1,9 @@
 ﻿using System;
 using Microsoft.Win32;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Xml;
 using ZXMAK2.Host.WinForms.Controls;
 using ZXMAK2.Host.Entities;
 using ZXMAK2.Host.WinForms.Tools;
@@ -11,6 +15,58 @@ namespace ZXMAK2.Host.WinForms.Services
     public class SettingService : ISettingService
     {
         private const string RegistryPath = "SOFTWARE\\ZXMAK2";
+        private readonly Dictionary<string, int> m_values = new Dictionary<string, int>();
+        private readonly object m_sync = new object();
+        private readonly string m_path = PortablePaths.ConfigFile("interface.xml");
+
+        public SettingService()
+        {
+            if (File.Exists(m_path))
+            {
+                try
+                {
+                    var xml = new XmlDocument();
+                    xml.Load(m_path);
+                    foreach (XmlElement node in xml.SelectNodes("/Interface/Value"))
+                    {
+                        int value;
+                        if (int.TryParse(node.GetAttribute("value"), NumberStyles.Integer,
+                            CultureInfo.InvariantCulture, out value)) m_values[node.GetAttribute("name")] = value;
+                    }
+                }
+                catch (Exception ex) { Logger.Error(ex, "Portable interface settings could not be read; original retained"); }
+                return;
+            }
+            // One-time read-only import. Never create or write a registry key.
+            using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath, false))
+            {
+                if (key != null)
+                    foreach (var name in new[] { "WindowWidth", "WindowHeight", "ViewShowToolBar", "ViewShowStatusBar",
+                        "SyncSource", "RenderScaleMode", "RenderNoBorder", "RenderVideoFilter", "RenderSmoothing",
+                        "RenderMimicTv", "RenderDisplayIcon", "RenderDebugInfo" })
+                    {
+                        var value = key.GetValue(name);
+                        if (value is int) m_values[name] = (int)value;
+                    }
+            }
+            try { Persist(); }
+            catch (Exception ex) { Logger.Error(ex, "Cannot create portable interface settings"); }
+        }
+
+        private void Persist()
+        {
+            var xml = new XmlDocument();
+            var root = xml.CreateElement("Interface");
+            xml.AppendChild(root);
+            foreach (var pair in m_values)
+            {
+                var node = xml.CreateElement("Value");
+                node.SetAttribute("name", pair.Key);
+                node.SetAttribute("value", pair.Value.ToString(CultureInfo.InvariantCulture));
+                root.AppendChild(node);
+            }
+            PortablePaths.WriteAtomic(m_path, stream => xml.Save(stream));
+        }
 
         
         public int WindowWidth
@@ -207,24 +263,10 @@ namespace ZXMAK2.Host.WinForms.Services
 
         private int GetValue(string name, int defValue)
         {
-            try
+            lock (m_sync)
             {
-                var rkey = Registry.CurrentUser.CreateSubKey(RegistryPath);
-                if (rkey == null)
-                {
-                    return defValue;
-                }
-                var objValue = rkey.GetValue(name);
-                if (objValue == null)
-                {
-                    return defValue;
-                }
-                return Convert.ToInt32(objValue);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex);
-                return defValue;
+                int value;
+                return m_values.TryGetValue(name, out value) ? value : defValue;
             }
         }
 
@@ -232,12 +274,13 @@ namespace ZXMAK2.Host.WinForms.Services
         {
             try
             {
-                var rkey = Registry.CurrentUser.CreateSubKey(RegistryPath);
-                if (rkey == null)
+                lock (m_sync)
                 {
-                    return;
+                    int previous;
+                    if (m_values.TryGetValue(name, out previous) && previous == value) return;
+                    m_values[name] = value;
+                    Persist();
                 }
-                rkey.SetValue(name, value, RegistryValueKind.DWord);
             }
             catch (Exception ex)
             {

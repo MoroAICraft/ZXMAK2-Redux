@@ -14,6 +14,17 @@ namespace ZXMAK2.Host.WinForms.Services
         {
             _hostDialog = new System.Windows.Forms.SaveFileDialog();
             _hostDialog.SupportMultiDottedExtensions = true;
+            _hostDialog.InitialDirectory = PortablePaths.DataDirectory("Saves");
+            _hostDialog.RestoreDirectory = true;
+            _hostDialog.FileOk += (s, e) =>
+            {
+                if (!PortablePaths.IsInternal(_hostDialog.FileName))
+                {
+                    e.Cancel = true;
+                    System.Windows.Forms.MessageBox.Show("Choose a destination inside the emulator folder.\n" + PortablePaths.Root,
+                        "Portable save", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+                }
+            };
         }
 
         public void Dispose()

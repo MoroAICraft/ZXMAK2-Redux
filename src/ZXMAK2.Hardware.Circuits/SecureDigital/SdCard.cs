@@ -57,7 +57,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public string MountedFileName
         {
-            get { return mountedFileName; }
+            get { return HostFolderStream != null ? HostFolderStream.SourceFolder :
+                ImageSessionStream != null ? ImageSessionStream.ImagePath : mountedFileName; }
         }
 
         public bool IsReadOnly
@@ -169,7 +170,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             return File.Open(
                 fileName,
                 FileMode.Open,
-                FileAccess.ReadWrite,
+                PortablePaths.IsInternal(fileName) ? FileAccess.ReadWrite : FileAccess.Read,
                 FileShare.Read);
         }
 

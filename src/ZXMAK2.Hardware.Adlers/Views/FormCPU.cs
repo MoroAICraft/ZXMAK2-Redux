@@ -623,7 +623,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
 
             if (dissassembly != String.Empty)
             {
-                File.WriteAllText(Path.Combine(Utils.GetAppFolder(), "dis.asm"), dissassembly);
+                File.WriteAllText(Path.Combine(PortablePaths.DataDirectory("Saves\\Debugger"), "dis.asm"), dissassembly);
                 Locator.Resolve<IUserMessage>().Info("File dis.asm saved!");
             }
             else
@@ -668,7 +668,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
 
             if (memBytes != String.Empty)
             {
-                File.WriteAllText("membytes.asm", memBytes);
+                File.WriteAllText(Path.Combine(PortablePaths.DataDirectory("Saves\\Debugger"), "membytes.asm"), memBytes);
                 Locator.Resolve<IUserMessage>().Info("File membytes.asm saved!");
             }
             else
@@ -939,6 +939,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
                 byte[] data = new byte[s_len];
                 m_spectrum.ReadMemory((ushort)s_addr, data, 0, s_len);
 
+                PortablePaths.RequireInternal(saveDialog.FileName);
                 using (FileStream fs = new FileStream(saveDialog.FileName, FileMode.Create, FileAccess.Write, FileShare.Read))
                     fs.Write(data, 0, data.Length);
             }
@@ -1591,6 +1592,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
                 if (saveDialog.FileName == null || saveDialog.FileName.Length == 0)
                     return;
 
+            PortablePaths.RequireInternal(saveDialog.FileName);
             using (XmlWriter writer = XmlWriter.Create(saveDialog.FileName))
             {
                 writer.WriteStartElement("Root");
@@ -2273,7 +2275,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
         private XmlNode _xmlNode_SavedAssemblerSettings = null;
         private void SaveConfig()
         {
-            XmlWriter writer = XmlWriter.Create(Path.Combine(Utils.GetAppFolder(), ConfigXmlFileName));
+            XmlWriter writer = XmlWriter.Create(PortablePaths.ConfigFile(ConfigXmlFileName));
             //using (XmlWriter writer = XmlWriter.Create(Path.Combine(Utils.GetAppFolder(), configXmlFileName)))
             {
                 writer.WriteStartElement("Root");
@@ -2341,18 +2343,18 @@ namespace ZXMAK2.Hardware.Adlers.Views
 
         private void LoadConfig()
         {           
-            if (!File.Exists(Path.Combine(Utils.GetAppFolder(), ConfigXmlFileName)))
+            if (!File.Exists(PortablePaths.ConfigFile(ConfigXmlFileName)))
                 return;
 
             XmlDocument xmlDoc = new System.Xml.XmlDocument();
             try
             {
-                xmlDoc.Load(Path.Combine(Utils.GetAppFolder(), ConfigXmlFileName));
+                xmlDoc.Load(PortablePaths.ConfigFile(ConfigXmlFileName));
             }
             catch(XmlException)
             {
                 Locator.Resolve<IUserMessage>().Error("Configuration file is corrupted and will be deleted.");
-                File.Delete(Path.Combine(Utils.GetAppFolder(), ConfigXmlFileName));
+                File.Delete(PortablePaths.ConfigFile(ConfigXmlFileName));
                 return;
             }
 
@@ -2465,7 +2467,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
             string strFileName = textBoxTraceFileName.Text;
             if (strFileName.Length == 0)
                 return;
-            string logFileName = Path.Combine(Utils.GetAppFolder(), strFileName);
+            string logFileName = Path.Combine(PortablePaths.DataDirectory("Logs"), strFileName);
             if (!File.Exists(logFileName))
                 return;
             System.Diagnostics.Process.Start(logFileName);

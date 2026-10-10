@@ -22,6 +22,13 @@ namespace Test
 	{
 		static void Main(string[] args)
 		{
+            PortableBootstrap.Initialize();
+            Run(args);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void Run(string[] args)
+        {
             if (args.Length >= 1 && args[0].ToLower() == "/zexall")
 			{
 				runZexall();
@@ -872,7 +879,7 @@ namespace Test
                     .Invoke(null, arguments);
             var rom = new byte[0x200000];
             for (int index = 0; index < rom.Length; index++) rom[index] = 0xFF;
-            var folder = Path.Combine(Path.GetTempPath(), "ZXMAK2-MoonFlash-" +
+            var folder = Path.Combine(ZXMAK2.PortablePaths.DataDirectory("Temp"), "ZXMAK2-MoonFlash-" +
                 Guid.NewGuid().ToString("N"));
             var path = Path.Combine(folder, "flash.bin");
             boardType.GetField("m_flashPath", hidden).SetValue(board, path);
@@ -2873,7 +2880,7 @@ namespace Test
         private static void TestHostFolderSd()
         {
             var root = Path.Combine(
-                Path.GetTempPath(),
+                ZXMAK2.PortablePaths.DataDirectory("Temp"),
                 "zxmak2-host-folder-sd-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             try

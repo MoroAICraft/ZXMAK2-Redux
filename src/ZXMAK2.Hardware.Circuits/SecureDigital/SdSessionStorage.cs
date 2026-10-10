@@ -8,7 +8,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
     {
         private static string AppFolder
         {
-            get { return Path.GetDirectoryName(typeof(SdSessionStorage).Assembly.Location); }
+            get { return PortablePaths.Root; }
         }
 
         public static string GetDirectory(string kind)
