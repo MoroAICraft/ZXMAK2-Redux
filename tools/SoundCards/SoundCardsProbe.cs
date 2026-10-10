@@ -159,6 +159,24 @@ static partial class SoundCardsProbe
             double freq=Frequency(data,rate);if(reference==0)reference=freq;Check(reference>100 && Math.Abs(freq-reference)<2,"Max pitch "+rate);
             Console.WriteLine("Max OPL3 {0}: {1:F3} Hz",rate,freq);
         }
+        foreach(int rate in new[]{44100,48000,96000})
+        {
+            string normal=null;
+            for(int split=0;split<2;split++)using(var f=new Fixture(2,rate,false))
+            {
+                var opl=((IAdditionalSoundRenderers)f.Board).SoundRenderers.Last();opl.Volume=100;
+                Action<int,int> write=(r,v)=>{f.Port(0xC4,(byte)r);f.Port(0xC5,(byte)v);};
+                write(0x20,1);write(0x23,1);write(0x60,0xF0);write(0x63,0xF0);write(0x80,0x77);write(0x83,0x77);write(0xA0,0x98);write(0xB0,0x31);
+                var pcm=new List<uint>();var render=opl.GetType().GetMethod("RenderTo",Private);
+                for(int frame=0;frame<20;frame++)
+                {
+                    if(split!=0)foreach(int target in new[]{1,3,17,48,237,500,rate/50})render.Invoke(opl,new object[]{target});
+                    f.Frame();pcm.AddRange(opl.AudioBuffer);
+                }
+                string hash=Hash(pcm.ToArray());if(normal==null)normal=hash;Check(hash==normal,"Max resampler chunk boundary "+rate);
+            }
+            Console.WriteLine("Max OPL3 {0}: identical PCM with irregular render chunks PASS",rate);
+        }
     }
     static void Paths()
     {
@@ -184,18 +202,22 @@ static partial class SoundCardsProbe
     }
     static void Benchmark()
     {
-        for(int old=1;old>=0;old--)using(var f=new Fixture(0,44100,old!=0))
+        string affinity=Environment.GetEnvironmentVariable("ZXMAK2_BENCH_AFFINITY");
+        if(!String.IsNullOrEmpty(affinity))Process.GetCurrentProcess().ProcessorAffinity=new IntPtr(Convert.ToInt64(affinity,16));
+        Console.WriteLine("Diagnostic CPU affinity={0}",affinity??"not pinned");
+        var order=Environment.GetEnvironmentVariable("ZXMAK2_SOUND_REVERSE")=="1"?new[]{0,1}:new[]{1,0};
+        foreach(bool active in new[]{false,true})foreach(int old in order)using(var f=new Fixture(0,44100,old!=0))
         {
-            for(int chip=0;chip<2;chip++){f.Select(chip,true);for(int channel=0;channel<3;channel++){
+            if(active)for(int chip=0;chip<2;chip++){f.Select(chip,true);for(int channel=0;channel<3;channel++){
                 int ch=channel;Tone((r,v)=>f.Reg(r==0x28?r:r+ch,r==0x28?(v|ch):v),0,7,0,0,31);}}
             for(int i=0;i<50;i++)f.Frame();var times=new List<double>();
             for(int run=0;run<3;run++){var watch=Stopwatch.StartNew();for(int i=0;i<300;i++)f.Frame();watch.Stop();times.Add(watch.Elapsed.TotalMilliseconds);}
-            Console.WriteLine("TSFM six active FM channels, 300 complete CPU/video/audio frames, median: {0} {1:F2} ms ({2})",old!=0?"legacy":"ymfm",times.OrderBy(t=>t).ElementAt(1),String.Join(",",times.Select(t=>t.ToString("F2"))));
+            Console.WriteLine("TSFM {0}, 300 complete CPU/video/audio frames, median: {1} {2:F2} ms ({3})",active?"six active FM channels":"idle/reset",old!=0?"legacy":"ymfm",times.OrderBy(t=>t).ElementAt(1),String.Join(";",times.Select(t=>t.ToString("F2"))));
         }
     }
     static int Main(string[] args)
     {
-        try {if(args.Length>0 && args[0]=="paths")Paths();else if(args.Length>0 && args[0]=="music")Music(args[1]);else {BoardChecks();CoreChecks();MaxChecks();Benchmark();}
+        try {if(args.Length>0 && args[0]=="paths")Paths();else if(args.Length>0 && args[0]=="music")Music(args[1]);else if(args.Length>0 && args[0]=="bench")Benchmark();else {BoardChecks();CoreChecks();MaxChecks();Benchmark();}
             Console.WriteLine("PASS: {0} assertions",checks);return 0;}catch(Exception e){Console.Error.WriteLine(e);return 1;}
     }
 }

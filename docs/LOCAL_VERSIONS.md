@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Новая сборка для проверки: **v87 Portable**, ветка `codex/portable-v87`.
+Новая сборка для проверки: **v88 Portable SoundCards**, ветка `codex/soundcards-v88`.
 Принятая контрольная версия и полный откат: **v84**.
 Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
@@ -20,10 +20,18 @@
 | v85 | `codex/sd-refresh-v85`, tag `zxmak2-v85-sd-refresh` | ZXMAK2-v85-ZXEVO-BC-SD-Refresh-Test-20261009 | Refresh с выборочным сохранением сессии, внешние PC-правки, штатный холодный старт; SD_REFRESH_V85.md |
 | v86 | `codex/release-v86-tape-sd`, tag `zxmak2-v86-tape-sd` | ZXMAK2-v86-ZXEVO-BC-Tape-SD-Test-20261010 | Два патча BC: Tape для REAL, правильные R1/CRC/data response SD; CPU/NMI не изменены; TAPE_SD_V86.md |
 | v87 | `codex/portable-v87`, tag `zxmak2-v87-portable-test` | ZXMAK2-v87-Portable-Test-20261010 | **ТОЛЬКО ТЕСТ**: переносимая структура, локальные настройки/flash/сохранения, защита внешних оригиналов, новый Help; PORTABLE_V87_REPORT.md |
+| v88 | `codex/soundcards-v88`, tag `zxmak2-v88-soundcards-test` | ZXMAK2-v88-Portable-SoundCards-Test-20261010 | **ТОЛЬКО ТЕСТ**: общее ymfm YM2203 для TSFM/MultiSound/Max/Omni, Max host-rate, IDE/CMOS paths; SOUNDCARDS_V88_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.
 Не переименовывать/удалять пользовательские ROM, музыку и образы.
+
+v88 продолжает исходники v87, не становится рабочей автоматически. Пользователь
+подтвердил замену YM2203 на ymfm с проверками, но приёмка сборки/переход к
+дальнейшей работе требуют отдельного подтверждения. В пакете baseline-v87,
+Full/Clean ZIP, исходники с OmniSound, обе Git history и V88_RELEASE_REPORT.md.
+MoonSound и отменённый v83 FIR не менялись/не включались. Нагрузка активного FM
+в локальном тесте снизилась, idle вырос на 0,09–0,17 мс/кадр; детали — в отчёте.
 
 v87 НЕ принята автоматически: обязательны явное подтверждение пользователя,
 что сборка работает, и отдельное согласие продолжать работу на ней. Принятая

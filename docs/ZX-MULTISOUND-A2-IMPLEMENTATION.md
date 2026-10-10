@@ -167,6 +167,17 @@ Manual mode exposes the four real switches.  A conflicting selection is not
 silently accepted: Apply reports the exact collision and leaves the running
 machine unchanged.
 
+## v88 shared YM2203 core (TEST)
+
+TSFM Pro, MultiSound A2, Max and OmniSound now use the existing native ymfm
+YM2203 core instead of the earlier approximate managed FM renderer. Two chip
+states remain independent. SSG remains the single existing host PSG output;
+SSG writes also reach native data/BUSY. Board decoders and non-OPN blocks are
+unchanged. FM writes no longer read back shadow values or alias the SSG I/O
+ports. Prescaler address commands update the native and host SSG clocks.
+Native timer/BUSY integration is audio-quantized, not cycle-perfect Z80 timing.
+Full checks and limits: `history/SOUNDCARDS_V88_REPORT.md`.
+
 ## Acceptance gates
 
 1. XML round-trip and two-slot permutations.

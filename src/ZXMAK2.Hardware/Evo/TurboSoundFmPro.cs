@@ -459,8 +459,8 @@ namespace ZXMAK2.Hardware.Evo
             // Its logarithmic AY/YM table already reaches the full signed
             // range.  Applying the board-wide post gain here clipped peaks
             // independently in every PSG renderer and made ordinary AY music
-            // sound as if channels or notes were being dropped.  SAA and FM
-            // retain the accepted +50% board gain below.
+            // sound as if channels or notes were being dropped. SAA keeps
+            // the accepted gain below; native FM uses its calibrated output.
         }
     }
 

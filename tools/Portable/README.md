@@ -1,5 +1,13 @@
 # Portable build and verification
 
+v88 adds a separate TEST candidate on branch codex/soundcards-v88. Pass
+`-Version v88` to PrepareRuntime with the preserved structured v87 baseline;
+pass `-ArchiveName ZXMAK2-v88-Portable-SoundCards-Test` to PackageRuntime.
+Sound-card tests use tools/SoundCards/RunSoundCards.ps1 and ONLY a private
+diagnostics/test-runtime. Current pinned OmniSound is included dynamically
+by ExportSources, rather than hardcoding an older submodule commit.
+v87 workflow below is retained as historical baseline documentation.
+
 v87 is TEST ONLY until the user explicitly accepts it as the next work base.
 Start from c57bf2b (v86), branch codex/portable-v87, not cancelled v83.
 

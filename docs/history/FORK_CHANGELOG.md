@@ -7,6 +7,19 @@
 Статус runtime указывается только там, где пользователь действительно провёл
 проверку. Успешная сборка или compiled-probe не заменяет runtime-приёмку.
 
+## 2026-10-10 — v88 Portable SoundCards (локальная TEST)
+
+- Общий native ymfm YM2203 для TSFM Pro, MultiSound A2/Max и OmniSound:
+  исправлен синтез относительно старого приближённого FM; раздельные чипы,
+  таймеры/BUSY, SSG data-cycle, write-only FM reads и prescaler.
+- Max OPL3 host-rate conversion; MoonSound и общий mixer сохранены.
+- Legacy IDE сохраняют локальный saved-copy путь/закрывают handle; CMOS null
+  sidecar не открывается. External originals остаются нетронутыми.
+- Звуковые/музыкальные/portable/legacy проверки проходят; 10 state hashes
+  совпали с v87. Performance/ограничения: SOUNDCARDS_V88_REPORT.md.
+- Только TEST до подтверждения пользователя, полные архивы/исходники/откат
+  сохранены. GitHub и пользовательские D: установки не изменялись.
+
 ## 2026-09-30 — v64 Host Folder as SD (локальная)
 
 - Основной SD Z-controller теперь может подключать обычную Windows-папку как
