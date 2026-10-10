@@ -7,6 +7,16 @@
 Статус runtime указывается только там, где пользователь действительно провёл
 проверку. Успешная сборка или compiled-probe не заменяет runtime-приёмку.
 
+## 2026-10-11 — v90 Portable Direct SD Folder (локальная TEST)
+
+- По новой команде пользователя selected SD folders сохраняются напрямую:
+  без full clone/смены пути, PC-only Refresh без prompt, cold machine restart
+  после перечитывания. Missing source — тихий пустой слот.
+- Temp/backup names не превышают 255-char filename limit; 64 direct checks,
+  9 large checks, прежние regressions/10 fingerprints проходят.
+- Звук v88 и portable v89 сохранены; отчёт SD_DIRECT_V90_REPORT.md.
+- Старые copies/релизы/D: runtime/L: коллекция нетронуты, без GitHub, только TEST.
+
 ## 2026-10-10 — v89 Portable SD Folder Fix (локальная TEST)
 
 - Исправлены длинные пути при сохранении внешней SD-папки в локальную копию;

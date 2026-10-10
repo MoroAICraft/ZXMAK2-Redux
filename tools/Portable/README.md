@@ -1,5 +1,13 @@
 # Portable build and verification
 
+Current v90 exception to the historical v87 policy: selected host SD folders
+save guest deltas in place; never clone/switch the directory. Settings/journals
+stay local; internal paths are relative, external folder paths absolute. Raw
+image/HDD/floppy policy is unchanged. Do not run obsolete v89 real-source write
+probes; direct save tests must use disposable external fixtures. Compile
+PortableFolderProbe.cs together with DirectFolderCases.cs, then run core/large.
+Use -Version v90 and -ArchiveName ZXMAK2-v90-Portable-Direct-SD-Folder-Test.
+
 v88 adds a separate TEST candidate on branch codex/soundcards-v88. Pass
 `-Version v88` to PrepareRuntime with the preserved structured v87 baseline;
 pass `-ArchiveName ZXMAK2-v88-Portable-SoundCards-Test` to PackageRuntime.

@@ -1,7 +1,7 @@
 # Локальные версии — единая точка входа
 
 Актуальные исходники: `L:\Work_two\ZX\ZXMAK2-Fork`.
-Новая сборка для проверки: **v89 Portable SD Folder Fix**, ветка `codex/sd-folder-v89`.
+Новая сборка для проверки: **v90 Portable Direct SD Folder**, ветка `codex/sd-direct-v90`.
 Принятая контрольная версия и полный откат: **v84**.
 Основа — принятая v82 с BC Commander / PrintScreen → NMI, НЕ v83.
 Не путать с историческими рабочими копиями в `.codex/worktrees`.
@@ -22,6 +22,7 @@
 | v87 | `codex/portable-v87`, tag `zxmak2-v87-portable-test` | ZXMAK2-v87-Portable-Test-20261010 | **ТОЛЬКО ТЕСТ**: переносимая структура, локальные настройки/flash/сохранения, защита внешних оригиналов, новый Help; PORTABLE_V87_REPORT.md |
 | v88 | `codex/soundcards-v88`, tag `zxmak2-v88-soundcards-test` | ZXMAK2-v88-Portable-SoundCards-Test-20261010 | **ТОЛЬКО ТЕСТ**: общее ymfm YM2203 для TSFM/MultiSound/Max/Omni, Max host-rate, IDE/CMOS paths; SOUNDCARDS_V88_REPORT.md |
 | v89 | `codex/sd-folder-v89`, tag `zxmak2-v89-sd-folder-test` | ZXMAK2-v89-Portable-SD-Folder-Fix-Test-20261010 | **ТОЛЬКО ТЕСТ**: long SD paths, живой save progress, Refresh state, close-error resume; SD_FOLDER_V89_REPORT.md |
+| v90 | `codex/sd-direct-v90`, tag `zxmak2-v90-direct-sd-test` | ZXMAK2-v90-Portable-Direct-SD-Folder-Test-20261011 | **ТОЛЬКО ТЕСТ**: Save в выбранную SD-папку без клона/смены пути; SD_DIRECT_V90_REPORT.md |
 
 Пакеты более ранних версий сохранены в той же папке ZX; сопоставление старых
 изменений — docs/history/PROJECT_JOURNAL.md и FORK_CHANGELOG.md.

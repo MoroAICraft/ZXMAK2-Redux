@@ -1,6 +1,6 @@
 # ZXMAK2 — журнал проекта
 
-Последнее обновление: 2026-10-10
+Последнее обновление: 2026-10-11
 
 Этот файл является постоянным рабочим источником истины проекта. Перед
 изменением кода нужно сверяться с ним, а после каждой сборки дополнять его
@@ -9,6 +9,28 @@
 текущее состояние, история и backlog должны оставаться здесь и в Git.
 
 ## Правила работы
+
+### Контрольная точка v90 (2026-10-11, TEST)
+
+Пользователь отменил automatic full copy выбранной SD-папки. Save теперь
+выборочно пишет в неё же, путь не переключается. PC-only Refresh без вопроса;
+guest changes Save/Discard/Cancel, после успешного reread — cold machine start.
+Exit сохраняет guest delta по подтверждению, missing/unavailable source startup
+тихо оставляет пустой слот. Собственные настройки/journals остаются в runtime.
+Отдельно смонтированные IMG/HDD/floppy сохраняют прежнюю политику, не расширять
+это изменение на них без команды. Старые copies/пользовательский D: нетронуты.
+
+Исправлены temp/backup имена при filename length 244/255. 64 targeted checks,
+9 large fixture checks (10002 initial files, unchanged 3GiB file locked against
+reading, real PrepareClose direct save ~0.670s, no clone). Старые SD/portable/
+model/keyboard/video/audio regressions и 10 fingerprints против v89 проходят.
+Реальную L: коллекцию не изменяли; старый real write probe mode отключён.
+
+Ветка codex/sd-direct-v90, tag zxmak2-v90-direct-sd-test; checkpoint 8b414ed.
+Пакет ZXMAK2-v90-Portable-Direct-SD-Folder-Test-20261011 содержит runtime,
+Full/Clean/source/Git histories/baseline-v89/report. Точный протокол:
+SD_DIRECT_V90_REPORT.md. Только явная пользовательская приёмка делает v90
+рабочей. GitHub не изменялся; CPU/звук/ROM/native сохранены.
 
 ### Контрольная точка v89 (2026-10-10, TEST)
 

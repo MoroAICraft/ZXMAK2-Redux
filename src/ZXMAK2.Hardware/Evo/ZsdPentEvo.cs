@@ -813,7 +813,7 @@ namespace ZXMAK2.Hardware.Evo
                 // Keep the path so a later run can find the folder again.
                 var unavailableSource = ex is FileNotFoundException || ex is DirectoryNotFoundException ||
                     ex is UnauthorizedAccessException || ex is System.Security.SecurityException;
-                m_restoreWarning = configuredSourceType == SdSourceType.HostFolder || unavailableSource ? null :
+                m_restoreWarning = unavailableSource ? null :
                     "The configured SD source could not be opened: " + ex.Message;
                 lock (cardSync)
                 {
