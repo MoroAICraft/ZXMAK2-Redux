@@ -96,6 +96,11 @@ namespace ZXMAK2
 
         public static void CopyDirectory(string source, string target)
         {
+            source = Resolve(source).TrimEnd(Path.DirectorySeparatorChar);
+            target = Resolve(target).TrimEnd(Path.DirectorySeparatorChar);
+            if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase) ||
+                target.StartsWith(source + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("The saved copy cannot be inside its source folder.");
             RequireInternal(target);
             Directory.CreateDirectory(target);
             foreach (var entry in new DirectoryInfo(source).GetFileSystemInfos())
@@ -129,7 +134,14 @@ namespace ZXMAK2
             {
                 using (var stream = new FileStream(pending, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 { write(stream); stream.Flush(true); }
-                if (File.Exists(path)) File.Replace(pending, path, path + ".bak");
+                if (File.Exists(path))
+                {
+                    var relative = Store(path);
+                    var backup = Path.Combine(DataDirectory("Backups"), relative + ".bak");
+                    RequireInternal(backup);
+                    Directory.CreateDirectory(Path.GetDirectoryName(backup));
+                    File.Replace(pending, path, backup);
+                }
                 else File.Move(pending, path);
             }
             finally { if (File.Exists(pending)) File.Delete(pending); }

@@ -56,3 +56,18 @@ model switching/reset tests, clean packaging and manifests. This is NOT acceptan
 SD-folder crash policy remains fresh scan. SD-image recovery remains its existing
 separate workflow with relative internal source identities; do not generalize the
 folder crash policy to normal image sessions.
+
+## Checkpoint 3
+
+External folder copy approved by user. Source checkpoint ZIP and both full local
+Git bundles saved at package/checkpoints/checkpoint-02/source (d66e447).
+Portable tests now cover 64 checks including warm/CMOS/factory resets, NeoGS SD,
+VMZ import and sidecars, atomic floppy failure retaining dirty state.
+22 templates plus 4 model round trips pass 78 basic ROM/frame/switch assertions.
+Moved runtime under Unicode/spaces/# and foreign CWD passes 15 checks, native
+MoonSound and MIDI bank tests. AudioMix passes 583176; native Moon 100% PCM hash
+is 9F3EE7BD381A9180. All 10 machine fingerprints MATCH isolated v86 using the
+SAME current VMZ. The older archived state log used another profile; keep the
+aligned comparison log, do not compare mismatched inputs.
+Minor final changes need rerun: Sessions/SD directory, registry read fallback,
+Test.exe instance lock and guarded debugger trace output. Final package still WIP.

@@ -164,6 +164,13 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.targets\Common.targets" />
+  <Target Name="PortableDeveloperResources" AfterTargets="Build">
+    <MakeDir Directories="$(TargetDir)Config;$(TargetDir)Docs\Help" />
+    <Copy SourceFiles="unity.config;log4net.config;machines.config;plugins.config"
+          DestinationFolder="$(TargetDir)Config" />
+    <Copy SourceFiles="..\ZXMAK2.Host\Keyboard.config" DestinationFolder="$(TargetDir)Config" />
+    <Copy SourceFiles="..\..\docs\Help\index.html" DestinationFolder="$(TargetDir)Docs\Help" />
+  </Target>
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>

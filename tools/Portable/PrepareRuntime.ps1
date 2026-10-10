@@ -36,6 +36,14 @@ foreach ($taskSub in @('Resources\ROMs','Docs\Help','Data\State','Data\Sessions'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\..\docs\Help\index.html') -Destination "$taskRoot\Docs\Help\index.html"
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\..\docs\HOTKEYS.md') -Destination "$taskRoot\Docs\HOTKEYS.md"
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\..\docs\releases\README-v87.txt') -Destination "$taskRoot\README-v87.txt"
+$taskLegacyHelp=Join-Path $PSScriptRoot '..\..\src\Help'
+New-Item -ItemType Directory -Path "$taskRoot\Docs\Help\Legacy" -Force | Out-Null
+Get-ChildItem -LiteralPath $taskLegacyHelp -File |
+    Where-Object { $_.Extension -in @('.htm','.html','.css') } |
+    Copy-Item -Destination "$taskRoot\Docs\Help\Legacy"
+foreach($taskSub in @('Pics','Assembler code')) {
+    Copy-Item -LiteralPath (Join-Path $taskLegacyHelp $taskSub) -Destination "$taskRoot\Docs\Help\Legacy\$taskSub" -Recurse
+}
 $taskFlags = 'C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\CorFlags.exe'
 foreach ($taskExe in @('ZXMAK2.exe','Test.exe')) {
     & $taskFlags (Join-Path $taskRoot $taskExe) /32BIT+ /nologo

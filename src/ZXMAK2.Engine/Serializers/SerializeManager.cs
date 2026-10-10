@@ -87,9 +87,21 @@ namespace ZXMAK2.Serializers
 
 		public string SaveFileName(string fileName)
 		{
-            PortablePaths.WriteAtomic(fileName, stream => saveStream(stream, Path.GetExtension(fileName).ToUpper(), fileName));
+            var serializer = GetSerializer(Path.GetExtension(fileName).ToUpper());
+            if (serializer == null || !serializer.CanSerialize)
+                throw new NotSupportedException("Save format is not supported: " + Path.GetExtension(fileName));
+            var previous = CaptureSaveState();
+            try
+            {
+                PortablePaths.WriteAtomic(fileName, stream => serializer.Serialize(stream));
+                serializer.SetSource(fileName);
+            }
+            catch { RestoreSaveState(previous); throw; }
 			return Path.GetFileName(fileName);
 		}
+
+        protected virtual object CaptureSaveState() { return null; }
+        protected virtual void RestoreSaveState(object state) { }
 
 		public string OpenFileStream(string fileName, Stream fileStream)
 		{

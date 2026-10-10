@@ -7,6 +7,7 @@ using ZXMAK2;
 using ZXMAK2.Dependency;
 using ZXMAK2.Engine;
 using ZXMAK2.Engine.Entities;
+using ZXMAK2.Engine.Interfaces;
 using ZXMAK2.Hardware;
 using ZXMAK2.Hardware.Evo;
 using ZXMAK2.Hardware.General;
@@ -15,6 +16,9 @@ using ZXMAK2.Hardware.Circuits.SecureDigital;
 using ZXMAK2.Host.Entities;
 using ZXMAK2.Host.Interfaces;
 using ZXMAK2.Host.WinForms.Services;
+using ZXMAK2.Host.Presentation;
+using ZXMAK2.Model.Disk;
+using ZXMAK2.Serializers;
 
 internal static class PortableProbe
 {
@@ -29,6 +33,26 @@ internal static class PortableProbe
         public object ObjectSelector(object[] v,string c) { return null; }
         public bool QueryText(string c,string t,ref string v) { return false; }
         public bool QueryValue(string c,string t,string f,ref int v,int min,int max) { return false; }
+    }
+    sealed class Messages : IUserMessage
+    {
+        public int Errors;
+        public void ErrorDetails(Exception error) { Errors++; }
+        public void Error(Exception error) { Errors++; }
+        public void Error(string text,params object[] values) { Errors++; }
+        public void Warning(Exception error) { Errors++; }
+        public void Warning(string text,params object[] values) { Errors++; }
+        public void Info(string text,params object[] values) { }
+    }
+    sealed class Host : IHostService
+    {
+        public IHostKeyboard Keyboard {get{return null;}} public IHostMouse Mouse {get{return null;}}
+        public IHostJoystick Joystick {get{return null;}} public SyncSource SyncSource {get;set;}
+        public int SampleRate {get{return 44100;}} public bool IsCaptured {get{return false;}}
+        public IMediaRecorder MediaRecorder {get;set;}
+        public bool CheckSyncSourceSupported(SyncSource value) {return true;}
+        public void PushFrame(IFrameInfo info,IFrameVideo video,IFrameSound sound) { }
+        public void CancelPush() { } public void Capture() { } public void Uncapture() { } public void Dispose() { }
     }
     static void Reject(Action action, string message)
     {
@@ -154,17 +178,108 @@ internal static class PortableProbe
             var second=new SettingService();Check(second.WindowWidth==1234 && second.WindowHeight==567 && second.RenderNoBorder,"portable interface settings lost"); }
         finally { if(original!=null)File.WriteAllBytes(path,original);else if(File.Exists(path))File.Delete(path); }
     }
+    static void Models()
+    {
+        var templates=new MachinesConfig();templates.Load();
+        var spectrum=new Spectrum();spectrum.Init();
+        var path=Path.Combine(PortablePaths.DataDirectory("Temp\\Models"),"machine.vmz");
+        typeof(BusManager).GetProperty("MachineFile",Private).SetValue(spectrum.BusManager,path,null);
+        foreach(var name in templates.GetNames().Concat(new[]{"ZX-Evo BSconf","ZX Spectrum 48","ZX Spectrum 128","ZX-Evo BSconf"}))
+        {
+            spectrum.BusManager.LoadConfigXml(templates.GetConfig(name));
+            spectrum.DebugReset();
+            Check(spectrum.BusManager.FindDevice<IUlaDevice>()!=null,"ULA missing after model switch: "+name);
+            var memory=spectrum.BusManager.FindDevice<IMemoryDevice>();
+            Check(memory!=null && memory.RomPages!=null && memory.RomPages.Any(p=>p.Any(b=>b!=0 && b!=255)),"ROM missing: "+name);
+            spectrum.ExecuteFrame();Check(spectrum.BusManager.SoundFrame.GetBuffer().Length>0,"audio frame missing: "+name);
+            Console.WriteLine("MODEL PASS: "+name);
+        }
+        spectrum.BusManager.Disconnect();
+    }
+    static void NeoGs(Query query)
+    {
+        var board=new NeoGsDevice();var card=new SdCard();
+        var source=Path.Combine(PortablePaths.DataDirectory("Temp"),"neo.img");var bytes=new byte[4096];bytes[510]=0x55;bytes[511]=0xAA;bytes[450]=0x0B;bytes[454]=1;bytes[458]=7;File.WriteAllBytes(source,bytes);card.Open(source);
+        typeof(NeoGsDevice).GetField("m_sdCard",Private).SetValue(board,card);
+        try
+        {
+            card.ImageSessionStream.WriteByte(0x77);query.Result=DlgResult.Cancel;
+            Check(!board.PrepareForMediaChange() && board.HasPendingChanges,"NeoGS cancel lost session");
+            query.Result=DlgResult.No;Check(board.PrepareForMediaChange() && !board.HasPendingChanges && FileByte(source,0)==0,"NeoGS discard saved changes");
+            card.ImageSessionStream.Position=0;card.ImageSessionStream.WriteByte(0x78);query.Result=DlgResult.Yes;
+            Check(board.PrepareForMediaChange() && FileByte(source,0)==0x78,"NeoGS save failed");
+        }
+        finally { card.Close(); }
+    }
+    static void Resets(Query query)
+    {
+        var names=new[]{"ZXMAK2.vmz","ZXMAK2.vmide","ZXMAK2.cmos","ZXMAK2.nvram"};
+        var original=names.Select(n=>File.Exists(Path.Combine(PortablePaths.Root,n))?File.ReadAllBytes(Path.Combine(PortablePaths.Root,n)):null).ToArray();
+        VirtualMachine vm=null;
+        try
+        {
+            vm=new VirtualMachine(new Host(),null);vm.Init();vm.SaveConfigAs(Path.Combine(PortablePaths.Root,"ZXMAK2.vmz"));
+            vm.Bus.LoadConfigXml(new MachinesConfigFixture().Evo());
+            var model=(MainViewModel)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(MainViewModel));
+            typeof(MainViewModel).GetField("m_vm",Private).SetValue(model,vm);
+            var messages=new Messages();typeof(MainViewModel).GetField("m_userMessage",Private).SetValue(model,messages);
+            vm.DoReset();Check(File.Exists(Path.Combine(PortablePaths.Root,"ZXMAK2.vmz")),"warm reset removed VMZ");
+            model.ResetCmosState();Check(File.Exists(Path.Combine(PortablePaths.Root,"ZXMAK2.cmos")),"CMOS reset missing active file");
+            Check(model.PrepareFactoryReset(),"factory reset failed");vm=null;
+            Check(names.All(n=>!File.Exists(Path.Combine(PortablePaths.Root,n))),"factory reset missed root state files");
+            Check(File.Exists(Path.Combine(PortablePaths.Root,"ROMS.PAK")) && File.Exists(Path.Combine(PortablePaths.Root,"boot.zip")),"factory reset deleted resources");
+            Check(Directory.Exists(Path.Combine(PortablePaths.Root,"Data","Saves")),"factory reset deleted saves");
+            Check(File.Exists(PortablePaths.ConfigFile("machines.config")),"factory reset deleted templates");
+        }
+        finally
+        {
+            if(vm!=null)vm.Dispose();
+            for(int i=0;i<names.Length;i++) {var path=Path.Combine(PortablePaths.Root,names[i]);if(original[i]!=null)File.WriteAllBytes(path,original[i]);else if(File.Exists(path))File.Delete(path);}
+        }
+    }
+    static void ImportedConfig(string external)
+    {
+        var source=Path.Combine(external,"profile.vmz");
+        File.WriteAllText(source,"<VirtualMachine><Info/><Bus><Device type='ZXMAK2.Hardware.Spectrum.UlaSpectrum48'/><Device type='ZXMAK2.Hardware.Spectrum.MemorySpectrum48'/><Device type='ZXMAK2.Hardware.General.FddController'><Drive index='0' inserted='true' readOnly='false' fileName='missing.trd'/></Device></Bus></VirtualMachine>");
+        var bytes=File.ReadAllBytes(source);
+        File.WriteAllText(Path.ChangeExtension(source,".vmide"),"<IdeDiskDescriptor><Image fileName='relative.img' isReadOnly='false'/><Geometry cylinders='1' heads='1' sectors='2' lba='2'/></IdeDiskDescriptor>");
+        var sidecar=File.ReadAllBytes(Path.ChangeExtension(source,".vmide"));
+        using(var vm=new VirtualMachine(new Host(),null))
+        {
+            vm.Init();vm.OpenConfig(source);vm.SaveConfig();
+            var saved=(string)typeof(VirtualMachine).GetField("m_configFileName",Private).GetValue(vm);
+            Check(PortablePaths.IsInternal(saved) && saved!=source,"external VMZ not imported locally");
+            Check(File.ReadAllText(Path.ChangeExtension(saved,".vmide")).Contains(Path.Combine(external,"relative.img")),"imported IDE relative reference rebased incorrectly");
+            Check(bytes.SequenceEqual(File.ReadAllBytes(source)) && sidecar.SequenceEqual(File.ReadAllBytes(Path.ChangeExtension(source,".vmide"))),"external config/sidecar overwritten");
+        }
+    }
+    static void Floppy(string external,Query query)
+    {
+        var source=Path.Combine(external,"disk.trd");File.WriteAllBytes(source,new byte[655360]);
+        var disk=new DiskImage();disk.Init(3500000/5);var manager=new DiskLoadManager(disk);
+        manager.OpenFileName(source,false);
+        var sector=new byte[256];sector[0]=0x5A;disk.WriteLogicalSector(1,0,1,sector);
+        var dirty=(ModifyFlag)1;disk.ModifyFlag=dirty;disk.Disconnect();
+        Check(PortablePaths.IsInternal(disk.FileName) && FileByte(source,8192)==0,"external floppy overwritten or path not local");
+        Check(FileByte(disk.FileName,8192)==0x5A,"external floppy local copy missing guest data");
+        var oldPath=disk.FileName;disk.ModifyFlag=dirty;
+        using(var lease=new FileStream(oldPath,FileMode.Open,FileAccess.Read,FileShare.None))
+            Reject(()=>manager.SaveFileName(oldPath),"locked floppy save accepted");
+        Check(disk.FileName==oldPath && disk.ModifyFlag==dirty,"failed atomic save lost dirty flag or path");
+    }
+    sealed class MachinesConfigFixture { public XmlNode Evo() {var config=new MachinesConfig();config.Load();return config.GetConfig("ZX-Evo BSconf");} }
     [STAThread] static int Main(string[] args)
     {
         try
         {
-            if(args.Length>0 && args[0]=="relocated") { Paths(PortablePaths.DataDirectory("Temp"));Missing();Settings();
+            if(args.Length>0 && args[0]=="models") { Models();Console.WriteLine("PASS model template/frame/switch: {0} checks",checks);return 0; }
+            if(args.Length>0 && args[0]=="relocated") { Paths(Directory.GetParent(PortablePaths.Root).FullName);Missing();Settings();
                 Check(RomPack.GetRomData("~mapping.xml").Length>0,"relocated ROMS.PAK unreadable");
                 var machines=new MachinesConfig();machines.Load();Check(machines.GetConfig("ZX-Evo BSconf")!=null,"relocated Evo template missing");
                 Console.WriteLine("PASS relocated root/resources/settings/missing media: {0} checks",checks);return 0; }
             var external=Path.Combine(Directory.GetParent(PortablePaths.Root).FullName,"diagnostics","external-fixture-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(external);
             var query=new Query();Locator.Resolve<IResolver>().RegisterInstance<IUserQuery>(null,query);
-            Paths(external);Folders(external,query);Images(external);Missing();Settings();
+            Paths(external);Folders(external,query);Images(external);Missing();Settings();NeoGs(query);Resets(query);ImportedConfig(external);Floppy(external,query);
             Console.WriteLine("PASS portable paths/local saves/PC merge/conflict/rollback/missing media/settings: {0} checks",checks);return 0;
         }
         catch(Exception error) { Console.WriteLine(error);return 1; }

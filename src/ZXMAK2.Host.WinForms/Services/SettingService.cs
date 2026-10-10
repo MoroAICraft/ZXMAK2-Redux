@@ -38,6 +38,8 @@ namespace ZXMAK2.Host.WinForms.Services
                 return;
             }
             // One-time read-only import. Never create or write a registry key.
+            try
+            {
             using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath, false))
             {
                 if (key != null)
@@ -49,6 +51,8 @@ namespace ZXMAK2.Host.WinForms.Services
                         if (value is int) m_values[name] = (int)value;
                     }
             }
+            }
+            catch (Exception ex) { Logger.Warn("Legacy interface settings unavailable; using portable defaults: {0}", ex.Message); }
             try { Persist(); }
             catch (Exception ex) { Logger.Error(ex, "Cannot create portable interface settings"); }
         }

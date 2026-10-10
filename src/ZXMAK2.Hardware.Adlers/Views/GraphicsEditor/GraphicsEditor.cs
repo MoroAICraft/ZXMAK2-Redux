@@ -547,6 +547,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.GraphicsEditorView
             }
 
             string filePath = Path.Combine(PortablePaths.DataDirectory("Saves\\Debugger"), fileName);
+            PortablePaths.RequireInternal(filePath);
 
             if (File.Exists(filePath))
                 File.Delete(filePath);
@@ -556,7 +557,7 @@ namespace ZXMAK2.Hardware.Adlers.Views.GraphicsEditorView
             Bitmap cloneBitmap = bmp.Clone(new Rectangle(0, 0, bitmapWidth, bitmapHeight), bmp.PixelFormat);
             cloneBitmap.Save(filePath, i_imgFormat);
 
-            Locator.Resolve<IUserMessage>().Info(String.Format("File '{0}' saved to root app directory!", fileName));
+            Locator.Resolve<IUserMessage>().Info(String.Format("File saved: {0}", filePath));
         }
         private void menuItemSaveBitmapAsPNG_Click(object sender, EventArgs e)
         {

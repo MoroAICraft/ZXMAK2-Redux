@@ -25,7 +25,7 @@ namespace ZXMAK2.Host.WinForms.Services
             {
                 return;
             }
-            Process.Start(new ProcessStartInfo(s_url) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(new Uri(s_url).AbsoluteUri) { UseShellExecute = true });
         }
 
         public void ShowHelp(object uiControl, HelpNavigator navigator)

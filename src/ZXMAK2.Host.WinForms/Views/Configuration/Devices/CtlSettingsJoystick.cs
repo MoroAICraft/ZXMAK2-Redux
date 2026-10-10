@@ -369,8 +369,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         {
             var doc=new XmlDocument(); var root=doc.CreateElement("JoystickProfiles"); doc.AppendChild(root); root.SetAttribute("version","1");
             foreach(var p in profiles) root.AppendChild(p.ToXml(doc));
-            string temp=path+".tmp"; doc.Save(temp);
-            if(File.Exists(path)) File.Replace(temp,path,path+".bak"); else File.Move(temp,path);
+            PortablePaths.WriteAtomic(path, stream => doc.Save(stream));
         }
         private void ImportGame()
         {

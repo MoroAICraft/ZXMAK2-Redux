@@ -2051,7 +2051,9 @@ namespace ZXMAK2.Hardware.Adlers.Views
             System.IO.StreamWriter file = null;
             try
             {
-                file = new System.IO.StreamWriter(Path.Combine(Utils.GetAppFolder(), fileName));
+                var path = PortablePaths.Resolve(fileName);
+                PortablePaths.RequireInternal(path);
+                file = new System.IO.StreamWriter(path);
 
                 foreach (KeyValuePair<byte, BreakpointAdlers> breakpoint in localBreakpointsList)
                 {
@@ -2060,7 +2062,7 @@ namespace ZXMAK2.Hardware.Adlers.Views
             }
             finally
             {
-                file.Close();
+                if (file != null) file.Close();
             }
         }
 

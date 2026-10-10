@@ -43,7 +43,9 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         private void SetJournalPaths()
         {
-            var folder = PortablePaths.DataDirectory("SD-sessions\\Images");
+            var folder = SdSessionStorage.GetDirectory("Images");
+            PortablePaths.RequireInternal(folder);
+            Directory.CreateDirectory(folder);
             var name = Hash(PortablePaths.Store(m_imagePath).ToUpperInvariant());
             m_journalPath = Path.Combine(folder, name + ".journal");
             m_applyingPath = Path.Combine(folder, name + ".applying");

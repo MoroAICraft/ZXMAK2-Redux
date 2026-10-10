@@ -13,7 +13,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public static string GetDirectory(string kind)
         {
-            return Path.Combine(AppFolder, "Data", "SD-sessions", kind);
+            return Path.Combine(AppFolder, "Data", "Sessions", "SD", kind);
         }
 
         public static string ResolveSourcePath(string path)

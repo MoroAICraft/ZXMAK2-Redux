@@ -152,12 +152,28 @@ namespace ZXMAK2.Engine
             fileName = Path.GetFullPath(fileName);
             if (!PortablePaths.IsInternal(fileName))
             {
+                var sourceFolder = Path.GetDirectoryName(fileName);
                 var target = PortablePaths.NewSavePath(fileName, "Imported-Configurations");
-                File.Copy(fileName, target);
+                var imported = new XmlDocument();
+                imported.Load(fileName);
+                foreach (XmlAttribute reference in imported.SelectNodes("//@fileName|//@ideImage|//@sdImage|//@sdPath"))
+                    if (!string.IsNullOrWhiteSpace(reference.Value) && !Path.IsPathRooted(reference.Value))
+                        reference.Value = PortablePaths.Store(Path.Combine(sourceFolder, reference.Value));
+                PortablePaths.WriteAtomic(target, output => imported.Save(output));
                 foreach (var extension in new[] { ".cmos", ".vmide", ".nvram" })
                 {
                     var satellite = Path.ChangeExtension(fileName, extension);
-                    if (File.Exists(satellite)) File.Copy(satellite, Path.ChangeExtension(target, extension));
+                    if (!File.Exists(satellite)) continue;
+                    var destination = Path.ChangeExtension(target, extension);
+                    if (extension == ".vmide")
+                    {
+                        var descriptor = new XmlDocument(); descriptor.Load(satellite);
+                        var image = descriptor.SelectSingleNode("/IdeDiskDescriptor/Image/@fileName");
+                        if (image != null && !string.IsNullOrWhiteSpace(image.Value) && !Path.IsPathRooted(image.Value))
+                            image.Value = PortablePaths.Store(Path.Combine(sourceFolder, image.Value));
+                        PortablePaths.WriteAtomic(destination, output => descriptor.Save(output));
+                    }
+                    else File.Copy(satellite, destination);
                 }
                 fileName = target;
             }

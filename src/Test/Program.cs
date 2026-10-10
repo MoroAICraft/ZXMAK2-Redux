@@ -29,6 +29,13 @@ namespace Test
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void Run(string[] args)
         {
+            ZXMAK2.PortablePaths.AcquireInstance();
+            try { RunTests(args); }
+            finally { ZXMAK2.PortablePaths.ReleaseInstance(); }
+        }
+
+        private static void RunTests(string[] args)
+        {
             if (args.Length >= 1 && args[0].ToLower() == "/zexall")
 			{
 				runZexall();

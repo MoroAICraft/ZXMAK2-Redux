@@ -12,8 +12,21 @@ namespace ZXMAK2.Serializers
 {
     public class DiskLoadManager : SerializeManager
     {
+        private readonly DiskImage m_image;
+        private sealed class SaveState { public string FileName; public ModifyFlag Dirty; }
+        protected override object CaptureSaveState()
+        {
+            return new SaveState { FileName = m_image.FileName, Dirty = m_image.ModifyFlag };
+        }
+        protected override void RestoreSaveState(object state)
+        {
+            var saved = (SaveState)state;
+            m_image.FileName = saved.FileName;
+            m_image.ModifyFlag = saved.Dirty;
+        }
         public DiskLoadManager(DiskImage diskImage)
         {
+            m_image = diskImage;
             AddSerializer(new UdiSerializer(diskImage));
             AddSerializer(new FdiSerializer(diskImage));
             AddSerializer(new Td0Serializer(diskImage));
@@ -103,8 +116,7 @@ namespace ZXMAK2.Serializers
                     string folderName = Path.GetDirectoryName(fileName);
                     if (!Directory.Exists(folderName))
                         Directory.CreateDirectory(folderName);
-                    image.FileName = fileName;
-                    SaveFileName(image.FileName);
+                    SaveFileName(fileName);
                     Locator.Resolve<IUserMessage>().Info(
                         "Disk image successfuly saved!\n{0}", 
                         image.FileName);

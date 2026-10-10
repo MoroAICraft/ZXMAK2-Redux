@@ -19,6 +19,7 @@ namespace ZXMAK2.Engine
             {
                 Load(fileName);
             }
+            else throw new FileNotFoundException("Machine templates are missing. Restore Config/machines.config.", fileName);
         }
 
         public void Load(string fileName)

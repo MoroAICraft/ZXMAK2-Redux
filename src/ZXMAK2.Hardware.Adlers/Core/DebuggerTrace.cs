@@ -158,7 +158,9 @@ namespace ZXMAK2.Hardware.Adlers.Core
                 //log filter info
                 traceCountersLog += _traceInfo;
 
-                File.WriteAllText(Path.Combine(PortablePaths.DataDirectory("Logs"), _traceLogFilename), traceCountersLog);
+                var output = Path.Combine(PortablePaths.DataDirectory("Logs"), _traceLogFilename);
+                PortablePaths.RequireInternal(output);
+                File.WriteAllText(output, traceCountersLog);
 
                 _counters = null;
             }
