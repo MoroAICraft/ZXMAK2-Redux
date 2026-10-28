@@ -12,6 +12,7 @@ namespace ZXMAK2.Hardware.General
     {
         private const int BaseConfOutputCalibrationPercent = 55;
         private IMemoryDevice m_memory;
+        private Evo.ZxmSoundCardExtreme m_extreme;
         private bool m_noDos;
         private int m_mask;
         private int m_port;
@@ -149,6 +150,7 @@ namespace ZXMAK2.Hardware.General
         {
             base.BusInit(bmgr);
             m_memory = m_noDos ? bmgr.FindDevice<IMemoryDevice>() : null;
+            m_extreme = bmgr.FindDevice<Evo.ZxmSoundCardExtreme>();
             //bmgr.SubscribeWrIo(0x0004, 0x00FB & 0x0004, WritePort);
             bmgr.Events.SubscribeWrIo(Mask, Port & Mask, WritePort);
         }
@@ -160,6 +162,9 @@ namespace ZXMAK2.Hardware.General
 
         private void WritePort(ushort addr, byte value, ref bool handled)
         {
+            // The standalone emulator Covox is redundant on ports owned by
+            // an installed Extreme DAC. Do not mix the same sample twice.
+            if (m_extreme != null && m_extreme.RespondsToDacWrite(addr)) return;
             if (handled || (m_memory != null && m_memory.DOSEN))
                 return;
             handled = true;

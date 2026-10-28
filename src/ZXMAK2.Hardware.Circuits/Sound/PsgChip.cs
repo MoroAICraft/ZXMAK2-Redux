@@ -143,6 +143,17 @@ namespace ZXMAK2.Hardware.Circuits.Sound
 
         public byte RegAddr { get; set; }
 
+        // Board-specific resistor routing; never change shared SoundTables.
+        public void SetStereoWeights(uint[] weights)
+        {
+            if (weights == null || weights.Length != 6 ||
+                Array.Exists(weights, value => value > 100))
+                throw new ArgumentException("Six stereo weights in 0..100 are required.", "weights");
+            m_panTables[PanType.Custom] = (uint[])weights.Clone();
+            m_panType = PanType.Custom;
+            UpdateVolumeTables();
+        }
+
         public Action<double, ushort, ushort> UpdateHandler { get; set; }
         
         #endregion Properties

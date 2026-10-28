@@ -387,13 +387,19 @@ namespace ZXMAK2.Hardware.Evo
         private readonly IPsgChip m_chip;
         private double m_lastTime;
 
-        public TsFmPsgRenderer(string name, PanType pan)
+        public TsFmPsgRenderer(string name, PanType pan, uint[] stereoWeights = null)
         {
             Name = name;
             Description = name;
             m_chip = Locator.Resolve<IPsgChip>();
             m_chip.AmpType = AmpType.Ym2203;
             m_chip.PanType = pan;
+            if (stereoWeights != null)
+            {
+                var chip = m_chip as PsgChip;
+                if (chip == null) throw new NotSupportedException("Board-specific PSG stereo requires PsgChip.");
+                chip.SetStereoWeights(stereoWeights);
+            }
             // A YM2203 driven at 3.5 MHz clocks its SSG section after the
             // internal divide-by-two stage.
             m_chip.ChipFrequency = 1750000;

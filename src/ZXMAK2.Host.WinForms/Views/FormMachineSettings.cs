@@ -541,6 +541,7 @@ namespace ZXMAK2.Host.WinForms.Views
                     (device is NeoGsDevice ||
                      device is ZxMultiSoundDevice ||
                      device is ZxMultiSoundMaxDevice ||
+                     device is ZxmSoundCardExtreme ||
                      device is ZxmMoonSoundDevice ||
                      device is ZxOmniSoundDevice ||
                      device is ZxNetUsbDevice ||
@@ -966,6 +967,7 @@ namespace ZXMAK2.Host.WinForms.Views
                     additionalIgnoreTypes.Add(typeof(NeoGsDevice));
                     additionalIgnoreTypes.Add(typeof(ZxMultiSoundDevice));
                     additionalIgnoreTypes.Add(typeof(ZxMultiSoundMaxDevice));
+                    additionalIgnoreTypes.Add(typeof(ZxmSoundCardExtreme));
                     additionalIgnoreTypes.Add(typeof(ZxmMoonSoundDevice));
                     additionalIgnoreTypes.Add(typeof(ZxOmniSoundDevice));
                     additionalIgnoreTypes.Add(typeof(ZxNetUsbDevice));

@@ -35,6 +35,11 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         private readonly CheckBox m_maxSoundDrive;
         private readonly CheckBox m_maxTsFmSaaCompatibility;
         private readonly Label m_maxEffective;
+        private readonly GroupBox m_extremeSwitches;
+        private readonly CheckBox m_extremePevo;
+        private readonly CheckBox m_extremeDisableYm;
+        private readonly CheckBox m_extremeLegacySaa;
+        private readonly NumericUpDown m_extremeVolume;
         private BusManager m_bmgr;
         private UlaPentEvo m_device;
         private bool m_updatingSlots;
@@ -115,8 +120,16 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                         m_automatic.Checked && m_ym.Checked) ||
                     (IsMultiSoundMaxBoardEnabled &&
                         m_maxAutomatic.Checked && m_maxYm.Checked) ||
-                    IsOmniSoundBoardEnabled;
+                    IsOmniSoundBoardEnabled ||
+                    (IsExtremeBoardEnabled && !m_extremeDisableYm.Checked);
             }
+        }
+
+        public bool IsExtremeBoardEnabled
+        {
+            get { return IsSelected(PentEvoZxBusDevice.SoundCardExtreme,
+                m_slot1Enabled, m_slot1Device) || IsSelected(
+                PentEvoZxBusDevice.SoundCardExtreme, m_slot2Enabled, m_slot2Device); }
         }
 
         public CtlSettingsPentEvoZxBus()
@@ -194,6 +207,37 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             m_maxEffective.Size = new Size(272, 66);
             m_maxSwitches.Controls.Add(m_maxEffective);
 
+            m_extremeSwitches = new GroupBox();
+            m_extremeSwitches.Text = "ZXM Extreme Rev.03 jumpers:";
+            m_extremeSwitches.Location = new Point(4, 170);
+            m_extremeSwitches.Size = new Size(292, 212);
+            m_extremeSwitches.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Controls.Add(m_extremeSwitches);
+            m_extremePevo = CreateSwitch(m_extremeSwitches, "JP2: PentEvo mode", 24);
+            m_extremeDisableYm = CreateSwitch(m_extremeSwitches, "JP1: Disable YM ports (#xxFD)", 52);
+            m_extremeLegacySaa = CreateSwitch(m_extremeSwitches, "Legacy SAA ports (#00FF/#01FF)", 80);
+            var extremeHint = new Label();
+            extremeHint.Location = new Point(10, 112);
+            extremeHint.Size = new Size(272, 68);
+            extremeHint.Text = "Legacy off: JP3 closed, #04FF/#05FF.\n" +
+                "YM clock: software-controlled #FFFC.\n" +
+                "2 x YM2203 + SAA1099 + SounDrive.";
+            m_extremeSwitches.Controls.Add(extremeHint);
+            var extremeVolumeLabel = new Label();
+            extremeVolumeLabel.Text = "Volume (%):";
+            extremeVolumeLabel.Location = new Point(10, 181);
+            extremeVolumeLabel.Size = new Size(90, 20);
+            m_extremeSwitches.Controls.Add(extremeVolumeLabel);
+            m_extremeVolume = new NumericUpDown();
+            m_extremeVolume.Location = new Point(112, 177);
+            m_extremeVolume.Size = new Size(70, 24);
+            m_extremeVolume.Minimum = 0; m_extremeVolume.Maximum = 100;
+            m_extremeVolume.Value = 100;
+            m_extremeSwitches.Controls.Add(m_extremeVolume);
+            m_extremePevo.CheckedChanged += SwitchChanged;
+            m_extremeDisableYm.CheckedChanged += SwitchChanged;
+            m_extremeLegacySaa.CheckedChanged += SwitchChanged;
+
             m_slot1Enabled.CheckedChanged += Slot1SelectionChanged;
             m_slot1Device.SelectedIndexChanged += Slot1SelectionChanged;
             m_slot2Enabled.CheckedChanged += Slot2SelectionChanged;
@@ -236,6 +280,13 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                     TryRestoreBoard(PentEvoZxBusDevice.MultiSound);
                 }
                 var max = m_bmgr.FindDevice<ZxMultiSoundMaxDevice>();
+                var extreme = m_bmgr.FindDevice<ZxmSoundCardExtreme>();
+                if (extreme != null && !IsExtremeBoardEnabled)
+                    TryRestoreBoard(PentEvoZxBusDevice.SoundCardExtreme);
+                m_extremePevo.Checked = extreme == null || extreme.PentEvoJumperClosed;
+                m_extremeDisableYm.Checked = extreme != null && extreme.YmPortsDisabled;
+                m_extremeLegacySaa.Checked = extreme != null && extreme.LegacySaaPorts;
+                m_extremeVolume.Value = extreme == null ? 100 : extreme.Volume;
                 if (max != null && !IsMultiSoundMaxBoardEnabled)
                     TryRestoreBoard(PentEvoZxBusDevice.MultiSoundMax);
                 if (m_bmgr.FindDevice<ZxmMoonSoundDevice>() != null &&
@@ -306,6 +357,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 RemoveBoard<NeoGsDevice>();
                 RemoveBoard<ZxMultiSoundDevice>();
                 RemoveBoard<ZxMultiSoundMaxDevice>();
+                RemoveBoard<ZxmSoundCardExtreme>();
                 RemoveBoard<ZxmMoonSoundDevice>();
                 RemoveBoard<ZxOmniSoundDevice>();
                 RemoveBoard<ZxNetUsbDevice>();
@@ -321,6 +373,10 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             var moonSoundSelected = IsMoonSoundBoardEnabled;
             var omniSoundSelected = IsOmniSoundBoardEnabled;
             var zxNetUsbSelected = IsZxNetUsbBoardEnabled;
+            var extremeSelected = IsExtremeBoardEnabled;
+            if (extremeSelected && (multiSoundSelected || maxSelected || omniSoundSelected))
+                throw new InvalidOperationException("Extreme shares YM/SAA/SounDrive ports " +
+                    "with MultiSound/Max/OmniSound. Choose one of these boards.");
 
             if (omniSoundSelected && (neoGsSelected || multiSoundSelected ||
                 maxSelected || moonSoundSelected))
@@ -373,6 +429,21 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             SetBoardPresence<ZxNetUsbDevice>(zxNetUsbSelected);
             SetBoardPresence<ZxMultiSoundMaxDevice>(maxSelected);
             SetBoardPresence<ZxOmniSoundDevice>(omniSoundSelected);
+            SetBoardPresence<ZxmSoundCardExtreme>(extremeSelected);
+            var extremeBoard = m_bmgr.FindDevice<ZxmSoundCardExtreme>();
+            if (extremeBoard != null)
+            {
+                extremeBoard.PentEvoJumperClosed = m_extremePevo.Checked;
+                extremeBoard.YmPortsDisabled = m_extremeDisableYm.Checked;
+                extremeBoard.LegacySaaPorts = m_extremeLegacySaa.Checked;
+                extremeBoard.Volume = (int)m_extremeVolume.Value;
+                if (!extremeBoard.YmPortsDisabled)
+                {
+                    foreach (var ay in m_bmgr.FindDevices<AYCHRV>().ToArray()) m_bmgr.Remove(ay);
+                    foreach (var ts in m_bmgr.FindDevices<TurboSoundFmPro>().ToArray()) m_bmgr.Remove(ts);
+                    m_device.InternalSound = PentEvoInternalSound.None;
+                }
+            }
             var multiSound = m_bmgr.FindDevice<ZxMultiSoundDevice>();
             if (multiSoundSelected && multiSound == null)
             {
@@ -499,6 +570,9 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 PentEvoZxBusDevice.MultiSoundMax, "ZX-MultiSound Max"));
             comboBox.Items.Add(new SlotChoice(
                 PentEvoZxBusDevice.OmniSound, "ZX OmniSound"));
+            comboBox.Items.Add(new SlotChoice(
+                PentEvoZxBusDevice.SoundCardExtreme, "ZXM Extreme Rev.03"));
+            comboBox.DropDownWidth = 245;
             comboBox.SelectedIndex = 0;
             parent.Controls.Add(comboBox);
             return comboBox;
@@ -561,6 +635,8 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             m_slot2Device.Enabled = m_slot2Enabled.Checked;
             var multiSound = IsMultiSoundBoardEnabled;
             var max = IsMultiSoundMaxBoardEnabled;
+            var extreme = IsExtremeBoardEnabled;
+            m_extremeSwitches.Visible = extreme;
             m_multiSoundSwitches.Visible = multiSound;
             m_maxSwitches.Visible = max;
             var maxTop = multiSound ? 438 : 170;
@@ -568,6 +644,13 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 max ? maxTop + m_maxSwitches.Height + 8 :
                 multiSound ? 170 + m_multiSoundSwitches.Height + 8 : 0);
             var scroll = AutoScrollPosition;
+            if (extreme)
+            {
+                var extremeTop = max ? maxTop + m_maxSwitches.Height + 8 :
+                    multiSound ? 438 : 170;
+                m_extremeSwitches.Location = new Point(4 + scroll.X, extremeTop + scroll.Y);
+                AutoScrollMinSize = new Size(0, extremeTop + m_extremeSwitches.Height + 8);
+            }
             var maxLocation = new Point(4 + scroll.X, maxTop + scroll.Y);
             if (m_maxSwitches.Location != maxLocation)
                 m_maxSwitches.Location = maxLocation;

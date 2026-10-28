@@ -1,0 +1,32 @@
+2026-10-28 — implementation in progress, NOT a completed release.
+Main baseline f945a344ce79df93eac30c3fa9c8208f35a18160, Omni baseline
+756cb473b75390fe6fb7fa27504c8ca8c9886588. New local branches
+codex/extreme-rev03-v91 and codex/extreme-clock-v91; no remote writes.
+Four pre-existing untracked v81 research files must remain untouched/uncommitted.
+Package: L:/Work_two/ZX/ZXMAK2-v91-Extreme-Rev03-Test-20261028
+diagnostics/baseline-v90 is a preserved independent runtime copy.
+References: L:/Work_two/ZX/_reference_ZXM-SoundCard-Extreme-20261028
+
+Implemented: separate Extreme device, CPLD decode, memory-read latch, three
+hardware jumpers, clock switching, board-specific PSG stereo, ZXBUS UI and
+conflict validation. Full managed solution builds. Native DLL built with Zig
+0.15.2 x86-windows-gnu C++14 O2, per-instance clock defaults unchanged at 3.5MHz.
+Tests, review, packaging and final checkpoint remain to be completed.
+
+Important hardware details:
+Rev03 mounting only per MickLab. Rev02 schematic + Rev01 V0100 EPM7064/7128
+source (logic identical). JP2 closed = PentEvo, JP1 closed = YM ports disabled,
+JP3 closed = new SAA 04FF/05FF; open = legacy broad aliases 00FF/01FF.
+Config F0..FF resets to 0xE; #FFFC mask F0FF=F0FC, bits0/1 clock 3.5/2/4MHz,
+bit7 forces chip0. Native FM/SSG/timers must all follow clock, no register reset.
+SAA clock off does not prohibit writes; no hardware SAA or DAC reset pin.
+PentEvo latch clocks on EVERY memory read end, not only M1; writes do not alter.
+Standard mode uses external /DOS pin, not DOSEN; IODOS pulled high on BaseConf.
+SoundDrive #B3 deliberately removed in source; #FB/#3F plus 0F/1F/4F/5F remain.
+Both PSGs A-left B-centre C-right; resistor ratio B 24/47, no synthetic crosstalk.
+Both FM DACs feed both outputs. DAC A+B left, C+D right. No GS/MIDI/OPL3/ROM.
+
+Remaining verification: full-port decode/aliases, timer/SSG/FM clock ratios,
+reset/latch/disabled IO/silent core advance, UI slots/roundtrip/conflict rejection,
+old-card PCM fingerprints and regressions, packaged runtime dependencies.
+No real-board analogue comparison available. Do not claim hardware measurements.

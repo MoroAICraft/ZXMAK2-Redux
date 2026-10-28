@@ -222,7 +222,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             {
                 txtDescription.Text =
                     "Internal music is disabled automatically because " +
-                    "ZX-MultiSound YM/TSFM is active on ZXBUS.";
+                    "a ZXBUS sound card owns the AY/YM ports.";
             }
             else if (cbxPentEvoDevice.SelectedIndex == 2)
             {
