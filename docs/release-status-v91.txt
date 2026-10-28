@@ -1,0 +1,12 @@
+v91 Extreme Rev.03 — TEST, 2026-10-28. User acceptance still required.
+Main branch: codex/extreme-rev03-v91.
+Omni branch: codex/extreme-clock-v91, pinned commit 726c63d.
+Main baseline v90: f945a344ce79df93eac30c3fa9c8208f35a18160.
+Omni baseline: 756cb473b75390fe6fb7fa27504c8ca8c9886588.
+
+Package: L:/Work_two/ZX/ZXMAK2-v91-Extreme-Rev03-Test-20261028
+Report: docs/history/EXTREME_V91_REPORT.txt.
+Source archives and verified local-history bundles in package/source.
+No GitHub writes; no D: runtime/user media modifications. Four pre-existing
+untracked v81 research files remain outside this change and source snapshot.
+Use the complete v90 archive for rollback; do not mix native/managed DLLs.

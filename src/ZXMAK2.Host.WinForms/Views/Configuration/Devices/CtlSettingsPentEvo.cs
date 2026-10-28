@@ -377,6 +377,11 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             if (extremeSelected && (multiSoundSelected || maxSelected || omniSoundSelected))
                 throw new InvalidOperationException("Extreme shares YM/SAA/SounDrive ports " +
                     "with MultiSound/Max/OmniSound. Choose one of these boards.");
+            var internalTsfm = m_bmgr.FindDevice<TurboSoundFmPro>();
+            if (extremeSelected && m_extremeDisableYm.Checked && internalTsfm != null &&
+                internalTsfm.MultiSoundSaaPortCompatibility)
+                throw new InvalidOperationException("Disable TSFM's MultiSound SAA port compatibility " +
+                    "when using Extreme: both would respond to #xxFF.");
 
             if (omniSoundSelected && (neoGsSelected || multiSoundSelected ||
                 maxSelected || moonSoundSelected))

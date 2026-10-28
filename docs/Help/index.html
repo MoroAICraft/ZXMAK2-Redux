@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ZXMAK2 — справка портативной сборки v90</title>
+<title>ZXMAK2 — справка портативной сборки v91</title>
 <style>body{font:17px/1.6 system-ui,sans-serif;max-width:980px;margin:32px auto;padding:0 24px;color:#20252c;background:#f7f8fa}h1,h2{line-height:1.25}nav a{margin-right:16px}table{border-collapse:collapse;width:100%;background:white}td,th{padding:9px 12px;border:1px solid #d8dde5;text-align:left}code,kbd{background:#e6eaf0;padding:2px 5px;border-radius:3px}.note{background:#fff1cb;padding:14px;border-left:4px solid #aa7900}footer{margin:40px 0;color:#596474}</style>
 <h1>ZXMAK2: управление и перенос</h1>
-<p>Тестовая портативная сборка v90. Она станет основной только после подтверждения пользователя.
-SD-папка сохраняется напрямую, без полной копии; звуковые исправления v88 сохранены.</p>
+<p>Тестовая портативная сборка v91. Она станет основной только после подтверждения пользователя.
+Добавлена ZXM-SoundCard Extreme Rev.03 в ZXBUS ZX Evolution. Логика SD-папок и прежних карт сохранена.</p>
 <nav><a href="#keys">Клавиши</a><a href="#models">Машины</a><a href="#media">Носители</a><a href="#portable">Перенос</a><a href="#reset">Сбросы</a><a href="#sound">Звук</a><a href="#debug">Отладчик</a></nav>
 <h2 id="keys">Общие клавиши главного окна</h2>
 <p>Это команды оболочки ZXMAK2, а не сочетания внутри NedoOS, TR-DOS, игры или плеера.
@@ -87,6 +87,21 @@ Ctrl+Alt+F12 удаляет четыре активных файла состо�
 <p>Отдельный Yamaha ROM в Resources/ROMs имеет приоритет перед ROMS.PAK. Старые расположения в корне и roms читаются для совместимости.
 Неправильный размер ROM — ошибка, а не повод незаметно выбрать другой файл.
 Изменяемая виртуальная flash хранится в Data/State/MoonSound и привязана к содержимому заводского ROM.</p>
+<h3 id="extreme">ZXM-SoundCard Extreme Rev.03</h3>
+<p>Alt+P → Other / ZXBUS PentEvo → активный слот → <strong>ZXM Extreme Rev.03</strong> → Apply.
+Это отдельная плата MickLab: два YM2203, SAA1099 и четырёхканальный DAC TLC7226 (SounDrive).
+GS, MIDI UART, OPL3/OPL4 и Yamaha ROM в ней нет. Не выбирайте MultiSound/Max/OmniSound во втором слоте: порты пересекаются.</p>
+<ul><li>JP2: PentEvo mode — включён по умолчанию. Доступ SAA/DAC определяется защёлкой последнего чтения памяти.
+Без JP2 используется физический сигнал /DOS шины, а не просто флаг DOSEN.</li>
+<li>JP1: Disable YM ports — выключен. При включении освобождает порты YM для внутренней музыки;
+управление самой Extreme через #FFFD/#FFFC продолжает работать. Если используете внутреннюю TSFM, её расширение MultiSound SAA ports должно быть выключено.</li>
+<li>Legacy SAA ports — выключен (JP3 замкнут): адрес #05FF, данные #04FF. Включите для старых программ с #01FF/#00FF.
+Это аппаратная перемычка, не перенаправление AY-портов на SAA.</li>
+<li>Частота YM задаётся программой через #FFFC: 3,5 / 2 / 4 МГц. Турборежим CPU не меняет высоту звука.
+Бит 7 #FFFC принудительно выбирает первый YM, не обнуляя второй.</li>
+<li>Громкость платы регулируется под перемычками. Положение сохраняется в VMZ.</li></ul>
+<p>Rev.03 отличается от Rev.02 креплением, а не цифровой логикой. Использованы схема Rev.02 и CPLD Rev.01 V0100.
+Отдельный файл прошивки для запуска этой эмуляции не нужен. Сброс останавливает SAA clock, но не стирает регистры SAA/DAC: у этих чипов нет линии RESET.</p>
 <h2 id="debug">Отладчик — отдельный контекст</h2>
 <p>В стандартном отладчике: F5 — остановка, F7 — шаг с заходом, F8 — шаг с обходом, F9 — продолжить.
 В Adlers F10 — продолжить, F12 — Stack/Breakpoints, Ctrl+F — поиск, Ctrl+G — переход в дизассемблере,
@@ -96,5 +111,5 @@ Ctrl+D — переход в дампе, Escape — закрытие сообщ�
 <p>Сохранена историческая подробная документация: <a href="Legacy/Debugger.htm">отладчик</a>,
 <a href="Legacy/Assembler.html">ассемблер</a>, <a href="Legacy/Commands.htm">команды</a>.
 Её старые назначения клавиш и пути могут быть устаревшими: для них используйте разделы новой справки выше.</p>
-<footer>Документация v87, 10 октября 2026. Непроверенные сценарии перечисляются в отчёте сборки; наличие функции в коде не заменяет проверку на машине пользователя.</footer>
+<footer>Документация v91, 28 октября 2026. Непроверенные сценарии перечисляются в отчёте сборки; наличие функции в коде не заменяет проверку на машине пользователя.</footer>
 </html>

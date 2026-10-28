@@ -1,0 +1,115 @@
+ZXMAK2 v91 — ZXM-SoundCard Extreme Rev.03, 2026-10-28
+TEST build; approval by the user is required before adopting as the working base.
+
+SCOPE AND HARDWARE
+Separate ZX Evolution ZXBUS board. Not a renamed MultiSound or OmniSound.
+Primary specification: http://micklab.ru/My%20Soundcard/ZXMSoundCard.htm
+Local references: L:/Work_two/ZX/_reference_ZXM-SoundCard-Extreme-20261028.
+Rev.03 adds mounting holes; digital implementation follows the Rev.02 schematic
+and Rev.01 V0100 dd2.tdf. EPM7064/7128 equations agree. No external firmware file
+is needed at runtime: the CPLD logic is implemented as bus behavior.
+
+2 x YM2203, SAA1099, TLC7226. No GS, MIDI UART, OPL3/4 or sample-ROM block.
+YM address/read mask C0FF=C0FD, data C0FF=80FD. F0..FF values set board config.
+Reset config E: YM0, register read, FM DAC off, SAA clock off.
+#FFFC mask F0FF=F0FC; bits0/1 select 3.5/2/4 MHz; bit7 forces YM0, preserves YM1.
+FM synthesis, SSG oscillators and timers track the selected external clock.
+No address/data reset on clock switching. FM DAC mute does not stop timers/core.
+PA/PB are unconnected; input reads FF. FM registers do not fabricate readback.
+
+JP1 gates YM chip access only; board config/clock writes remain available.
+JP2 closed (default) uses the end-of-every-memory-read latch, NOT only M1.
+A14|A15 controls SAA/DAC visibility; writes do not change that latch.
+JP2 open uses physical ZXBUS /DOS (mapped page bit), not Memory.DOSEN.
+IODOS is pulled high on BaseConf. YM/config ports are independent of this gate.
+JP3 closed: #05FF address / #04FF data, mask CEFF=04FF. Legacy option opens JP3:
+#01FF/#00FF, mask C0FF=00FF. Bit3 config stops the clock, not register writes.
+There is no fictitious AY-port redirection to SAA. SAA/DAC have no reset pins;
+CPU reset preserves their registers. Power-on uses deterministic initial state.
+DAC decode 00AF=000F plus #3F and #FB, A4/A6 selects channel. #B3 deliberately
+excluded in author's CPLD. A+B left, C+D right. PSGs both A-left/B-centre/C-right;
+B relative resistor weight 24/47, approximated by 51%. FM on both outputs.
+
+UI AND CONFLICT PROTECTION
+Alt+P -> Other / ZXBUS PentEvo -> Slot 1 or 2 -> ZXM Extreme Rev.03.
+Hardware jumpers and board volume are saved in VMZ. Internal AY/YM disabled
+while Extreme owns YM; JP1 may release it. MultiSound/Max/Omni rejected because
+ports overlap. Internal TSFM with optional MultiSound-SAA aliases is rejected
+when JP1 releases YM. MoonSound/NeoGS/ZXNetUSB may use the other slot.
+Standalone CovoxMono does not double-mix an Extreme-owned #FB write.
+Existing enum entries keep their numeric values (new entry appended).
+Full package selects Extreme in slot1 and mounts no media. Clean archive omits
+root sidecars, retaining existing factory template; choose Extreme manually.
+
+PRODUCTION CHANGES
+src/ZXMAK2.Hardware/Evo/ZxmSoundCardExtreme.cs — board/CPLD/jumpers/renderers.
+src/ZXMAK2.Hardware/Evo/UlaPentEvo.cs — appended ZXBUS slot identity.
+src/ZXMAK2.Hardware/ZXMAK2.Hardware.csproj — compile the new board.
+src/ZXMAK2.Hardware/Evo/TurboSoundFmPro.cs — optional per-board PSG stereo weights;
+  existing constructor call sites preserve their prior routing.
+src/ZXMAK2.Hardware.Circuits/Sound/PsgChip.cs — instance-local stereo table setter.
+src/ZXMAK2.Hardware/General/CovoxMono.cs — suppress duplicate active Extreme DAC.
+src/ZXMAK2.Host.WinForms/Views/Configuration/Devices/CtlSettingsPentEvo.cs — slot,
+  jumpers, volume, pre-Apply conflict checks.
+src/ZXMAK2.Host.WinForms/Views/Configuration/Devices/CtlSettingsGenericSound.cs —
+  generic internal-Music override description instead of always saying MultiSound.
+src/ZXMAK2.Host.WinForms/Views/FormMachineSettings.cs — managed slot device listing.
+src/ZX-OmniSound/src/OmniOpnFmRenderer.cs and native/YmfmOpn/ymfm_opn_bridge.cpp,
+  omni_opn.dll — instance clock setter. Old default remains exactly 3500000 Hz.
+Unmodified upstream ymfm engines; no CPU, memory, SD or keyboard rewrites.
+Help, README, test runner, preset and local checkpoint/source records updated.
+
+VERIFICATION
+Release/Any CPU solution builds. Existing code-analysis ruleset warnings only.
+Runtime EXEs have x86 flag, native DLL built Zig 0.15.2 x86-windows-gnu C++14 O2.
+ExtremeProbe: 590040 assertions PASS, including all 65536 IO addresses for YM,
+both SAA decode modes and DAC channels; memory-read latch; reset; unconnected
+ports; jumpers; both slots/VMZ/volume; conflict rejection; SAA/FM mute/resume;
+PSG stereo; DAC ownership; physical DOS gating.
+FM observed 228.826 / 130.760 / 261.522 Hz for 3.5 / 2 / 4 MHz oscillator.
+Long timer B: 17591 / 30745 / 15373 Spectrum CPU tacts, correct clock ratios.
+Actual BaseConf CPU modes 3.5 / 7 / 14 MHz: identical FM 228.826 Hz.
+Author's unchanged AmMusic STPlayer routine + buggos party.str executes through
+Z80/MemoryPentEvo, sets #FFFC to CPC clock, returns each call and produces varying
+audio in all 150 frames. PCM SHA256:
+AADF641CDACA91F6CB289D502B1AD345421D1E8C9CE05A452412025CF201D553.
+~1.2 seconds wall time for 3 seconds of guest frames on this host (not a rigorous
+performance comparison or guarantee for other systems).
+
+Old SoundCardsProbe v90/new: 219 assertions each, same FM PCM fingerprints for
+eight algorithms and feedback/detune/KS cases across TSFM/MultiSound/Max/Omni.
+Existing MoonSound/flash (44.1/48/96k), OmniSound, Omni/Max OPL, MultiSound, Max,
+TSFM, master volume, EVO display and host-folder SD tests PASS.
+Private Test.exe initially ran without required x86 flag after a development
+copy; this produced BadImageFormat, fixed in the test copy by the normal runtime
+packaging x86 step. Tests rerun successfully. No production MoonSound workaround.
+Portable core/model-switch/renamed Unicode+space+# path/foreign CWD/native sound
+and soundbank checks PASS. Packaged BaseConf preset executes 200 ROM frames and
+bus XML disconnect/load/reconnect succeeds. This is headless, not manual UI boot.
+Diagnostics are outside release; runtime Data folders are empty at packaging.
+
+LIMITS / NOT VERIFIED
+No physical Extreme board A/B capture; analogue levels/filtering and power-on
+undefined values are not measurement-calibrated. Not a claim of bit-perfect DAC.
+Shared OPN timers/BUSY retain existing host-audio-sample scheduling granularity
+(about 22.7 us at 44.1 kHz); sub-sample/cycle-perfect edges are not established.
+No manual full TRD launch, NedoOS/OmniPlayer listening session, physical 2-card
+combination, full 4K UI interaction or test on another physical Windows PC.
+Guest music test calls the real author's routine, NOT the entire TR-DOS loader.
+Automated UI checks initialize/apply controls; offscreen preview is not a complete
+human visual/DPI check. Machine tests do not establish compatibility of every game.
+No v83 HQ path, no overall sound redesign, no external-media changes.
+
+REPRODUCTION / ROLLBACK
+Full source with pinned OmniSound plus two Git bundles in package/source.
+Main baseline f945a344ce79df93eac30c3fa9c8208f35a18160;
+Omni baseline 756cb473b75390fe6fb7fa27504c8ca8c9886588.
+Working branches codex/extreme-rev03-v91, codex/extreme-clock-v91.
+Build native OPN bridge for x86, then src/ZXVM.sln Release/Any CPU.
+tools/SoundCards/PrepareExtremeRuntime.ps1 takes Baseline and new Destination.
+tools/SoundCards/RunExtreme.ps1 takes Package and optional AmstradFolder.
+AmstradFolder is .../amstrad-source/Amstrad music 1 from the primary references.
+tools/Portable/PackageRuntime.ps1 creates/verifies Full/Clean ZIPs and SHA256 lists.
+Restore a complete old v90 archive for rollback. Do not overlay v91 DLLs into an
+old installation or open its Extreme preset in an older binary. No GitHub push.
+The old v90, previous releases, user D: folders and original music stay untouched.

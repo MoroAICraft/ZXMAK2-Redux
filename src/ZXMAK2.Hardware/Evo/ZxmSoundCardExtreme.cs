@@ -70,6 +70,10 @@ namespace ZXMAK2.Hardware.Evo
                 bmgr.FindDevice<TurboSoundFmPro>() != null))
                 throw new InvalidOperationException("Extreme YM ports require Internal Music: None " +
                     "(or close JP1 to disable Extreme YM ports).");
+            var tsfm = bmgr.FindDevice<TurboSoundFmPro>();
+            if (tsfm != null && tsfm.MultiSoundSaaPortCompatibility)
+                throw new InvalidOperationException("Disable TSFM's MultiSound SAA port compatibility " +
+                    "when using Extreme: both would respond to #xxFF.");
             base.BusInit(bmgr);
             m_memory = bmgr.FindDevice<MemoryPentEvo>();
             foreach (BusDeviceBase renderer in m_renderers) renderer.BusInit(bmgr);

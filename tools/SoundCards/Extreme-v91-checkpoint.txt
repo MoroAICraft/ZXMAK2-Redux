@@ -1,4 +1,4 @@
-2026-10-28 — implementation in progress, NOT a completed release.
+2026-10-28 — implementation/tests complete; v91 remains TEST pending user approval.
 Main baseline f945a344ce79df93eac30c3fa9c8208f35a18160, Omni baseline
 756cb473b75390fe6fb7fa27504c8ca8c9886588. New local branches
 codex/extreme-rev03-v91 and codex/extreme-clock-v91; no remote writes.
@@ -11,7 +11,9 @@ Implemented: separate Extreme device, CPLD decode, memory-read latch, three
 hardware jumpers, clock switching, board-specific PSG stereo, ZXBUS UI and
 conflict validation. Full managed solution builds. Native DLL built with Zig
 0.15.2 x86-windows-gnu C++14 O2, per-instance clock defaults unchanged at 3.5MHz.
-Tests, review, packaging and final checkpoint remain to be completed.
+590040 Extreme assertions, real guest music routine, BaseConf 3.5/7/14MHz,
+old-card fingerprints and portable tests passed. Final packaging/checks recorded
+in package diagnostics. Report: docs/history/EXTREME_V91_REPORT.txt.
 
 Important hardware details:
 Rev03 mounting only per MickLab. Rev02 schematic + Rev01 V0100 EPM7064/7128
@@ -26,7 +28,6 @@ SoundDrive #B3 deliberately removed in source; #FB/#3F plus 0F/1F/4F/5F remain.
 Both PSGs A-left B-centre C-right; resistor ratio B 24/47, no synthetic crosstalk.
 Both FM DACs feed both outputs. DAC A+B left, C+D right. No GS/MIDI/OPL3/ROM.
 
-Remaining verification: full-port decode/aliases, timer/SSG/FM clock ratios,
-reset/latch/disabled IO/silent core advance, UI slots/roundtrip/conflict rejection,
-old-card PCM fingerprints and regressions, packaged runtime dependencies.
+Remaining USER verification: actual UI/guest players and listening on their
+machine; physical board capture not available. Full runtime/DLLs must stay together.
 No real-board analogue comparison available. Do not claim hardware measurements.

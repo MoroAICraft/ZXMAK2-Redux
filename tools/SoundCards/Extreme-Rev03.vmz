@@ -1,0 +1,19 @@
+<VirtualMachine>
+  <Info />
+  <Bus name="ZX-Evo BSconf">
+    <Device type="ZXMAK2.Hardware.Evo.UlaPentEvo, ZXMAK2.Hardware" ulaPlusEnabled="True" internalSound="None" internalSoundVolume="50" zxBusSlot1Enabled="True" zxBusSlot1Device="SoundCardExtreme" zxBusSlot2Enabled="False" zxBusSlot2Device="Empty" />
+    <Device type="ZXMAK2.Hardware.Evo.FddPentEvo, ZXMAK2.Hardware" noDelay="False" logIo="False" />
+    <Device type="ZXMAK2.Hardware.Evo.IdePentEvo, ZXMAK2.Hardware" logIo="False" ideConfigured="False" ideImage="" ideReadOnly="False" ideCdConfigured="False" ideCdDrive="" />
+    <Device type="ZXMAK2.Hardware.Evo.ZsdPentEvo, ZXMAK2.Hardware" sdImage="" sdSource="Image" sdPath="" />
+    <Device type="ZXMAK2.Hardware.Evo.BeeperPentEvo, ZXMAK2.Hardware" volume="50" />
+    <Device type="ZXMAK2.Hardware.General.CovoxMono, ZXMAK2.Hardware" volume="100" noDos="False" mask="255" port="251" gain="100" />
+    <Device type="ZXMAK2.Hardware.General.KeyboardDevice, ZXMAK2.Hardware" noDos="False" mask="247" port="254" />
+    <Device type="ZXMAK2.Hardware.General.TapeDevice, ZXMAK2.Hardware" volume="0" useTraps="True" useAutoPlay="True" noDos="False" mask="247" port="254" bit="6" outputLoopback="False" />
+    <Device type="ZXMAK2.Hardware.General.KempstonJoystick, ZXMAK2.Hardware" interface="0" noDos="True" mask="255" port="31" bitWidth="8" hostId="" />
+    <Device type="ZXMAK2.Hardware.General.KempstonMouseDevice, ZXMAK2.Hardware" noDos="False" maskX="65535" portX="64479" maskY="65535" portY="65503" maskB="65535" portB="64223" />
+    <Device type="ZXMAK2.Hardware.Evo.CmosPentEvo, ZXMAK2.Hardware" />
+    <Device type="ZXMAK2.Hardware.General.Debugger, ZXMAK2.Hardware" />
+    <Device type="ZXMAK2.Hardware.Evo.ZxmSoundCardExtreme, ZXMAK2.Hardware" pentEvoJumper="True" disableYmPorts="False" legacySaaPorts="False" volume="100" />
+    <Device type="ZXMAK2.Hardware.Evo.MemoryPentEvo, ZXMAK2.Hardware" romSet="PentEvo" />
+  </Bus>
+</VirtualMachine>

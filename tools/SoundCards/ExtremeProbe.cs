@@ -28,17 +28,22 @@ static class ExtremeProbe
     sealed class Fixture : IDisposable
     {
         public readonly Spectrum Machine=new Spectrum();
-        public readonly MemorySpectrum48 Memory=new MemorySpectrum48();
+        public readonly IMemoryDevice Memory;
         public readonly ZxmSoundCardExtreme Board=new ZxmSoundCardExtreme();
         public readonly SoundDeviceBase Fm;
-        public Fixture()
+        public Fixture(bool evo=false, bool covox=false)
         {
             Machine.BusManager.Init(Machine,true);Machine.BusManager.Disconnect();Machine.BusManager.Clear();
-            Machine.BusManager.Add(Memory);Machine.BusManager.Add(new UlaSpectrum48());Machine.BusManager.Add(Board);
+            Memory=evo?(IMemoryDevice)new MemoryPentEvo():new MemorySpectrum48();
+            Machine.BusManager.Add((BusDeviceBase)Memory);
+            Machine.BusManager.Add(evo?(BusDeviceBase)new UlaPentEvo():new UlaSpectrum48());Machine.BusManager.Add(Board);
+            if(covox)Machine.BusManager.Add(new ZXMAK2.Hardware.General.CovoxMono());
             Check(Machine.BusManager.Connect(),"Extreme connect");
             Fm=(SoundDeviceBase)Field(Board,"m_fm");
+            Machine.DebugReset();
+            if(evo)((MemoryPentEvo)Memory).ResetState();
             Memory.WRMEM_DBG(0x4000,0x18);Memory.WRMEM_DBG(0x4001,0xFE);
-            Machine.DebugReset();Machine.CPU.regs.PC=0x4000;Machine.CPU.RDMEM(0x4000);
+            Machine.CPU.regs.PC=0x4000;Machine.CPU.RDMEM(0x4000);
         }
         public void Port(int a,int v){Machine.CPU.WRPORT((ushort)a,(byte)v);}
         public byte Read(int a=0xFFFD){return Machine.CPU.RDPORT((ushort)a);}
@@ -191,10 +196,12 @@ static class ExtremeProbe
             Check(b!=null&&b.PentEvoJumperClosed&&!b.LegacySaaPorts,"default jumpers");
             ((CheckBox)Field(ui,"m_extremeLegacySaa")).Checked=true;
             ((CheckBox)Field(ui,"m_extremeDisableYm")).Checked=true;ui.Apply();
+            ((NumericUpDown)Field(ui,"m_extremeVolume")).Value=67;ui.Apply();
             Check(b.LegacySaaPorts&&b.YmPortsDisabled&&!ui.IsAutomaticMultiSoundYmActive,"UI jumpers apply");
             var doc=new XmlDocument();doc.LoadXml("<Device/>");b.SaveConfigXml(doc.DocumentElement);
             var loaded=new ZxmSoundCardExtreme();loaded.LoadConfigXml(doc.DocumentElement);
             Check(loaded.LegacySaaPorts&&loaded.YmPortsDisabled&&loaded.PentEvoJumperClosed,"config XML roundtrip");
+            Check(loaded.Volume==67&&b.SoundRenderers.All(x=>x.Volume==67),"board volume and child renderers persist");
             int other=slot==1?2:1;
             ((CheckBox)Field(ui,"m_slot"+other+"Enabled")).Checked=true;
             Select((ComboBox)Field(ui,"m_slot"+other+"Device"),"ZX-MultiSound Max");
@@ -202,13 +209,139 @@ static class ExtremeProbe
             Check(rejected&&f.Machine.BusManager.FindDevice<ZxMultiSoundMaxDevice>()==null,"reject conflict before modifying bus");
             Select((ComboBox)Field(ui,"m_slot"+other+"Device"),"ZXM-MoonSound Rev.01");ui.Apply();
             Check(f.Machine.BusManager.FindDevice<ZxmMoonSoundDevice>()!=null,"MoonSound has disjoint ports");
+            var ts=new TurboSoundFmPro {MultiSoundSaaPortCompatibility=true};
+            f.Machine.BusManager.Add(ts);rejected=false;try{ui.Apply();}catch(InvalidOperationException){rejected=true;}
+            Check(rejected,"reject internal TSFM legacy SAA overlap when JP1 closed");
+            f.Machine.BusManager.Remove(ts);
             if(slot==1){ui.Size=new Size(540,440);ui.CreateControl();using(var image=new Bitmap(ui.Width,ui.Height)){ui.DrawToBitmap(image,ui.ClientRectangle);image.Save("extreme-settings.png");}}
         }
         Console.WriteLine("ZXBUS slots 1/2, settings persistence, conflict validation PASS");
     }
+    static void Evo()
+    {
+        var hz=new List<double>();
+        foreach(int speed in new[]{1,2,4})using(var f=new Fixture(true))
+        {
+            var m=(MemoryPentEvo)f.Memory;
+            m.SHADOW=true;f.Port(0xFF77,speed==4?0xAB:0xA3);m.TURBO=speed==1;m.LatchClockAtRefresh();
+            Check(m.CpuClockMultiplier==speed,"BaseConf CPU clock selected");
+            f.Memory.WRMEM_DBG(0x4000,0x18);f.Memory.WRMEM_DBG(0x4001,0xFE);
+            f.Port(0xFFFD,0xFA);Tone(f);
+            var samples=new List<short>();for(int i=0;i<40;i++)samples.AddRange(f.Frame().Select(x=>(short)x));
+            hz.Add(Frequency(samples,44100));
+            Console.WriteLine("ZX Evolution CPU {0:F1} MHz: FM {1:F3} Hz",3.5*speed,hz.Last());
+            Check(hz.Last()>200&&hz.Last()<240,"BaseConf independent oscillator");
+            // DOSEN does not gate the YM or PentEvo-jumper peripherals.
+            m.CPM=true;Check(m.DOSEN,"CPM enters DOSEN");f.Machine.CPU.RDMEM(0x4000);
+            f.Port(0xFFFD,0xFE);f.Reg(0,81);Check(f.Read()==81,"YM works with DOSEN");
+            f.Saa(0,0x52);var regs=(byte[])Field(Field(f.Board,"m_saa"),"m_registers");
+            Check(regs[0]==0x52,"SAA PentEvo works with DOSEN");
+            // Standard mode follows actual ZXBUS /DOS by mapped bank, not DOSEN.
+            f.Board.PentEvoJumperClosed=false;
+            foreach(int port in new[]{0x04FF,0x14FF,0x24FF,0x34FF})
+            {
+                bool available=(bool)Call(m,"GetZxBusDosN",(ushort)port);
+                Call(Field(f.Board,"m_saa"),"SetReg",0,(byte)0);
+                f.Port(port+256,0);f.Port(port,0x37);
+                Check(regs[0]==(available?0x37:0),"standard mode uses physical DOS signal");
+            }
+        }
+        Check(hz.Max()-hz.Min()<0.2,"CPU turbo does not detune sound");
+        using(var f=new Fixture(false,true))
+        {
+            f.Port(0xFB,255);f.Frame();
+            var covox=f.Machine.BusManager.FindDevice<ZXMAK2.Hardware.General.CovoxMono>();
+            Check(covox.AudioBuffer.All(x=>x==0),"standalone Covox not doubled on Extreme FB");
+            Check(((byte[])Field(f.Board,"m_dac"))[3]==255,"Extreme receives FB");
+        }
+        Console.WriteLine("BaseConf 3.5/7/14 MHz, physical DOS gating and Covox ownership PASS");
+    }
+    static int Peak(uint[] wave,bool right)
+    { return wave.Max(x=>Math.Abs((int)(short)(right?x>>16:x))); }
+    static int Swing(uint[] wave,bool right)
+    { return wave.Max(x=>(int)(short)(right?x>>16:x))-wave.Min(x=>(int)(short)(right?x>>16:x)); }
+    static void Outputs()
+    {
+        using(var f=new Fixture())
+        {
+            var psg=(Array)Field(f.Board,"m_psg");
+            foreach(int chip in new[]{0,1})
+            {
+                f.Port(0xFFFD,0xFE|chip);f.Reg(7,0x3E);f.Reg(0,100);f.Reg(1,0);f.Reg(8,15);f.Frame();
+                var wave=((SoundDeviceBase)psg.GetValue(chip)).AudioBuffer;
+                Check(Swing(wave,false)>1000&&Swing(wave,true)==0,"both PSG A channels left only");
+                f.Reg(8,0);f.Reg(7,0x3B);f.Reg(4,100);f.Reg(5,0);f.Reg(10,15);f.Frame();f.Frame();
+                wave=((SoundDeviceBase)psg.GetValue(chip)).AudioBuffer;
+                Check(Swing(wave,true)>1000&&Swing(wave,false)==0,"both PSG C channels right only");
+                f.Reg(10,0);
+            }
+            f.Port(0xFFFD,0xF6);f.Saa(0,0xFF);f.Saa(8,0x90);f.Saa(0x10,4);f.Saa(0x14,1);f.Saa(0x1C,1);
+            var saa=(SoundDeviceBase)Field(f.Board,"m_saa");f.Frame();f.Frame();
+            Check(Peak(saa.AudioBuffer,false)>100&&Peak(saa.AudioBuffer,true)>100,"SAA stereo audio");
+            f.Port(0xFFFD,0xFE);f.Frame();f.Frame();
+            Check(saa.AudioBuffer.All(x=>x==0),"SAA clock-off mutes renderer");
+            f.Port(0xFFFD,0xF6);f.Frame();f.Frame();
+            Check(Peak(saa.AudioBuffer,false)>100,"SAA resumes retained voice");
+            f.Port(0xFFFD,0xFA);Tone(f);f.Frame();
+            Check(Peak(f.Fm.AudioBuffer,false)>0&&f.Fm.AudioBuffer.All(x=>(short)x==(short)(x>>16)),"FM routes to both outputs");
+            f.Port(0xFFFD,0xFE);f.Frame();f.Frame();Check(f.Fm.AudioBuffer.All(x=>x==0),"FM DAC off");
+            f.Port(0xFFFD,0xFA);f.Frame();Check(Peak(f.Fm.AudioBuffer,false)>0,"FM resume without reprogramming");
+            f.Port(0xFFFC,3);f.Machine.DebugReset();
+            Check(f.Board.InputClock==3500000&&(int)psg.GetValue(0).GetType().GetProperty("ChipFrequency").GetValue(psg.GetValue(0),null)==1750000,"reset restores both oscillator paths");
+        }
+        Console.WriteLine("PSG resistor stereo, SAA/FM audio, mute/resume and reset PASS");
+    }
+    static void Guest(string folder)
+    {
+        using(var f=new Fixture(true))
+        {
+            byte[] code=File.ReadAllBytes(Path.Combine(folder,"AmMusic.bin"));
+            byte[] music=File.ReadAllBytes(Path.Combine(folder,"Music","Module str","buggos party.str"));
+            for(int i=0;i<code.Length;i++)f.Memory.WRMEM_DBG((ushort)(0x6000+i),code[i]);
+            for(int i=0;i<music.Length;i++)f.Memory.WRMEM_DBG((ushort)(0xC000+i),music[i]);
+            // Unchanged guest player routine; skip its LD HL,0 placeholder.
+            byte[] init={0xF3,0x01,0xFC,0xFF,0x3E,0x01,0xED,0x79,0x21,0x00,0xC0,0xCD,0xFC,0x62,0x18,0xFE};
+            for(int i=0;i<init.Length;i++)f.Memory.WRMEM_DBG((ushort)(0x5000+i),init[i]);
+            f.Machine.CPU.regs.SP=0xBFFF;f.Machine.CPU.regs.PC=0x5000;f.Frame();
+            Check(f.Machine.CPU.regs.PC==0x500E,"Mick guest init returns");
+            byte[] play={0xCD,0xFF,0x62,0x18,0xFE};
+            for(int i=0;i<play.Length;i++)f.Memory.WRMEM_DBG((ushort)(0x5000+i),play[i]);
+            int active=0;var wave=new List<uint>();var watch=Stopwatch.StartNew();
+            for(int i=0;i<150;i++)
+            {
+                f.Machine.CPU.regs.PC=0x5000;f.Frame();
+                Check(f.Machine.CPU.regs.PC==0x5003,"Mick guest play returns");
+                var psg=((SoundDeviceBase)((Array)Field(f.Board,"m_psg")).GetValue(0)).AudioBuffer;
+                if(Swing(psg,false)>100||Swing(psg,true)>100)active++;wave.AddRange(psg);
+            }
+            watch.Stop();Check(active>140,"real guest module produces audio");
+            Check(f.Board.InputClock==2000000,"guest OUT selects CPC clock");
+            byte[] bytes=new byte[wave.Count*4];Buffer.BlockCopy(wave.ToArray(),0,bytes,0,bytes.Length);
+            using(var sha=SHA256.Create())Console.WriteLine("Mick AmMusic/STPlayer, buggos party, 150 frames: active={0}, {1:F1} ms, PCM SHA256={2}",active,watch.Elapsed.TotalMilliseconds,BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-",""));
+        }
+    }
+    static void Profile(string path)
+    {
+        using(var machine=new Spectrum())
+        {
+            machine.BusManager.Init(machine,true);machine.BusManager.Disconnect();machine.BusManager.Clear();
+            var doc=new XmlDocument();doc.Load(path);machine.BusManager.LoadConfigXml(doc.DocumentElement.SelectSingleNode("Bus"));
+            var board=machine.BusManager.FindDevice<ZxmSoundCardExtreme>();
+            Check(board!=null,"packaged profile contains Extreme");
+            Check(machine.BusManager.FindDevice<MemoryPentEvo>()!=null,"packaged profile is ZX Evolution");
+            machine.DebugReset();for(int i=0;i<200;i++)machine.ExecuteFrame();
+            var saved=new XmlDocument();saved.LoadXml("<Bus/>");machine.BusManager.SaveConfigXml(saved.DocumentElement);
+            machine.BusManager.Disconnect();machine.BusManager.Clear();machine.BusManager.LoadConfigXml(saved.DocumentElement);
+            board=machine.BusManager.FindDevice<ZxmSoundCardExtreme>();
+            Check(board!=null&&board.PentEvoJumperClosed&&!board.LegacySaaPorts,"full bus roundtrip");
+            for(int i=0;i<10;i++)machine.ExecuteFrame();
+            Console.WriteLine("Packaged BaseConf ROM boot, 200 frames, bus XML reconnect: PASS; PC={0:X4}",machine.CPU.regs.PC);
+        }
+    }
     [STAThread] static int Main(string[] args)
     {
-        try{Decode();Peripheral();Clocks();Configuration();Console.WriteLine("PASS: {0} assertions",checks);return 0;}
+        PortableBootstrap.Initialize();
+        try{if(args.Length==2&&args[0]=="--profile")Profile(args[1]);else{Decode();Peripheral();Clocks();Configuration();Evo();Outputs();if(args.Length>0)Guest(args[0]);}Console.WriteLine("PASS: {0} assertions",checks);return 0;}
         catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
     }
 }
