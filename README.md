@@ -1,8 +1,8 @@
 # ZXMAK2 Fork — ZX Evo BaseConf RC1
 
 Local working versions, control sources and build archives:
-[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Latest local candidate: v90 Portable
-Direct SD Folder TEST, retaining v88 sound; user acceptance is required.
+[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Latest local candidate: v92 BaseConf
+Prefinal TEST, based on v91; user acceptance is required.
 The accepted v84 control and historical audio experiments remain preserved.
 
 ZXMAK2 Fork is a Windows emulator focused on ZX Evolution BaseConf. It models

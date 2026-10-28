@@ -31,11 +31,11 @@ namespace ZXMAK2.Serializers.TapeSerializers
 		
 		public override void Deserialize(Stream stream)
 		{
-            _tape.Blocks.Clear();
             // Keep the image in its native 3.5 MHz tape-tact timebase.
             // The active machine applies its conversion while playing; this
             // lets one already-loaded tape survive a machine switch.
             var blocks = Load(stream);
+            _tape.Blocks.Clear(); // Keep the old tape if preparation throws.
             if (blocks != null)
             {
                 _tape.Blocks.AddRange(blocks);

@@ -631,7 +631,7 @@ namespace ZXMAK2.Host.Presentation
             }
             if (m_startupImage != null)
             {
-                Title = m_vm.Spectrum.BusManager.LoadManager.OpenFileName(m_startupImage, true);
+                OpenFile(m_startupImage, !BaseConfMedia.IsActive(m_vm.Spectrum));
             }
             SetTapeDevice(m_vm.Spectrum.BusManager.FindDevice<ITapeDevice>());
             m_vm.DoRun();
@@ -798,7 +798,8 @@ namespace ZXMAK2.Host.Presentation
             using (loadDialog)
             {
                 loadDialog.Title = "Open...";
-                loadDialog.Filter = m_vm.Spectrum.BusManager.LoadManager.GetOpenExtFilter();
+                loadDialog.Filter = BaseConfMedia.IsActive(m_vm.Spectrum) ? BaseConfMedia.Filter :
+                    m_vm.Spectrum.BusManager.LoadManager.GetOpenExtFilter();
                 loadDialog.FileName = "";
                 loadDialog.ShowReadOnly = true;
                 loadDialog.ReadOnlyChecked = false;
@@ -1281,7 +1282,8 @@ namespace ZXMAK2.Host.Presentation
             using (dialog)
             {
                 dialog.Title = "Load Tape...";
-                dialog.Filter = "Tape images (*.tap, *.tzx, *.csw, *.wav)|*.tap;*.tzx;*.csw;*.wav";
+                dialog.Filter = BaseConfMedia.IsActive(m_vm.Spectrum) ? "TAP tape (*.tap)|*.tap" :
+                    "Tape images (*.tap, *.tzx, *.csw, *.wav)|*.tap;*.tzx;*.csw;*.wav";
                 dialog.FileName = string.Empty;
                 dialog.ShowReadOnly = false;
                 dialog.ReadOnlyChecked = true;
@@ -1488,8 +1490,9 @@ namespace ZXMAK2.Host.Presentation
                 }
                 var uri = objUri as Uri;
                 return uri != null && 
-                    (!uri.IsLoopback ||
-                    m_vm.Spectrum.BusManager.LoadManager.CheckCanOpenFileName(uri.LocalPath));
+                    (BaseConfMedia.IsActive(m_vm.Spectrum)
+                        ? uri.IsFile && BaseConfMedia.Supports(uri.LocalPath)
+                        : !uri.IsFile || m_vm.Spectrum.BusManager.LoadManager.CheckCanOpenFileName(uri.LocalPath));
             }
             catch (Exception ex)
             {
@@ -1511,9 +1514,9 @@ namespace ZXMAK2.Host.Presentation
                     return;
                 }
                 var uri = (Uri)objUri;
-                if (uri.IsLoopback)
+                if (uri.IsFile)
                 {
-                    OpenFile(uri.LocalPath, true);
+                    OpenFile(uri.LocalPath, !BaseConfMedia.IsActive(m_vm.Spectrum));
                 }
                 else
                 {
@@ -1564,7 +1567,8 @@ namespace ZXMAK2.Host.Presentation
             {
                 var loadDialog = sender as IOpenFileDialog;
                 if (loadDialog == null) return;
-                e.Cancel = !m_vm.Spectrum.BusManager.LoadManager.CheckCanOpenFileName(loadDialog.FileName);
+                e.Cancel = BaseConfMedia.IsActive(m_vm.Spectrum) ? !BaseConfMedia.Supports(loadDialog.FileName) :
+                    !m_vm.Spectrum.BusManager.LoadManager.CheckCanOpenFileName(loadDialog.FileName);
             }
             catch (Exception ex)
             {
@@ -1580,6 +1584,33 @@ namespace ZXMAK2.Host.Presentation
             m_vm.DoStop();
             try
             {
+                if (BaseConfMedia.IsActive(m_vm.Spectrum))
+                {
+                    var data = BaseConfMedia.ReadValidated(fileName);
+                    var extension = Path.GetExtension(fileName).ToLowerInvariant();
+                    if (extension == ".trd" || extension == ".scl")
+                    {
+                        if (!BaseConfMedia.OpenDisk(m_vm.Spectrum, fileName, data, readOnly,
+                            m_resolver.Resolve<IUserQuery>(), m_userMessage)) return;
+                    }
+                    else
+                    {
+                        var serializer = m_vm.Spectrum.BusManager.LoadManager.GetSerializer(extension);
+                        if (serializer == null || !serializer.CanDeserialize)
+                            throw new InvalidOperationException("This machine has no loader for " + extension);
+                        if (extension == ".sna")
+                            foreach (var session in m_vm.Bus.FindDevices<IWritableSdSession>())
+                                if (session.HasPendingChanges && !session.PrepareForMediaChange()) return;
+                        using (var stream = new MemoryStream(data, false)) serializer.Deserialize(stream);
+                        serializer.SetSource(PortablePaths.Store(fileName));
+                        serializer.SetReadOnly(readOnly);
+                        // SNA already restored CPU/RAM. Never reset after loading it.
+                    }
+                    Title = Path.GetFileName(fileName);
+                    m_vm.SaveConfig();
+                    UpdateAllCommands();
+                    return;
+                }
                 if (m_vm.Spectrum.BusManager.LoadManager.CheckCanOpenFileName(fileName))
                 {
                     string imageName = m_vm.Spectrum.BusManager.LoadManager.OpenFileName(fileName, readOnly);

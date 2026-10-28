@@ -61,6 +61,9 @@ namespace ZXMAK2.Hardware.General
 
 
         public ISerializeManager[] LoadManagers { get; private set; }
+        // A settings-only bus reconnect need not eject unchanged in-memory disks.
+        // Owned by the stopped-VM settings transaction, cleared in its finally.
+        public bool PreserveMediaOnReconnect { get; set; }
         
 
         #region IBusDevice
@@ -92,7 +95,7 @@ namespace ZXMAK2.Hardware.General
 
         public override void BusConnect()
         {
-            if (!m_sandbox)
+            if (!m_sandbox && !PreserveMediaOnReconnect)
             {
                 foreach (var di in m_wd.FDD)
                 {
@@ -103,7 +106,7 @@ namespace ZXMAK2.Hardware.General
 
         public override void BusDisconnect()
         {
-            if (!m_sandbox)
+            if (!m_sandbox && !PreserveMediaOnReconnect)
             {
                 foreach (var di in m_wd.FDD)
                 {
@@ -121,6 +124,7 @@ namespace ZXMAK2.Hardware.General
             base.OnConfigLoad(itemNode);
             NoDelay = Utils.GetXmlAttributeAsBool(itemNode, "noDelay", false);
             LogIo = Utils.GetXmlAttributeAsBool(itemNode, "logIo", false);
+            if (PreserveMediaOnReconnect) return;
             for (var i = 0; i < m_wd.FDD.Length; i++)
             {
                 var inserted = false;

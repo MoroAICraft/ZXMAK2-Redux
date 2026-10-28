@@ -754,6 +754,11 @@ namespace ZXMAK2.Host.WinForms.Views
 
         private void btnApply_Click(object sender, EventArgs e)
         {
+            var running = m_vm.IsRunning;
+            XmlNode rollback = null;
+            bool reloadStarted = false;
+            bool canResume = true;
+            FddController retainedFdd = null;
             try
             {
                 foreach (var csc in m_ctlList)
@@ -782,6 +787,15 @@ namespace ZXMAK2.Host.WinForms.Views
                 var neoGsSdMediaChanged = IsNeoGsSdMediaChanged(
                     GetNeoGsMediaDevice(m_vm.Bus),
                     GetNeoGsMediaDevice(m_workBus));
+                var soundHardwareChanged = MachineSettingsPolicy.SoundHardwareChanged(m_vm.Bus, m_workBus);
+                m_vm.DoStop();
+                if (MachineSettingsPolicy.TryApplyVolumes((BusManager)m_vm.Bus, m_workBus))
+                {
+                    foreach (var joystick in m_ctlList.OfType<CtlSettingsJoystick>()) joystick.CommitProfileLibrary();
+                    m_vm.SaveConfig();
+                    Close();
+                    return;
+                }
 
                 if (!m_workBus.Connect())
                 {
@@ -795,7 +809,6 @@ namespace ZXMAK2.Host.WinForms.Views
                 XmlNode root = xml.AppendChild(xml.CreateElement("Bus"));
                 m_workBus.SaveConfigXml(root);
 
-                bool running = m_vm.IsRunning;
                 // Internal Apply calls during Add/rebuild only stage edits.
                 // Write the shared profile library at the user's final Apply.
                 m_vm.DoStop();
@@ -808,20 +821,32 @@ namespace ZXMAK2.Host.WinForms.Views
                         m_vm.DoRun();
                     return;
                 }
+                // Any full bus reconnect closes the SD session, even if the
+                // settings change was unrelated to storage. Never silently lose it.
+                foreach (var session in m_vm.Bus.FindDevices<IWritableSdSession>())
+                    if (session.HasPendingChanges && !session.PrepareForMediaChange()) return;
                 foreach(var joystick in m_ctlList.OfType<CtlSettingsJoystick>()) joystick.CommitProfileLibrary();
 
 
                 var bmgr = m_vm.Bus;
+                rollback = MachineSettingsPolicy.Snapshot(bmgr);
+                // Save-as may have moved an image to a portable local path.
+                // Do not reload the stale pre-save path from the settings sandbox.
+                MachineSettingsPolicy.RefreshSavedMediaPaths(root, rollback, sdMediaChanged, neoGsSdMediaChanged);
+                retainedFdd = bmgr.FindDevice<FddController>();
+                if (retainedFdd != null)
+                    retainedFdd.PreserveMediaOnReconnect = MachineSettingsPolicy.SameFloppies(rollback, root, retainedFdd.GetType().FullName);
 
                 // workaround to save border color + Reset in case when memory changed
                 var ula = bmgr.FindDevice<IUlaDevice>();
                 var oldMemory = bmgr.FindDevice<IMemoryDevice>();
                 int portFE = ula != null ? ula.PortFE : 0x00;
-                bmgr.LoadConfigXml(root);
+                reloadStarted = true;
+                ((BusManager)bmgr).LoadConfigXmlChecked(root);
                 ula = bmgr.FindDevice<IUlaDevice>();
-                ula.PortFE = (byte)portFE;
+                if (ula != null) ula.PortFE = (byte)portFE;
                 var memory = bmgr.FindDevice<IMemoryDevice>();
-                if (ideMediaChanged || sdMediaChanged || neoGsSdMediaChanged)
+                if (ideMediaChanged || sdMediaChanged || neoGsSdMediaChanged || soundHardwareChanged)
                 {
                     // Media replacement is completed by the same cold start
                     // for IDE and SD. The emulated device sees a clean power
@@ -841,8 +866,28 @@ namespace ZXMAK2.Host.WinForms.Views
             {
                 Logger.Error(ex);
                 m_workBus.Disconnect();
+                if (reloadStarted && rollback != null)
+                {
+                    try
+                    {
+                        ((BusManager)m_vm.Bus).LoadConfigXmlChecked(rollback);
+                        m_vm.DoPowerCycle();
+                    }
+                    catch (Exception restoreError)
+                    {
+                        canResume = false;
+                        Logger.Error(restoreError);
+                    }
+                }
                 Locator.Resolve<IUserMessage>()
-                    .Error("Apply failed!\n\n{0}", ex.Message);
+                    .Error("Apply failed!\n\n{0}{1}", ex.Message,
+                        reloadStarted ? (canResume ? "\nPrevious configuration restored and restarted." :
+                        "\nRestore failed. The machine is paused; see the log.") : "");
+            }
+            finally
+            {
+                if (retainedFdd != null) retainedFdd.PreserveMediaOnReconnect = false;
+                if (running && canResume && !m_vm.IsRunning) m_vm.DoRun();
             }
         }
 

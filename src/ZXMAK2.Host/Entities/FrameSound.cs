@@ -10,7 +10,9 @@ namespace ZXMAK2.Host.Entities
     {
         private readonly uint[] _mixBuffer;
         private readonly bool _rejectDc;
-        private readonly int _masterVolume;
+        private int _masterVolume;
+        public void SetMasterVolume(int value)
+        { _masterVolume = Math.Max(0, Math.Min(200, value)); }
         private readonly int[] _sourceGains;
         private readonly bool _hasSourceGain;
         private readonly bool _useModernMix;

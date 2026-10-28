@@ -5,8 +5,10 @@ using ZXMAK2.Engine.Interfaces;
 
 namespace ZXMAK2.Hardware.Evo
 {
-    public class FddPentEvo : FddController
+    public class FddPentEvo : FddController, IHostFloppyVisibility
     {
+        public bool IsHostDriveVisible(int driveIndex)
+        { return driveIndex >= 0 && driveIndex < 4 && (m_p13BD & (1 << driveIndex)) == 0; }
         private byte m_p2F, m_p4F, m_p6F, m_p8F;
         private byte m_p13BD;
         private byte m_lastSystem;

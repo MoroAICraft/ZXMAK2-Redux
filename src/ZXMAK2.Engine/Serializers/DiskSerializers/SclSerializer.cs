@@ -46,7 +46,7 @@ namespace ZXMAK2.Serializers.DiskSerializers
 
         private void loadFromStream(Stream stream)
         {
-            if (stream.Length < 9 || stream.Length > 2544 * 256 + 9)
+            if (stream.Length < 9 || stream.Length > 2544 * 256 + 9 + 128 * 14 + 4)
             {
                 Locator.Resolve<IUserMessage>()
                     .Error("SCL loader\n\nInvalid SCL file size!");

@@ -89,7 +89,8 @@ namespace ZXMAK2.Hardware.Evo
             bmgr.Events.SubscribeRdMemM1(0, 0, TrackMemoryRead);
             bmgr.Events.SubscribeRdMem(0, 0, TrackMemoryRead);
             bmgr.Events.SubscribeReset(ResetBoard);
-            ResetBoard();
+            // Bus reattachment (e.g. Apply video settings) is not a board reset.
+            // Constructor and the real reset event establish power-on state.
         }
 
         public override void BusConnect()

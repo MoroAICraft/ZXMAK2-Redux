@@ -153,6 +153,7 @@ namespace ZXMAK2.Host.WinForms.Controls
         private readonly HashSet<ToolStrip> _strips = new HashSet<ToolStrip>();
         private readonly HashSet<ToolStrip> _focusedStrips = new HashSet<ToolStrip>();
         private bool _disposed;
+        public bool HasActiveMenu { get { return _openMenus.Count != 0 || _focusedStrips.Count != 0; } }
 
         public HostKeyboardMessageFilter(Form form, HostKeyboardRouter router)
         {

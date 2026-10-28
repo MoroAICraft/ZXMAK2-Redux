@@ -20,10 +20,18 @@ namespace ZXMAK2
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void Run(string[] args)
         {
-            PortablePaths.AcquireInstance();
+            try { PortablePaths.AcquireInstance(); }
+            catch (System.IO.IOException)
+            {
+                if (args.Length == 1 && System.IO.File.Exists(args[0]))
+                { PortableLaunch.Send(args[0]); return; }
+                throw;
+            }
             Logger.Start();
             try
             {
+                PortableLaunch.RegisterOpenWith();
+                PortableLaunch.StartReceiver();
                 AppDomain.CurrentDomain.UnhandledException +=
                     (s, e) => Logger.Fatal(e.ExceptionObject as Exception, "AppDomain.UnhandledException");
                 //AppDomain.CurrentDomain.FirstChanceException += 
@@ -37,6 +45,7 @@ namespace ZXMAK2
             }
             finally
             {
+                PortableLaunch.StopReceiver();
                 Logger.Finish();
                 PortablePaths.ReleaseInstance();
             }

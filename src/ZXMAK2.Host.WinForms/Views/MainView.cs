@@ -91,6 +91,7 @@ namespace ZXMAK2.Host.WinForms.Views
         private bool _isToolBarPopupActive;
         private bool _isFullScreenChanging;
         private bool _isFormShown;
+        private bool _openingExternalFile;
         private readonly HostKeyboardRouter _keyboardRouter = new HostKeyboardRouter();
         private HostKeyboardMessageFilter _keyboardMessages;
 
@@ -853,6 +854,7 @@ namespace ZXMAK2.Host.WinForms.Views
         {
             base.OnShown(e);
             _isFormShown = true;
+            Application.Idle += OpenQueuedFile;
             var available = Screen.FromControl(this).WorkingArea;
             Location = new Point(Math.Max(available.Left, Math.Min(Left, available.Right - Width)),
                 Math.Max(available.Top, Math.Min(Top, available.Bottom - Height)));
@@ -870,6 +872,7 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            Application.Idle -= OpenQueuedFile;
             base.OnFormClosed(e);
             try
             {
@@ -974,6 +977,9 @@ namespace ZXMAK2.Host.WinForms.Views
         {
             // Menu ShortcutKeys are the source of truth, including future additions.
             RegisterMenuShortcuts(mnuStrip.Items);
+            _keyboardRouter.RegisterShortcut(Keys.Control | Keys.F, () =>
+                ClickShortcut(menuViewVideoFilterNoFlick.Checked ? menuViewVideoFilterNone : menuViewVideoFilterNoFlick));
+            menuViewVideoFilterNoFlick.ShortcutKeyDisplayString = "Ctrl+F";
             _keyboardRouter.RegisterShortcut(Keys.Alt | Keys.P, () => ClickShortcut(menuVmSettings));
             _keyboardRouter.RegisterShortcut(Keys.Alt | Keys.Enter, () => ClickShortcut(menuViewFullScreen));
             _keyboardRouter.RegisterShortcut(Keys.Control | Keys.S, () => ClickShortcut(menuVmMaximumSpeed));
@@ -1020,6 +1026,25 @@ namespace ZXMAK2.Host.WinForms.Views
 
 
         #endregion Form Event Handlers
+
+        private void OpenQueuedFile(object sender, EventArgs args)
+        {
+            if (!_isFormShown || _openingExternalFile || !Enabled || CommandOpenUri == null ||
+                (_keyboardMessages != null && _keyboardMessages.HasActiveMenu) ||
+                (Form.ActiveForm != null && Form.ActiveForm != this)) return;
+            string path;
+            if (!PortableLaunch.TryDequeue(out path)) return;
+            _openingExternalFile = true;
+            try
+            {
+                if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+                Activate();
+                var uri = new Uri(path);
+                if (CanExecute(CommandOpenUri, uri)) OnCommand(CommandOpenUri, uri);
+                else _resolver.Resolve<IUserMessage>().Warning("This file is not supported by the active machine:\n" + path);
+            }
+            finally { _openingExternalFile = false; }
+        }
 
 
         #region Drag-n-Drop

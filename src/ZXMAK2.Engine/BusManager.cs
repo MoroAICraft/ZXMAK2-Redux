@@ -64,6 +64,13 @@ namespace ZXMAK2.Engine
         public string Name { get; set; }
         public int SampleRate { get; set; }
         public int MasterVolume { get; set; }
+        // Called only while the VM is stopped; preserve device/timer/filter state.
+        public void SetMasterVolumeLive(int value)
+        {
+            MasterVolume = Math.Max(0, Math.Min(200, value));
+            var frame = m_soundFrame as FrameSound;
+            if (frame != null) frame.SetMasterVolume(MasterVolume);
+        }
         public bool UseLegacyAudioMix { get; set; }
 
         public RzxHandler RzxHandler 
@@ -702,6 +709,16 @@ namespace ZXMAK2.Engine
 
         public void LoadConfigXml(XmlNode busNode)
         {
+            LoadConfigXmlCore(busNode, false);
+        }
+
+        public void LoadConfigXmlChecked(XmlNode busNode)
+        {
+            LoadConfigXmlCore(busNode, true);
+        }
+
+        private void LoadConfigXmlCore(XmlNode busNode, bool strict)
+        {
             //LogAgent.Debug("time begin BusManager.LoadConfig");
             Disconnect();
 
@@ -756,11 +773,13 @@ namespace ZXMAK2.Engine
                     var type = GetTypeByName(fullTypeName, GetAttrString(node, "assembly"));
                     if (type == null)
                     {
+                        if (strict) throw new InvalidOperationException("Device type not found: " + fullTypeName);
                         Logger.Error("Type not found: {0}", fullTypeName);
                         continue;
                     }
                     if (!typeof(BusDeviceBase).IsAssignableFrom(type))
                     {
+                        if (strict) throw new InvalidOperationException("Invalid device: " + fullTypeName);
                         Logger.Error("Invalid Device: {0}", type.FullName);
                         continue;
                     }
@@ -784,12 +803,14 @@ namespace ZXMAK2.Engine
                 catch (Exception ex)
                 {
                     Logger.Error(ex);
+                    if (strict) throw;
                     Locator.Resolve<IUserMessage>()
                         .Error("Load device failed: {0}", ex.Message);
                 }
             }
             Sort();
-            Connect();
+            var connected = Connect();
+            if (strict && !connected) throw new InvalidOperationException("Cannot connect the requested machine configuration.");
             //LogAgent.Debug("time end BusManager.LoadConfig");
         }
 

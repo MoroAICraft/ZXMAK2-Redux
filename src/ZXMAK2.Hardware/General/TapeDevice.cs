@@ -446,7 +446,7 @@ namespace ZXMAK2.Hardware.General
         {
             get
             {
-                if (m_playPosition >= Blocks[m_index].Count)
+                if (m_index < 0 || m_index >= Blocks.Count || m_playPosition >= Blocks[m_index].Count)
                     return 0;
                 return m_playPosition;
             }

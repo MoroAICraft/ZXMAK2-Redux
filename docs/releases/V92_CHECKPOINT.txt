@@ -1,0 +1,33 @@
+v92 implementation checkpoint — 2026-10-29
+Status: IMPLEMENTED AND TESTED, final packaging checkpoint, NOT ACCEPTED.
+Do not replace the user's working install.
+Base: main 877816002ce9c9ae166418755e01f2d7e6040a5b; OmniSound 726c63d7cb00275aff7975eaac3687405568be74.
+Branch: codex/prefinal-v92.
+Package: L:\Work_two\ZX\ZXMAK2-v92-BaseConf-Prefinal-Test-20261029
+Baseline ZIP and full main/submodule bundles saved under baseline-v91 and checkpoints.
+Unrelated untracked ENGINE_RESEARCH_V81 files and tools are preserved, not part of v92.
+
+Scope: Ctrl+F NoFlick; unified BaseConf TRD/SCL/TAP/SNA host opening;
+safe drive replacement; current-user Open With without default hijacking;
+sound hardware Apply power cycle, no power cycle for volume-only Apply;
+sound level measurements before calibration; regressions and portable packaging.
+SAA/OmniPlayer output fix belongs to the separate player task, not this build.
+
+Implemented: validated/staged BaseConf media opening, physical drive choice,
+Ctrl+F, checked transactional hardware Apply, current-user Open With/IPC.
+Fixed incidental empty tape position, unchanged dirty floppy retention during
+Apply, save-as SD path reconciliation, and Extreme reattach != physical reset.
+Volume-only Apply avoids reconnecting the bus. No new DSP or CPU timing changes.
+
+PASS: PrefinalProbe 78 checks; actual unchanged BaseConf ROM T loads a synthetic
+TAP BASIC program; 48K/128K SNA PC/SP/RAM; keyboard 569; sound cards 219;
+Extreme 589886; full existing SD/timing/renderer/native sound regression suite;
+portable 64 + models 78 + relocation 15 and relocated native Moon/MIDI bank.
+Sound levels TSFM/Multi/Max equal on identical FM input; Omni remains at its
+pre-existing intentional 140% gain. No gain changes justified by these tests.
+
+Large regression/portability runs used D:\ZXMAK2-v92-private-tests-20261029
+because L: had ~1 GB free, insufficient for temporary SD export. User installs
+and external media were not used for writes. Copy final logs to package diagnostics.
+Final deliverables: release, Full/Clean ZIP, report, source ZIP with pinned
+OmniSound, verified Git bundles. V92_RELEASE_REPORT.txt lists limitations.

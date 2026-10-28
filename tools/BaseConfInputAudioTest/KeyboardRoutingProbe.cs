@@ -121,6 +121,8 @@ internal static class KeyboardRoutingProbe
                 Physical(GuestKey.RightAlt, GuestKey.NumPadEnter),
                 Physical(GuestKey.LeftControl, GuestKey.S),
                 Physical(GuestKey.RightControl, GuestKey.S),
+                Physical(GuestKey.LeftControl, GuestKey.F),
+                Physical(GuestKey.RightControl, GuestKey.F),
                 Physical(GuestKey.LeftControl, GuestKey.F12),
                 Physical(GuestKey.LeftControl, GuestKey.LeftAlt, GuestKey.F12),
                 Physical(GuestKey.LeftControl, GuestKey.RightAlt, GuestKey.F12),
