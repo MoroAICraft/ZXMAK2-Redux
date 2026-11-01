@@ -229,7 +229,7 @@ namespace ZXMAK2.Hardware.Circuits.Sound
                     m_divC = m_regs[PsgRegId.FREQC_FINE] | (m_regs[PsgRegId.FREQC_COARSE] << 8);
                     break;
                 case 6:
-                    m_divN = value*2;
+                    m_divN = Math.Max(1, (int)value) * 2;
                     break;
                 case 7:
                     m_bit0 = 0 - ((value >> 0) & 1);

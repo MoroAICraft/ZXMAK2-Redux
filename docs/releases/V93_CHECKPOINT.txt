@@ -1,0 +1,16 @@
+v93 TEST - PSG noise zero - 2026-11-01
+Base: codex/prefinal-v92 72eb747621106f996d72a4bd573374a390665799.
+Isolated branch codex/psg-noise-zero-v93 on D:, original L: repo unchanged.
+Scope: normalize only internal R6 noise divider; retain stored masked register,
+counter/seed, timed writes, all v92 features and unrelated audio behavior.
+Original/shipped and rebuilt baseline reproduce 64/32/16/10 shifts for R6 0..3.
+Working root: D:\ZXMAK2_Work\psg_noise_zero_v93_20261101
+Completed: one-line product fix; 429873 core assertions; nonzero 1..31 golden;
+12 actual board PSG routes; full original YV1/NedoOS azimuth (4320 ticks,
+56314 reference writes); pause/resume/stop/next; 2 PT3 + TS + ASC/FXM/VTX;
+standard TSFM/Multi/Max/Omni/mixer tests; matched 15s audio; no performance loss.
+Package finalization: full/clean runtime, single-DLL patch, original rollback,
+source/history, diagnostics, SHA256 and verified K:\Download delivery.
+Product DLL SHA256: BD3AF72A63F1D80712C954C68D838676851878CCC665E37F9D97D3D4AFBDAFD6.
+Details: docs/releases/PSG_NOISE_ZERO_V93_REPORT.md.
+No installed emulator, working media or player modifications. NOT user-accepted.
