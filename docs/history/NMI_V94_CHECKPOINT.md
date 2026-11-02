@@ -38,5 +38,10 @@ Results so far:
 - Public CPU API unchanged. Raw IL hashes also differ where metadata tokens
   shifted after adding a private field; do not interpret these as extra logic edits.
 
-Remaining at this checkpoint: paired bounded speed check; final report,
-runtime/source ZIPs and verified local Git bundles; package manifest.
+Final verification: paired bounded speed checks show median changes
+-1.77..+0.70%, CPU-only +0.21%; no material slowdown in these workloads.
+The packaged native fixture and fresh-copy runner also pass their smoke test.
+Product commit dd06c55. Final report: docs/releases/NMI_PREFIX_V94_REPORT.md.
+Full/Clean packaging and source/history export use the established verified
+scripts. Runtime differs from v93 only in CPU DLL and release documentation.
+User desktop acceptance remains pending; do not promote over v93 automatically.
