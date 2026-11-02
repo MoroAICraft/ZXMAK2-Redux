@@ -32,6 +32,9 @@ regressions pass (keyboard/NMI/media/audio/video). Final tiny registry guard
 was rerun in final OpenWithProbe/Prefinal/Startup checks.
 Prepared package: L:/Work_two/ZX/ZXMAK2-v95-Open-With-Test-20261103.
 Only EXE + Logging/WinForms DLLs and docs differ from v94 runtime.
-Remaining handoff work: final package/source export and hash verification.
+Runtime Full/Clean archives passed entry/dependency/SHA256 checks (78/75 files).
+Package identification and final source revision: BUILD_ID.txt in package root.
+Source/history export uses tools/Optimization/ExportSources.ps1 and includes
+pinned OmniSound; SHA256SUMS.csv is the final package manifest.
 Final report: docs/releases/OPEN_WITH_V95_REPORT.md.
 Live user Classes registry has NOT been migrated; first normal v95 start does it.
