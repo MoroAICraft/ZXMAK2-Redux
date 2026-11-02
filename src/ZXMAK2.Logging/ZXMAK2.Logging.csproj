@@ -57,6 +57,7 @@
     <Compile Include="Logger.cs" />
     <Compile Include="PortablePaths.cs" />
     <Compile Include="PortableLaunch.cs" />
+    <Compile Include="PortableRegistration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

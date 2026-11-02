@@ -854,6 +854,7 @@ namespace ZXMAK2.Host.WinForms.Views
         {
             base.OnShown(e);
             _isFormShown = true;
+            PortableLaunch.WindowReady();
             Application.Idle += OpenQueuedFile;
             var available = Screen.FromControl(this).WorkingArea;
             Location = new Point(Math.Max(available.Left, Math.Min(Left, available.Right - Width)),
@@ -862,12 +863,26 @@ namespace ZXMAK2.Host.WinForms.Views
 
         protected override void OnClosing(CancelEventArgs e)
         {
-            var model = DataContext as IMainViewModel;
-            if (!e.Cancel && model != null && !model.PrepareClose())
+            if (!PortableLaunch.TryBeginClose())
+            {
                 e.Cancel = true;
-            base.OnClosing(e);
-            if (!e.Cancel)
-                _isFormShown = false;
+                MessageBox.Show(this, "A file from Open With is waiting. Finish opening it before closing this window.",
+                    "ZXMAK2", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            try
+            {
+                var model = DataContext as IMainViewModel;
+                if (!e.Cancel && model != null && !model.PrepareClose())
+                    e.Cancel = true;
+                base.OnClosing(e);
+                if (!e.Cancel)
+                    _isFormShown = false;
+            }
+            finally
+            {
+                if (e.Cancel || _isFormShown) PortableLaunch.CancelClose();
+            }
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)

@@ -20,6 +20,18 @@ namespace ZXMAK2
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void Run(string[] args)
         {
+            bool shellOpen = args.Length > 0 && args[0] == "--open-with";
+            if (shellOpen)
+            {
+                try
+                {
+                    if (args.Length != 2) throw new ArgumentException("Expected one file after --open-with.");
+                    string path = PortableLaunch.ValidateShellFile(args[1]);
+                    if (PortableLaunch.Route(path, OpenWithDialog.Choose)) return;
+                    args = new[] { path }; // No running copy: normal startup of this registered EXE.
+                }
+                catch (Exception ex) { Environment.ExitCode = 1; OpenWithDialog.Error(ex); return; }
+            }
             try { PortablePaths.AcquireInstance(); }
             catch (System.IO.IOException)
             {
@@ -30,8 +42,7 @@ namespace ZXMAK2
             Logger.Start();
             try
             {
-                PortableLaunch.RegisterOpenWith();
-                PortableLaunch.StartReceiver();
+                PortableLaunch.BeginSession(!shellOpen);
                 AppDomain.CurrentDomain.UnhandledException +=
                     (s, e) => Logger.Fatal(e.ExceptionObject as Exception, "AppDomain.UnhandledException");
                 //AppDomain.CurrentDomain.FirstChanceException += 

@@ -213,8 +213,8 @@ static class PrefinalProbe
                 Check(PortableLaunch.RegisterAt(root,exe),"first registration");
                 Check(!PortableLaunch.RegisterAt(root,exe),"registration not idempotent");
                 using(var trd=root.OpenSubKey(".trd"))Check((string)trd.GetValue("")=="Unrelated.Default","default hijacked");
-                using(var c=root.OpenSubKey("ZXMAK2.Portable."+PortableLaunch.Identity(exe)+@"\shell\open\command"))
-                    Check((string)c.GetValue("")=="\""+exe+"\" \"%1\"","quote command");
+                using(var c=root.OpenSubKey(PortableLaunch.ProgId+@"\shell\open\command"))
+                    Check((string)c.GetValue("")=="\""+exe+"\" --open-with \"%1\"","quote command");
             }
         }
         finally {Registry.CurrentUser.DeleteSubKeyTree(keyPath);}

@@ -1,0 +1,37 @@
+v95 Open With — checkpoint 2026-11-03
+
+Authorized: implement one Windows Open With entry and cross-copy routing.
+Base: c90d5d7e1fc778f37dc883e07bfa637c0c5d8bc4 (v94 NMI candidate,
+user reports several successful manual tests). v93 accepted base is preserved;
+v95 will be a separate test package, not an automatic promotion.
+Branch: codex/open-with-v95. No GitHub publication.
+
+Scope: host startup, per-user shell registration, IPC and destination chooser.
+No CPU, sound, emulated hardware, media loader or media-write changes.
+Installed D: emulators and real media must remain untouched.
+Tests use private D:/ZXMAK2_Work copies and isolated HKCU test keys.
+Package on L:/Work_two/ZX with Full/Clean/source/rollback/diagnostics.
+
+Design: --open-with dispatch before VM/lock/log/config; direct EXE launch local.
+Live current-user/session instances identified through versioned named pipes.
+One target => send; several => folder/path chooser; none => start this registered
+copy. Only successful normal-window startup updates the last-used registration.
+Cancel/closed target must not silently select another VM. Bounded IPC; dedup IDs.
+Ready/modal queues preserved; shutdown stops accepting new requests.
+Stable ProgID. Legacy registrations recognized by exact command/path hash;
+backup first, hide from Open With and retain forwarding aliases for defaults.
+Never touch UserChoice, unrelated associations, installed old EXEs or their data.
+Old unmodified builds can register legacy entries again (document limitation).
+
+Preexisting untracked ENGINE_RESEARCH_V81 files and probes remain untouched.
+
+Implementation finished. OpenWithProbe passes 92 checks, real multi-process
+dispatch and actual built EXE forwarding without Data/VM initialization.
+StartupProbe passes direct/shell paths. Prefinal passes 78 checks. Full common
+regressions pass (keyboard/NMI/media/audio/video). Final tiny registry guard
+was rerun in final OpenWithProbe/Prefinal/Startup checks.
+Prepared package: L:/Work_two/ZX/ZXMAK2-v95-Open-With-Test-20261103.
+Only EXE + Logging/WinForms DLLs and docs differ from v94 runtime.
+Remaining handoff work: final package/source export and hash verification.
+Final report: docs/releases/OPEN_WITH_V95_REPORT.md.
+Live user Classes registry has NOT been migrated; first normal v95 start does it.
