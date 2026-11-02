@@ -44,6 +44,10 @@ namespace ZXMAK2.Engine.Cpu.Processor
         public bool RST;
         public byte BUS = 0xFF;     // state of free data bus
 
+        // Host requests can last one ExecCycle; retain a request seen between
+        // prefixes until the complete instruction has finished.
+        private bool _nmiPending;
+
         public Action RESET;
         public Action NMIACK_M1;
         public Action INTACK_M1;
@@ -260,6 +264,7 @@ namespace ZXMAK2.Engine.Cpu.Processor
         {
             if (RST)    // RESET
             {
+                _nmiPending = false;
                 // 3T
                 RESET();
                 //Refresh();      //+1T
@@ -283,8 +288,15 @@ namespace ZXMAK2.Engine.Cpu.Processor
                 Tact += 2;      // total should be 3T?
                 return true;
             }
-            else if (NMI)
+            else if (NMI || _nmiPending)
             {
+                if (FX != CpuModeIndex.None || XFX != CpuModeEx.None)
+                {
+                    _nmiPending = true;
+                    return false;
+                }
+                // Do not use BINT here: it also inhibits maskable INT after EI.
+                _nmiPending = false;
                 // 11T (5, 3, 3)
 
                 if (HALTED) // workaround for Z80 snapshot halt issue + comfortable debugging

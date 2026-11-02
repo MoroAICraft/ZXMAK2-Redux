@@ -12,6 +12,7 @@ $taskProbes = [ordered]@{
     GoldenRenderer = 'tools\BaseConfVideoTest\GoldenRendererProbe-B40.cs'
     ContentionFloatingBus = 'tools\BaseConfVideoTest\ContentionFloatingBusProbe-B40.cs'
     InterruptNmi = 'tools\BaseConfInterruptTest\InterruptNmiProbe-B36.cs'
+    NmiPrefix = 'tools\BaseConfInterruptTest\NmiPrefixProbe.cs'
     WaitPort = 'tools\BaseConfInterruptTest\WaitPortProbe-B37.cs'
     VideoTiming = 'tools\BaseConfVideoTest\VideoTimingProbe-B30.cs'
     TapeClock = 'tools\BaseConfInputAudioTest\TapeClockProbe-B40.cs'
