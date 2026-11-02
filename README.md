@@ -1,9 +1,11 @@
 # ZXMAK2 Fork — ZX Evo BaseConf RC1
 
 Local working versions, control sources and build archives:
-[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Latest local candidate: v92 BaseConf
-Prefinal TEST, based on v91; user acceptance is required.
-The accepted v84 control and historical audio experiments remain preserved.
+[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Current local working base: v93,
+branch `codex/working-base-v93`, selected on 2026-11-02. All v92 features plus
+the verified shared PSG noise-zero fix are retained. v92 is the immediate
+rollback; v84 and historical audio experiments remain preserved. This local
+baseline selection does not claim complete manual/hardware acceptance.
 
 ZXMAK2 Fork is a Windows emulator focused on ZX Evolution BaseConf. It models
 the machine as a configurable virtual system: processor, memory, firmware,
@@ -79,10 +81,11 @@ Sound output is mixed with per-board calibration and a Master Volume control.
 `ZX OmniSound Virtual` has a 40% output increase as part of its single final
 mix stage.
 
-## Current release
+## Published release (separate from the local working base)
 
 [**ZXMAK2 Fork — ZX Evo BaseConf RC1**](https://github.com/Moro44444444/ZXMAK2-Fork/releases/tag/v1.0-rc1)
-is the current portable release for the ZX Evo BaseConf RC1 configuration.
+is the published portable release for the ZX Evo BaseConf RC1 configuration.
+It is not the current local v93 working package; see LOCAL_VERSIONS above.
 
 The archive excludes personal machine state, mounted media, logs, PDB files
 and the Yamaha YRW801-M instrument ROM. Place a legally obtained YRW801-M ROM
