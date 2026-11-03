@@ -1,0 +1,42 @@
+ZXMAK2 v96: аппаратные проверки, 2026-11-03
+
+Рабочая копия: D:/ZXMAK2_Work/hardware_v96_20261103/runtime/release
+Журнал: Data/hardware-session.txt; обычный лог: Data/Logs/ZXMAK2.log
+Исходники измерителя: tools/FaultAudit/HardwareSessionProbe.cs
+Основа: неизменённые DLL принятого v96 Clean. Измеритель запускает штатный
+ILauncher/VM/MainView/DirectSound/D3D, но не регистрирует Open With.
+Пользовательские носители не подключались. Production-код не изменялся.
+
+Уже выполнено (время UTC из журнала):
+- 05:16:32 успешный запуск; ~50 VM frames/s, ~60 presents/s.
+- ~05:17:19 Realtek HD Audio 2nd output -> DELL G3223Q default.
+- ~05:18:03 Realtek endpoint Disabled, затем Enabled.
+- 05:18:46 DELL HDMI endpoint Disabled, затем Enabled.
+- ~05:20:05 исходные роли полностью восстановлены:
+  Realtek HD Audio 2nd output = default; DENON-AVR = communications default;
+  DELL G3223Q = ready. Микрофоны, уровни громкости не изменялись.
+- ~05:20:14 fullscreen Alt+Enter, возврат; изображение и кадры есть.
+- 05:20:50..05:21:04 minimize/restore: presents остановились только пока
+  свёрнуто, VM frames продолжались; после возврата presents возобновились.
+- 05:25:38 CLEAN EXIT первого успешного запуска.
+
+В аудиотестах не было сообщений DirectSound output recovered: Windows/драйвер
+не вернули проверяемому потоку ошибку. Подтверждена непрерывность работы,
+не подтверждено прохождение собственного recovery и не измерена слышимость.
+Это отключение endpoint через Windows, НЕ физический unplug.
+
+Тестовый launcher сначала вызвал ошибку порядка инициализации WinForms
+SetCompatibleTextRenderingDefault (05:14:06). Исправлен только launcher:
+статический конструктор MainView теперь вызывается до создания таймера.
+Этот отказ не приписывается v96.
+
+Завершение этапа:
+- Пользователь разрешил S3 и разбудил/разблокировал компьютер.
+- 05:28:10.832 POWER Suspend; 05:29:39.973 POWER Resume.
+- D3DERR_DEVICELOST во время сна, reset после разблокировки; VM/video/audio
+  продолжили работу, без зависания. DirectSound recovery не требовался по логу.
+- DISPLAY1 -> DISPLAY2/fullscreen -> DISPLAY1: смена D3D adapter/device успешна.
+- 05:33:04.494 CLEAN EXIT; процессов измерителя не осталось.
+- 36 штатных EXE/DLL совпали SHA256 с принятой поставкой.
+Полный протокол и ограничения: V96_HARDWARE_CHECKS_20261103.txt рядом.
+Physical unplug / акустическая проверка / полный диск / power loss НЕ закрыты.
