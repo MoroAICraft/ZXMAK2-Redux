@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $taskRoot) { throw "Preserve existing runtime: $taskRoot" }
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
-$taskNative = @('ymfm_opl4.dll','omni_midi.dll','omni_opn.dll','SAASound.dll','Pasmo2.dll')
+$taskNative = @('ymfm_opl3.dll','ymfm_opl4.dll','omni_midi.dll','omni_opn.dll','SAASound.dll','Pasmo2.dll')
 $taskModified = @('ZXMAK2.exe','Test.exe','ZXMAK2.Logging.dll','ZXMAK2.Engine.dll','ZXMAK2.Host.dll',
     'ZXMAK2.Hardware.Circuits.dll','ZXMAK2.Hardware.dll','ZXMAK2.Host.Presentation.dll',
     'ZXMAK2.Host.WinForms.dll','ZXMAK2.Hardware.Adlers.dll')
@@ -47,6 +47,13 @@ foreach ($taskFile in Get-ChildItem -LiteralPath $Baseline -File) {
     if ($taskName -eq 'log4net.config') { $taskSource = Join-Path $PSScriptRoot '..\..\src\ZXMAK2\log4net.config' }
     Copy-Item -LiteralPath $taskSource -Destination (Join-Path $taskDirectory $taskName)
 }
+}
+if (Test-Path -LiteralPath (Join-Path $Built 'ymfm_opl3.dll')) {
+    New-Item -ItemType Directory -Path "$taskRoot\Lib\Native" -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $Built 'ymfm_opl3.dll') -Destination "$taskRoot\Lib\Native\ymfm_opl3.dll" -Force
+    New-Item -ItemType Directory -Path "$taskRoot\Docs\Licenses\OPL3-Toolchain" -Force | Out-Null
+    Copy-Item -LiteralPath "$PSScriptRoot\..\..\src\Libraries\YmfmOpl4\LICENSE" -Destination "$taskRoot\Docs\Licenses\ymfm-opl3.LICENSE.txt" -Force
+    Get-ChildItem -LiteralPath "$PSScriptRoot\..\..\src\Libraries\YmfmOpl3\Licenses" -File | Copy-Item -Destination "$taskRoot\Docs\Licenses\OPL3-Toolchain" -Force
 }
 foreach ($taskSub in @('Resources\ROMs','Docs\Help','Data\State','Data\Sessions','Data\Saves',
     'Data\Recordings','Data\Logs','Data\Backups','Data\Cache','Data\Temp')) {

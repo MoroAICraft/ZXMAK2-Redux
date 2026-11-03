@@ -74,6 +74,7 @@
     <Compile Include="Evo\ZxMultiSoundDevice.cs" />
     <Compile Include="Evo\ZxMultiSoundMaxDevice.cs" />
     <Compile Include="Evo\ZxmSoundCardExtreme.cs" />
+    <Compile Include="Evo\ZxOpl3Ur4qbpDevice.cs" />
     <Compile Include="..\ZX-OmniSound\src\ZxOmniSoundDevice.cs">
       <Link>Evo\ZxOmniSoundDevice.cs</Link>
     </Compile>
@@ -182,6 +183,10 @@
     </None>
     <None Include="..\Libraries\YmfmOpl4\ymfm_opl4.dll">
       <Link>ymfm_opl4.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Libraries\YmfmOpl3\ymfm_opl3.dll">
+      <Link>ymfm_opl3.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\ZX-OmniSound\native\YmfmOpn\omni_opn.dll">

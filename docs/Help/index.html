@@ -130,6 +130,13 @@ Ctrl+Alt+F12 удаляет четыре активных файла состо�
 <p>Отдельный Yamaha ROM в Resources/ROMs имеет приоритет перед ROMS.PAK. Старые расположения в корне и roms читаются для совместимости.
 Неправильный размер ROM — ошибка, а не повод незаметно выбрать другой файл.
 Изменяемая виртуальная flash хранится в Data/State/MoonSound и привязана к содержимому заводского ROM.</p>
+<h3 id="opl3-ur4qbp">ZX OPL3 (UR4QBP)</h3>
+<p>Для ZX Evolution: Alt+P → Other / ZXBUS PentEvo → активный слот → <strong>ZX OPL3 (UR4QBP)</strong> → Apply.
+Отдельная плата по схеме UR4QBP V1.0: YMF262, 14,31818 МГц, YAC512, стереовыход A/B.
+Порты #xxC4–#xxC7; старший байт адреса не участвует в дешифрации. Перемычек и блокировки по DOS нет.</p>
+<p>Можно ставить в пару с обычной ZX-MultiSound Rev.A2. С MoonSound, MultiSound Max и OmniSound порты пересекаются:
+такое сочетание отклоняется. В OPL3 нет PCM, Yamaha ROM/RAM и MIDI UART: в плеере нужен режим OPL3/FM,
+а не MoonSound/OPL4. Прошивка и звуковые банки для этой платы не нужны. Громкость сохраняется в VMZ.</p>
 <h3 id="extreme">ZXM-SoundCard Extreme Rev.03</h3>
 <p>Alt+P → Other / ZXBUS PentEvo → активный слот → <strong>ZXM Extreme Rev.03</strong> → Apply.
 Это отдельная плата MickLab: два YM2203, SAA1099 и четырёхканальный DAC TLC7226 (SounDrive).

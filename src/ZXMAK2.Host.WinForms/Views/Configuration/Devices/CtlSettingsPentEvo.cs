@@ -40,6 +40,8 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
         private readonly CheckBox m_extremeDisableYm;
         private readonly CheckBox m_extremeLegacySaa;
         private readonly NumericUpDown m_extremeVolume;
+        private readonly GroupBox m_opl3Settings;
+        private readonly NumericUpDown m_opl3Volume;
         private BusManager m_bmgr;
         private UlaPentEvo m_device;
         private bool m_updatingSlots;
@@ -130,6 +132,13 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             get { return IsSelected(PentEvoZxBusDevice.SoundCardExtreme,
                 m_slot1Enabled, m_slot1Device) || IsSelected(
                 PentEvoZxBusDevice.SoundCardExtreme, m_slot2Enabled, m_slot2Device); }
+        }
+
+        public bool IsOpl3BoardEnabled
+        {
+            get { return IsSelected(PentEvoZxBusDevice.Opl3Ur4qbp,
+                m_slot1Enabled, m_slot1Device) || IsSelected(
+                PentEvoZxBusDevice.Opl3Ur4qbp, m_slot2Enabled, m_slot2Device); }
         }
 
         public CtlSettingsPentEvoZxBus()
@@ -238,6 +247,29 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             m_extremeDisableYm.CheckedChanged += SwitchChanged;
             m_extremeLegacySaa.CheckedChanged += SwitchChanged;
 
+            m_opl3Settings = new GroupBox();
+            m_opl3Settings.Text = "ZX OPL3 (UR4QBP):";
+            m_opl3Settings.Location = new Point(4, 170);
+            m_opl3Settings.Size = new Size(292, 112);
+            m_opl3Settings.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Controls.Add(m_opl3Settings);
+            var opl3Hint = new Label();
+            opl3Hint.Location = new Point(10, 22);
+            opl3Hint.Size = new Size(272, 46);
+            opl3Hint.Text = "YMF262 + YAC512, #xxC4-#xxC7.\r\nNo jumpers, PCM ROM or RAM.";
+            m_opl3Settings.Controls.Add(opl3Hint);
+            var opl3VolumeLabel = new Label();
+            opl3VolumeLabel.Text = "Volume (%):";
+            opl3VolumeLabel.Location = new Point(10, 78);
+            opl3VolumeLabel.Size = new Size(90, 20);
+            m_opl3Settings.Controls.Add(opl3VolumeLabel);
+            m_opl3Volume = new NumericUpDown();
+            m_opl3Volume.Location = new Point(112, 74);
+            m_opl3Volume.Size = new Size(70, 24);
+            m_opl3Volume.Minimum = 0; m_opl3Volume.Maximum = 100;
+            m_opl3Volume.Value = 100;
+            m_opl3Settings.Controls.Add(m_opl3Volume);
+
             m_slot1Enabled.CheckedChanged += Slot1SelectionChanged;
             m_slot1Device.SelectedIndexChanged += Slot1SelectionChanged;
             m_slot2Enabled.CheckedChanged += Slot2SelectionChanged;
@@ -280,6 +312,10 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                     TryRestoreBoard(PentEvoZxBusDevice.MultiSound);
                 }
                 var max = m_bmgr.FindDevice<ZxMultiSoundMaxDevice>();
+                var opl3 = m_bmgr.FindDevice<ZxOpl3Ur4qbpDevice>();
+                if (opl3 != null && !IsOpl3BoardEnabled)
+                    TryRestoreBoard(PentEvoZxBusDevice.Opl3Ur4qbp);
+                m_opl3Volume.Value = opl3 == null ? 100 : opl3.Volume;
                 var extreme = m_bmgr.FindDevice<ZxmSoundCardExtreme>();
                 if (extreme != null && !IsExtremeBoardEnabled)
                     TryRestoreBoard(PentEvoZxBusDevice.SoundCardExtreme);
@@ -358,6 +394,7 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 RemoveBoard<ZxMultiSoundDevice>();
                 RemoveBoard<ZxMultiSoundMaxDevice>();
                 RemoveBoard<ZxmSoundCardExtreme>();
+                RemoveBoard<ZxOpl3Ur4qbpDevice>();
                 RemoveBoard<ZxmMoonSoundDevice>();
                 RemoveBoard<ZxOmniSoundDevice>();
                 RemoveBoard<ZxNetUsbDevice>();
@@ -374,6 +411,10 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             var omniSoundSelected = IsOmniSoundBoardEnabled;
             var zxNetUsbSelected = IsZxNetUsbBoardEnabled;
             var extremeSelected = IsExtremeBoardEnabled;
+            var opl3Selected = IsOpl3BoardEnabled;
+            if (opl3Selected && (moonSoundSelected || maxSelected || omniSoundSelected))
+                throw new InvalidOperationException("ZX OPL3 shares #C4-#C7 with MoonSound, " +
+                    "MultiSound Max and OmniSound. Choose ordinary MultiSound or another non-conflicting board.");
             if (extremeSelected && (multiSoundSelected || maxSelected || omniSoundSelected))
                 throw new InvalidOperationException("Extreme shares YM/SAA/SounDrive ports " +
                     "with MultiSound/Max/OmniSound. Choose one of these boards.");
@@ -435,6 +476,9 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             SetBoardPresence<ZxMultiSoundMaxDevice>(maxSelected);
             SetBoardPresence<ZxOmniSoundDevice>(omniSoundSelected);
             SetBoardPresence<ZxmSoundCardExtreme>(extremeSelected);
+            SetBoardPresence<ZxOpl3Ur4qbpDevice>(opl3Selected);
+            var opl3Board = m_bmgr.FindDevice<ZxOpl3Ur4qbpDevice>();
+            if (opl3Board != null) opl3Board.Volume = (int)m_opl3Volume.Value;
             var extremeBoard = m_bmgr.FindDevice<ZxmSoundCardExtreme>();
             if (extremeBoard != null)
             {
@@ -577,6 +621,8 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
                 PentEvoZxBusDevice.OmniSound, "ZX OmniSound"));
             comboBox.Items.Add(new SlotChoice(
                 PentEvoZxBusDevice.SoundCardExtreme, "ZXM Extreme Rev.03"));
+            comboBox.Items.Add(new SlotChoice(
+                PentEvoZxBusDevice.Opl3Ur4qbp, "ZX OPL3 (UR4QBP)"));
             comboBox.DropDownWidth = 245;
             comboBox.SelectedIndex = 0;
             parent.Controls.Add(comboBox);
@@ -641,6 +687,8 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             var multiSound = IsMultiSoundBoardEnabled;
             var max = IsMultiSoundMaxBoardEnabled;
             var extreme = IsExtremeBoardEnabled;
+            var opl3 = IsOpl3BoardEnabled;
+            m_opl3Settings.Visible = opl3;
             m_extremeSwitches.Visible = extreme;
             m_multiSoundSwitches.Visible = multiSound;
             m_maxSwitches.Visible = max;
@@ -659,6 +707,13 @@ namespace ZXMAK2.Host.WinForms.Views.Configuration.Devices
             var maxLocation = new Point(4 + scroll.X, maxTop + scroll.Y);
             if (m_maxSwitches.Location != maxLocation)
                 m_maxSwitches.Location = maxLocation;
+            if (opl3)
+            {
+                var opl3Top = extreme ? m_extremeSwitches.Bottom - scroll.Y + 8 :
+                    max ? maxTop + m_maxSwitches.Height + 8 : multiSound ? 438 : 170;
+                m_opl3Settings.Location = new Point(4 + scroll.X, opl3Top + scroll.Y);
+                AutoScrollMinSize = new Size(0, opl3Top + m_opl3Settings.Height + 8);
+            }
             m_tsFmSaaCompatibility.Enabled = multiSound && m_saa.Checked;
             m_automatic.Enabled = multiSound;
             m_ym.Enabled = multiSound;

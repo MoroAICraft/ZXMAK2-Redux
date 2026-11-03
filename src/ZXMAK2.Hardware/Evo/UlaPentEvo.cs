@@ -27,6 +27,7 @@ namespace ZXMAK2.Hardware.Evo
         MultiSoundMax,
         OmniSound,
         SoundCardExtreme,
+        Opl3Ur4qbp,
     }
 
     public class UlaPentEvo : UlaAtm450, IUlaFrameTiming, IUlaPlusDevice

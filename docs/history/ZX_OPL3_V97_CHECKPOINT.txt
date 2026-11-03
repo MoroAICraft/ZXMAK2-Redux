@@ -1,0 +1,37 @@
+ZX OPL3 (UR4QBP) v97 TEST - checkpoint, 2026-11-03
+
+Accepted base: v96, source c3e6538 (product unchanged since 85bf816).
+Branch: codex/zx-opl3-v97. v96 remains the accepted working base.
+Package: L:/Work_two/ZX/ZXMAK2-v97-ZX-OPL3-Test-20261103
+Unmodified Full v96 ZIP copied to rollback; original installs/media untouched.
+Source archive ZX_OPL3.zip SHA256:
+988FFC82DC6FDD98C245F926153FB935C78356A055011F0BBB6A4C0BE9441180
+
+Scope: standalone ZXBUS YMF262 board, schematic V1.0 by UR4QBP /
+Alexander Karnaukh, updated 2026-03-18. No other new card or audio overhaul.
+DD2: A7..A2=110001 -> low-byte C4..C7; A8..15 ignored.
+DD3: /IORQ low, /M1 high; /CS asserted. No DOS/IODOS gate or jumper.
+YMF262 at 14.31818 MHz, DOAB -> YAC512 stereo; DOCD and /IRQ unconnected.
+Not an OPL4: no Yamaha sample ROM, RAM, PCM ports, remap or OPL4 ID.
+The tester's photographed GAL board is not positively identified; equivalence
+of its decode/reset cannot be asserted. Test target: ordinary MultiSound + OPL3.
+
+Implementation plan:
+1. Dedicated native ymfm::ymf262 bridge (reuse unchanged vendored BSD source,
+   not the existing YMF278B wrapper); independent exact timer clock and
+   bounded audio resampling. Existing MoonSound/Max/Omni cores unchanged.
+2. New slot choice/device, config/volume, sound-hardware cold apply policy,
+   reject #C4..C7 conflicts before changing a configuration.
+3. Bus/timer/native/PCM/config/UI tests, ordinary MultiSound in both slot
+   orders, reset/reload, baseline regressions and bounded performance.
+4. Separate Full/Clean runtime, source + pinned OmniSound, Git history,
+   report/hashes/rollback. User acceptance required before adopting v97.
+
+Four pre-existing untracked engine research files preserved in checkout and
+copied to package/checkpoints. No GitHub publication.
+
+Completed checkpoint: dedicated board/core, slots, packaging and help.
+132335 checks, real NedoOS/OmniPlayer Aryx playback alone/with MultiSound,
+baseline regressions and relocated native/profile boot PASS.
+See docs/releases/OPL3_V97_REPORT.txt for exact evidence and limitations.
+v96 still accepted; v97 requires explicit user acceptance.

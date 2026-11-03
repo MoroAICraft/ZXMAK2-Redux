@@ -1,5 +1,6 @@
 param([string]$Package='L:\Work_two\ZX\ZXMAK2-v87-Portable-Test-20261010',
-    [string]$ArchiveName='ZXMAK2-v87-Portable-Test')
+    [string]$ArchiveName='ZXMAK2-v87-Portable-Test',
+    [string[]]$ExtraRequired=@())
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -43,7 +44,7 @@ foreach($taskClean in @($false,$true)) {
         }
         foreach($taskRequired in @('ZXMAK2.exe','Test.exe','boot.zip','ROMS.PAK','Config/unity.config','Config/machines.config',
             'Config/Keyboard.config','Lib/Native/ymfm_opl4.dll','Lib/Native/omni_midi.dll','Lib/Native/omni_opn.dll',
-            'Lib/Native/SAASound.dll','Resources/SoundBanks/GeneralUser-GS.sf2','Docs/Help/index.html')) {
+            'Lib/Native/SAASound.dll','Resources/SoundBanks/GeneralUser-GS.sf2','Docs/Help/index.html') + $ExtraRequired) {
             if(!$taskVerify.GetEntry('release/'+$taskRequired)){throw "Required dependency omitted: $taskRequired"}
         }
         if($taskClean) {foreach($taskState in $taskRootState){if($taskVerify.GetEntry('release/'+$taskState)){throw 'Clean archive contains active state'}}}
