@@ -613,6 +613,8 @@ namespace ZXMAK2.Hardware.Evo
             EnsureExternalSound();
         }
 
+        protected override bool UsesPcmBuffer { get { return true; } }
+
         protected override void OnEndFrame()
         {
             RenderTo(m_frameSamples);
@@ -642,8 +644,7 @@ namespace ZXMAK2.Hardware.Evo
                 int left;
                 int right;
                 RenderSample(out left, out right);
-                double frameTime = (double)m_renderSample / m_frameSamples;
-                UpdateDac(frameTime, Clamp16(left), Clamp16(right));
+                WritePcmSample(m_renderSample, Clamp16(left), Clamp16(right));
                 m_renderSample++;
             }
         }
@@ -674,8 +675,7 @@ namespace ZXMAK2.Hardware.Evo
                     (m_externalPcm[offset + 3] << 8));
                 left = (short)(left * volume / 100);
                 right = (short)(right * volume / 100);
-                double frameTime = (double)m_renderSample / m_frameSamples;
-                UpdateDac(frameTime, left, right);
+                WritePcmSample(m_renderSample, left, right);
                 m_renderSample++;
             }
         }

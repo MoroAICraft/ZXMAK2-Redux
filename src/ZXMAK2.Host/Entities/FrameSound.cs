@@ -89,6 +89,17 @@ namespace ZXMAK2.Host.Entities
 
         public void Refresh()
         {
+            // An unavailable/full host backend may discard a frame without
+            // reading it. Its samples must not later be joined to stale DC
+            // history as if no emulated time had passed. Re-prime on recovery
+            // instead of mixing inaudible frames (notably in fast-forward).
+            if (_buffer == null)
+            {
+                _widePrimed = false;
+                _wideOutputLeft = _wideOutputRight = 0;
+                _dcPrimed = false;
+                _dcPreviousOutputLeft = _dcPreviousOutputRight = 0;
+            }
             _buffer = null;
         }
 

@@ -84,7 +84,7 @@ namespace ZXMAK2.Hardware.Evo
         private bool m_gsDataPending;
         private int m_lastDacLeft;
         private int m_lastDacRight;
-        private int m_volume;
+        private int m_lastDacVolume = 100;
         private bool m_effectiveYm;
         private bool m_effectiveSaa;
         private bool m_effectiveGs;
@@ -120,7 +120,6 @@ namespace ZXMAK2.Hardware.Evo
             m_effectiveSaa = true;
             m_effectiveGs = true;
             m_effectiveSoundDrive = true;
-            m_volume = 100;
             m_renderers = isMax && !isOmni
                 ? new ISoundRenderer[]
                   {
@@ -160,16 +159,21 @@ namespace ZXMAK2.Hardware.Evo
 
         public new int Volume
         {
-            get { return m_volume; }
-            set
-            {
-                value = Math.Max(0, Math.Min(100, value));
-                m_volume = value;
-                base.Volume = value;
-                foreach (var renderer in m_renderers)
-                    renderer.Volume = value;
-                OnConfigChanged();
-            }
+            get { return base.Volume; }
+            set { base.Volume = value; }
+        }
+
+        protected override void OnProcessConfigChange()
+        {
+            base.OnProcessConfigChange();
+            // One volume state for concrete, SoundDeviceBase and ISoundRenderer
+            // callers. Enumerate the actual board: OmniSound also owns MoonSound
+            // and NeoGS, which are not in the base class's private renderer array.
+            if (m_renderers == null)
+                return;
+            foreach (var renderer in SoundRenderers)
+                if (renderer != null)
+                    renderer.Volume = base.Volume;
         }
 
         public byte RegAddr
@@ -357,6 +361,10 @@ namespace ZXMAK2.Hardware.Evo
                 m_frameMasterStart += GsMasterTicksPerFrame;
             else
                 m_frameStarted = true;
+            // A held hardware sample does not generate further port writes.
+            // Apply a changed host volume at the next frame boundary too.
+            if (m_lastDacVolume != Volume)
+                UpdateCombinedDac(0D);
         }
 
         protected override void OnEndFrame()
@@ -392,6 +400,7 @@ namespace ZXMAK2.Hardware.Evo
             Array.Clear(m_dacVolume, 0, m_dacVolume.Length);
             m_lastDacLeft = 0;
             m_lastDacRight = 0;
+            m_lastDacVolume = Volume;
             m_gsMaster = 0;
             m_frameMasterStart = 0;
             m_frameStarted = false;
@@ -706,10 +715,12 @@ namespace ZXMAK2.Hardware.Evo
         {
             var left = MixDac(0) + MixDac(1);
             var right = MixDac(2) + MixDac(3);
-            if (left == m_lastDacLeft && right == m_lastDacRight)
+            if (left == m_lastDacLeft && right == m_lastDacRight &&
+                Volume == m_lastDacVolume)
                 return;
             m_lastDacLeft = left;
             m_lastDacRight = right;
+            m_lastDacVolume = Volume;
             var gain = Volume / 100D;
             UpdateDac(
                 frameTime,

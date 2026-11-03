@@ -26,6 +26,7 @@ namespace ZXMAK2.Hardware
         private IUlaDevice m_variableFrameUla;
         private int m_volume;
         private uint[] m_audioBuffer;   // render buffer (short|(short<<16)
+        private uint[] m_pcmBuffer;     // opt-in host-rate PCM, not DAC transitions
         private bool m_isFrameOpen;
         private long m_startStamp;
         private int m_frameTactCount;
@@ -122,6 +123,22 @@ namespace ZXMAK2.Hardware
             get { return 100; }
         }
 
+        /// <summary>
+        /// Opt-in for renderers that already produce signed PCM at SampleRate.
+        /// Timed AY/beeper/DAC transitions keep the original reconstruction.
+        /// </summary>
+        protected virtual bool UsesPcmBuffer
+        {
+            get { return false; }
+        }
+
+        protected void WritePcmSample(int sampleIndex, short left, short right)
+        {
+            if (m_pcmBuffer == null)
+                throw new InvalidOperationException("Host-rate PCM output is not enabled.");
+            m_pcmBuffer[sampleIndex] = (uint)(ushort)left | ((uint)(ushort)right << 16);
+        }
+
         public int Volume
         {
             get { return m_volume; }
@@ -185,6 +202,13 @@ namespace ZXMAK2.Hardware
 
         protected virtual void OnBeginFrame()
         {
+            if (UsesPcmBuffer)
+            {
+                // AudioBuffer must remain the last completed frame: the bus
+                // begins the next frame before ExecuteFrame returns to its sink.
+                Array.Clear(m_pcmBuffer, 0, m_pcmBuffer.Length);
+                return;
+            }
             m_sndQueue.Clear();
             while (m_sndQueueNext.Count > 0)
             {
@@ -194,7 +218,14 @@ namespace ZXMAK2.Hardware
 
         protected virtual void OnEndFrame()
         {
-            Render(m_sndQueue, m_frameTactCount);
+            if (UsesPcmBuffer)
+            {
+                // Preserve the array identity retained by FrameSound. No
+                // conversion, EQ or second resampling of already host-rate PCM.
+                Array.Copy(m_pcmBuffer, m_audioBuffer, m_audioBuffer.Length);
+            }
+            else
+                Render(m_sndQueue, m_frameTactCount);
 #if WRITE_RAW
             if (m_wavWriter != null)
             {
@@ -268,6 +299,8 @@ namespace ZXMAK2.Hardware
             m_sampleRate = (uint)sampleRate;
             var bufferLength = (int)Math.Ceiling(m_sampleRate / 50D);
             m_audioBuffer = new uint[bufferLength];   // 44100 => 882
+            if (UsesPcmBuffer)
+                m_pcmBuffer = new uint[bufferLength];
             m_sndQueue.Clear();
             m_sndQueueNext.Clear();
 

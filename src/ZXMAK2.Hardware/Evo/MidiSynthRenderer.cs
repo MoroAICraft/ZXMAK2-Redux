@@ -121,6 +121,8 @@ namespace ZXMAK2.Hardware.Evo
             }
         }
 
+        protected override bool UsesPcmBuffer { get { return true; } }
+
         protected override void OnEndFrame()
         {
             RenderTo(m_frameSamples);
@@ -150,7 +152,7 @@ namespace ZXMAK2.Hardware.Evo
                 int left = m_synth == IntPtr.Zero ? 0 : m_pcm[i * 2];
                 int right = m_synth == IntPtr.Zero ? 0 : m_pcm[i * 2 + 1];
                 double gain = Volume / 100D;
-                UpdateDac((double)(m_renderSample + i) / m_frameSamples,
+                WritePcmSample(m_renderSample + i,
                     Clamp16((int)(left * gain)),
                     Clamp16((int)(right * gain)));
             }

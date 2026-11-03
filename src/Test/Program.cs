@@ -2188,9 +2188,19 @@ namespace Test
                             GetStereoPeak(renderer.AudioBuffer) > 64;
                         for (int i = 0; i < status.Length; ++i)
                             equal &= status[i] == referenceStatus[i];
+                        // Omni contains a real OPL4 model: its reset F8=1B
+                        // mixes FM at 722/2048. Max models YMF262 without
+                        // that OPL4 attenuator (F8=00, 2042/2048 in ymfm).
+                        // Compare the same stereo waveform at those gains;
+                        // allow two low-gain LSBs for integer quantization.
                         for (int i = 0; equal && i < audio.Count; ++i)
-                            equal &= audio[i] == referenceAudio[i];
-                        Console.WriteLine("Omni/Max OPL3 DOSEN={0}: status={1}, stereo PCM identical={2}: {3}",
+                        {
+                            equal &= Math.Abs((long)(short)referenceAudio[i] * 722 -
+                                (long)(short)audio[i] * 2042) <= 4096;
+                            equal &= Math.Abs((long)(short)(referenceAudio[i] >> 16) * 722 -
+                                (long)(short)(audio[i] >> 16) * 2042) <= 4096;
+                        }
+                        Console.WriteLine("Omni/Max OPL3 DOSEN={0}: status={1}, stereo PCM calibrated (722/2042)={2}: {3}",
                             dos, BitConverter.ToString(status), equal, equal ? "PASS" : "FAIL");
                         if (!equal) Environment.ExitCode = 1;
                     }

@@ -361,6 +361,20 @@ namespace ZXMAK2.Hardware.Evo
         {
             ExecuteTo(m_frameMasterStart + MasterTicksPerFrame);
             base.OnEndFrame();
+            // Host volume is separate from the card's eight hardware volume
+            // registers and its DAC/MP3 mix. Keep the card and filter running
+            // when muted, and preserve the accepted 100% PCM exactly.
+            if (Volume != 100)
+            {
+                var buffer = AudioBuffer;
+                for (var i = 0; i < buffer.Length; i++)
+                {
+                    var left = unchecked((short)buffer[i]) * Volume / 100;
+                    var right = unchecked((short)(buffer[i] >> 16)) * Volume / 100;
+                    buffer[i] = (uint)(ushort)(short)left |
+                        ((uint)(ushort)(short)right << 16);
+                }
+            }
         }
 
         private void HostReadStatus(

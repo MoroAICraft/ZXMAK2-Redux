@@ -66,7 +66,8 @@ namespace ZXMAK2.Hardware.Evo
         public bool CoreAvailable { get { return m_core != IntPtr.Zero; } }
         public string LoadedRomPath { get { return m_loadedRomPath; } }
         // The physical clock is independent of the host's output sample rate.
-        // The 44.1 kHz path remains bit-identical.
+        // At 44.1 kHz the native generator needs no host-rate conversion.
+        // Completed PCM is published directly, without a second DAC filter.
         public bool ResampleHostOutput { get; set; }
         // OmniSound shares the Max OPL3 and MoonSound OPL4 FM port group.
         // Select Max's decoder/reset status without duplicating FM voices.
@@ -114,6 +115,8 @@ namespace ZXMAK2.Hardware.Evo
             m_rendering = true;
         }
 
+        protected override bool UsesPcmBuffer { get { return true; } }
+
         protected override void OnEndFrame()
         {
             RenderTo(m_frameSamples);
@@ -121,7 +124,7 @@ namespace ZXMAK2.Hardware.Evo
             base.OnEndFrame();
             // The native core bypasses the DAC devices' volume scaling.
             // Scale only completed PCM: chip registers and filter state stay
-            // unchanged; 100% remains bit-identical to the previous release.
+            // unchanged; 100% does not alter the completed PCM samples.
             if (Volume != 100)
             {
                 var buffer = AudioBuffer;
@@ -391,7 +394,7 @@ namespace ZXMAK2.Hardware.Evo
             {
                 while (m_renderSample < target)
                 {
-                    UpdateDac((double)m_renderSample / m_frameSamples, 0, 0);
+                    WritePcmSample(m_renderSample, 0, 0);
                     m_renderSample++;
                 }
                 return;
@@ -405,7 +408,7 @@ namespace ZXMAK2.Hardware.Evo
             NativeMethods.Generate(m_core, m_nativeBuffer, (uint)count);
             for (int index = 0; index < count; ++index)
             {
-                UpdateDac((double)m_renderSample / m_frameSamples,
+                WritePcmSample(m_renderSample,
                     m_nativeBuffer[index * 2],
                     m_nativeBuffer[index * 2 + 1]);
                 m_renderSample++;
@@ -441,7 +444,7 @@ namespace ZXMAK2.Hardware.Evo
                     (m_currentLeft - m_previousLeft) * m_resamplePhase);
                 var right = (short)Math.Round(m_previousRight +
                     (m_currentRight - m_previousRight) * m_resamplePhase);
-                UpdateDac((double)m_renderSample / m_frameSamples, left, right);
+                WritePcmSample(m_renderSample, left, right);
                 m_renderSample++;
             }
         }

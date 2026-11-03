@@ -70,7 +70,8 @@ namespace ZXMAK2.Hardware.Evo
             m_clockRemainder = 0;
             m_phase = 0;
             m_previousLeft = m_previousRight = m_currentLeft = m_currentRight = 0;
-            if (m_rendering) UpdateDac(GetFrameTime(), (short)0, (short)0);
+            // Subsequent host PCM comes from the reset core/resampler. No
+            // separate DAC transition is needed for an already sampled stream.
         }
         private void AdvanceTimers()
         {
@@ -108,6 +109,7 @@ namespace ZXMAK2.Hardware.Evo
             m_renderSample = 0;
             m_rendering = true;
         }
+        protected override bool UsesPcmBuffer { get { return true; } }
         protected override void OnEndFrame()
         {
             RenderTo(m_frameSamples);
@@ -145,7 +147,7 @@ namespace ZXMAK2.Hardware.Evo
                 // Causal interpolation: no future chip samples across writes.
                 var left = (short)Math.Round((m_previousLeft + (m_currentLeft - m_previousLeft) * m_phase) * gain);
                 var right = (short)Math.Round((m_previousRight + (m_currentRight - m_previousRight) * m_phase) * gain);
-                UpdateDac((double)m_renderSample / m_frameSamples, left, right);
+                WritePcmSample(m_renderSample, left, right);
                 m_renderSample++;
             }
         }

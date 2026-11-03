@@ -47,7 +47,7 @@ namespace ZXMAK2.Hardware.Evo
             if (m_core == IntPtr.Zero)
                 Logger.Error("ZX-MultiSound Max: ymfm OPL3 core unavailable");
             else
-                NativeMethods.Read(m_core, 0); // Consume YMF278B-only ID read.
+                InitializeOpl3Model();
             ResetResampler();
             bmgr.Events.SubscribeReset(ResetChip);
         }
@@ -76,6 +76,8 @@ namespace ZXMAK2.Hardware.Evo
             m_rendering = true;
         }
 
+        protected override bool UsesPcmBuffer { get { return true; } }
+
         protected override void OnEndFrame()
         {
             RenderTo(m_frameSamples);
@@ -89,9 +91,26 @@ namespace ZXMAK2.Hardware.Evo
             if (m_core != IntPtr.Zero)
             {
                 NativeMethods.Reset(m_core);
-                NativeMethods.Read(m_core, 0);
+                InitializeOpl3Model();
             }
             ResetResampler();
+        }
+
+        private void InitializeOpl3Model()
+        {
+            // The physical Max has YMF262 + YAC512, not an OPL4 mixer.
+            // Our reused YMF278B engine resets FM mixing to -9 dB (F8=1B).
+            // Remove that foreign attenuation inside the model, rather than
+            // amplifying already quantized/clipped PCM. NEW2 is only enabled
+            // temporarily; restore the reset FM mode and address afterwards.
+            NativeMethods.Write(m_core, 2, 0x05);
+            NativeMethods.Write(m_core, 3, 0x02);
+            NativeMethods.Write(m_core, 4, 0xF8);
+            NativeMethods.Write(m_core, 5, 0x00);
+            NativeMethods.Write(m_core, 2, 0x05);
+            NativeMethods.Write(m_core, 3, 0x00);
+            NativeMethods.Write(m_core, 0, 0x00);
+            NativeMethods.Read(m_core, 0); // Consume the YMF278B-only ID.
         }
 
         private void WritePort(ushort address, byte value, ref bool handled)
@@ -151,7 +170,7 @@ namespace ZXMAK2.Hardware.Evo
                 var right = m_core == IntPtr.Zero ? 0 :
                     m_nativeBuffer[source * 2 + 1];
                 var gain = Volume / 100D;
-                UpdateDac((double)output / m_frameSamples,
+                WritePcmSample(output,
                     (short)Math.Max(short.MinValue, Math.Min(short.MaxValue,
                         (int)(left * gain))),
                     (short)Math.Max(short.MinValue, Math.Min(short.MaxValue,
@@ -193,7 +212,7 @@ namespace ZXMAK2.Hardware.Evo
                 // Causal interpolation, preserving state across writes/frames.
                 var left = m_previousLeft + (m_currentLeft - m_previousLeft) * m_resamplePhase;
                 var right = m_previousRight + (m_currentRight - m_previousRight) * m_resamplePhase;
-                UpdateDac((double)m_renderSample / m_frameSamples,
+                WritePcmSample(m_renderSample,
                     (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, (int)Math.Round(left * gain))),
                     (short)Math.Max(short.MinValue, Math.Min(short.MaxValue, (int)Math.Round(right * gain))));
                 m_renderSample++;
