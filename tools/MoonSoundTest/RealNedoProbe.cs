@@ -33,6 +33,8 @@ internal static class RealNedoProbe
     private static int audioPeak;
     private static string phase = "boot";
     private static bool noTrace;
+    private static bool hashIo;
+    private static ulong ioHash, ioCount;
     private static readonly BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
 
     private static void WriteWavHeader(BinaryWriter output,int rate,int samples)
@@ -51,6 +53,7 @@ internal static class RealNedoProbe
         var writers=new BinaryWriter[sources.Length+1]; var sums=new double[writers.Length];
         var squares=new double[writers.Length]; var peaks=new int[writers.Length];
         int rate=bm.SoundFrame.SampleRate, samples=rate/50;
+        ioHash=14695981039346656037UL; ioCount=0;
         try {
             for(int i=0;i<writers.Length;i++) {
                 string label=i==sources.Length ? "mixed" : i+"-"+sources[i].GetType().Name;
@@ -76,6 +79,8 @@ internal static class RealNedoProbe
                     name,i==sources.Length ? "mixed" : i+"-"+sources[i].GetType().Name,rate,count,mean,
                     Math.Sqrt(square),Math.Sqrt(Math.Max(0,square-mean*mean)),peaks[i]);
             }
+            if(hashIo) Console.WriteLine("IOHASH count={0} hash={1:X16} tact={2} PC={3:X4}",
+                ioCount,ioHash,spec.CPU.Tact,spec.CPU.regs.PC);
         } finally {foreach(var writer in writers) if(writer!=null) writer.Dispose();}
     }
 
@@ -122,6 +127,29 @@ internal static class RealNedoProbe
     }
     private static bool Target(ushort p)
     { int b = p & 255; return (b >= 0xC2 && b <= 0xC7) || b == 0x7E || b == 0x7F; }
+    private static void HashIo(bool write,ushort port,byte value,bool handled)
+    {
+        unchecked {
+            ioHash=(ioHash^(write?1UL:0UL))*1099511628211UL;
+            ioHash=(ioHash^port)*1099511628211UL;
+            ioHash=(ioHash^value)*1099511628211UL;
+            ioHash=(ioHash^(handled?1UL:0UL))*1099511628211UL;
+            ioHash=(ioHash^(ulong)spec.CPU.Tact)*1099511628211UL;
+            ioHash=(ioHash^spec.CPU.regs.PC)*1099511628211UL;
+            ioCount++;
+        }
+    }
+    private static void InstallIoHash()
+    {
+        var events=((IBusManager)spec.BusManager).Events;
+        var reads=(BusReadIoProc[])events.GetType().GetField("m_mapReadPort",flags).GetValue(events);
+        var writes=(BusWriteIoProc[])events.GetType().GetField("m_mapWritePort",flags).GetValue(events);
+        for(int i=0;i<65536;i++) {
+            var read=reads[i]; var write=writes[i];
+            if(read!=null) reads[i]=delegate(ushort p,ref byte v,ref bool h){read(p,ref v,ref h);HashIo(false,p,v,h);};
+            if(write!=null) writes[i]=delegate(ushort p,byte v,ref bool h){write(p,v,ref h);HashIo(true,p,v,h);};
+        }
+    }
     private static void Record(string op, ushort p, byte value, bool before, bool after, ZxmMoonSoundDevice board)
     {
         if (rows++ >= 1500) return;
@@ -199,6 +227,8 @@ internal static class RealNedoProbe
             trace = new StreamWriter(Path.Combine(output, "ports.csv"));
             trace.WriteLine("phase,op,port,PC,DOSEN,available,handled_before,handled_after,value,rejected,clock");
             noTrace = Array.IndexOf(args, "no-trace") >= 0;
+            hashIo = Array.IndexOf(args, "iohash") >= 0;
+            if(hashIo) InstallIoHash();
             if (!noTrace) TracePorts(); foreach (byte[] page in memory.RamPages) Array.Clear(page, 0, page.Length);
             spec.DebugReset(); spec.CPU.Tact = 0; Frames(180); Screen(Path.Combine(output, "00-ers.png"));
             for (int i = 3; i < args.Length; i++)
@@ -206,6 +236,7 @@ internal static class RealNedoProbe
                 phase = args[i]; rows = 0; audioPeak = 0;
                 if (phase.StartsWith("board:")) continue;
                 if (phase == "no-trace") continue;
+                if (phase == "iohash") continue;
                 if (phase.StartsWith("key:")) Press((Key)Enum.Parse(typeof(Key), phase.Substring(4)));
                 else if (phase.StartsWith("keys:"))
                 {
@@ -234,6 +265,7 @@ internal static class RealNedoProbe
                     // Genuine OS/player state, measured WITHOUT trace wrappers
                     // or per-sample peak telemetry. No output algorithm changes.
                     if (!noTrace) throw new Exception("Use no-trace for real workload benchmark");
+                    if (hashIo) throw new Exception("Do not benchmark instrumented I/O");
                     Process.GetCurrentProcess().ProcessorAffinity = new IntPtr(1);
                     Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
                     int count = int.Parse(phase.Substring(6));
