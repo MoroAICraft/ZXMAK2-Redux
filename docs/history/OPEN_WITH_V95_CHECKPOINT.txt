@@ -38,3 +38,11 @@ Source/history export uses tools/Optimization/ExportSources.ps1 and includes
 pinned OmniSound; SHA256SUMS.csv is the final package manifest.
 Final report: docs/releases/OPEN_WITH_V95_REPORT.md.
 Live user Classes registry has NOT been migrated; first normal v95 start does it.
+
+Acceptance update, 2026-11-03 (supersedes candidate status above):
+User confirmed plan items 1-3 tested and working: v95/Open With acceptance,
+main media/card/SD lifecycle scenarios, portability. Closed based on user report;
+no new agent-run UI/physical-PC test is claimed. v95 is the accepted working base.
+Packaged source: cca4faaa93155ad1a2c87db63aa8b9d4101538aa.
+Only documentation updated; no runtime/registry/media changes or archive rebuild.
+Next unresolved plan item: comparative real-music loudness, not started.
