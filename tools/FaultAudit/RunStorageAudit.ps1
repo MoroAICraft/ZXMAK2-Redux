@@ -1,4 +1,4 @@
-param([string]$Destination = 'D:\ZXMAK2_Work\fault_audit_v95_20261103')
+param([string]$Destination = 'D:\ZXMAK2_Work\fault_audit_v95_20261103', [string]$Built)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 $destinationPath = [IO.Path]::GetFullPath($Destination)
@@ -12,6 +12,11 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $runtime = "$destinationPath\runtime"
 if (Test-Path "$runtime\release\ZXMAK2.exe") { $runtime = "$runtime\release" }
 if (-not (Test-Path "$runtime\Lib\Managed\ZXMAK2.Hardware.dll")) { throw 'Unexpected archive layout.' }
+if ($Built) {
+    foreach ($dll in @('ZXMAK2.Hardware.Circuits.dll','ZXMAK2.Hardware.dll','ZXMAK2.Host.dll','ZXMAK2.Host.WinForms.dll')) {
+        Copy-Item -LiteralPath (Join-Path $Built $dll) -Destination "$runtime\Lib\Managed\$dll" -Force
+    }
+}
 $refs = @(Get-ChildItem "$runtime\Lib\Managed\ZXMAK2*.dll" | ForEach-Object { '/r:' + $_.FullName })
 $csc = 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe'
 $probes = [ordered]@{
@@ -31,6 +36,7 @@ try {
         Copy-Item "$runtime\Test.exe.config" "$runtime\$($entry.Key).exe.config"
         $log = "$destinationPath\diagnostics\$($entry.Key).txt"
         $arguments = if ($entry.Key -eq 'RefreshFolder') { @("$runtime\Data\Temp") } else { @() }
+        if ($Built -and $entry.Key -eq 'StorageFaultProbe') { $arguments = @('--fixed') }
         # No real-source/large-tree modes; each probe creates small disposable data.
         $info = New-Object System.Diagnostics.ProcessStartInfo
         $info.FileName = "$runtime\$($entry.Key).exe"

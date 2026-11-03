@@ -388,6 +388,11 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             oldFiles = oldFiles.Where(path => File.Exists(Path.Combine(m_sourceFolder, path))).ToList();
             oldDirectories = oldDirectories.Where(path => Directory.Exists(Path.Combine(m_sourceFolder, path))).ToList();
 
+            // Moving a read-only file into the backup would bypass its write
+            // protection and later make cleanup look like a failed save.
+            foreach (var path in oldFiles)
+                RequireWritableOriginal(Path.Combine(m_sourceFolder, path));
+
             foreach (var entry in changedFiles)
             {
                 var target = Path.Combine(m_sourceFolder, entry.RelativePath);
@@ -436,6 +441,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     CloseCachedFile();
                     foreach (var path in oldFiles)
                     {
+                        RequireWritableOriginal(Path.Combine(m_sourceFolder, path));
                         var target = Path.Combine(backup, path);
                         Directory.CreateDirectory(Path.GetDirectoryName(target));
                         File.Move(Path.Combine(m_sourceFolder, path), target);
@@ -520,16 +526,29 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                     foreach (var lease in leases) lease.Dispose();
                     if (backupCanBeRemoved)
                     {
-                        try { Directory.Delete(backup, true); }
-                        catch (IOException ex) { Logger.Warn("Cannot remove SD backup: {0}", ex.Message); }
+                        RemoveCommitScratch(backup);
                     }
                 }
             }
             finally
             {
-                try { Directory.Delete(stage, true); }
-                catch (IOException ex) { Logger.Warn("Cannot remove SD staging files: {0}", ex.Message); }
+                RemoveCommitScratch(stage);
             }
+        }
+
+        private static void RequireWritableOriginal(string path)
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0)
+                throw new UnauthorizedAccessException("Cannot save SD changes over a read-only file: " + path);
+        }
+
+        private static void RemoveCommitScratch(string path)
+        {
+            // Only our staging/backup directories, after commit or rollback.
+            // Cleanup must not mask the transaction result or remove protection.
+            try { Directory.Delete(path, true); }
+            catch (IOException ex) { Logger.Warn("SD temporary files retained at {0}: {1}", path, ex.Message); }
+            catch (UnauthorizedAccessException ex) { Logger.Warn("SD temporary files retained at {0}: {1}", path, ex.Message); }
         }
 
         public void ExportImage(string imagePath)

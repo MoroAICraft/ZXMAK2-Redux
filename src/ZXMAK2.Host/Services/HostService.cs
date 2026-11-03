@@ -133,7 +133,11 @@ namespace ZXMAK2.Host.Services
                 }
                 return;
             }
-            if (SyncSource == SyncSource.Time && timeSync != null)
+            // A failed host audio device must neither stall the VM on a dead
+            // consumer nor run it at unlimited speed. Preserve the selected
+            // sync source so sound pacing returns automatically on recovery.
+            if (timeSync != null && (SyncSource == SyncSource.Time ||
+                (SyncSource == SyncSource.Sound && (sound == null || !sound.IsSyncSupported))))
             {
                 timeSync.WaitFrame();
             }

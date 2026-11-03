@@ -22,6 +22,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         private string m_journalPath;
         private string m_applyingPath;
         private string m_fingerprint;
+        private bool m_applyStarted;
         private readonly Dictionary<long, byte[]> m_changed =
             new Dictionary<long, byte[]>();
         private FileStream m_journal;
@@ -54,6 +55,7 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
         }
 
         public bool HasChanges { get { return m_changed.Count != 0; } }
+        public bool IsSaveIncomplete { get { return m_applyStarted; } }
         public override bool CanRead { get { return true; } }
         public override bool CanSeek { get { return true; } }
         public override bool CanWrite { get { return true; } }
@@ -112,9 +114,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             {
                 // An interrupted save is idempotent. Complete it before the
                 // guest can read the image again.
-                ApplyChangedSectors();
-                ClearJournal();
-                m_fingerprint = Fingerprint();
+                m_applyStarted = true;
+                CompleteApply();
             }
             else if (HasChanges)
             {
@@ -174,6 +175,10 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
 
         public override void Write(byte[] buffer, int offset, int count)
         {
+            if (m_applyStarted)
+                throw new IOException("An SD image save is incomplete. Retry saving before writing more data.");
+            if (m_fingerprint == null)
+                throw new IOException("Cannot verify the SD image after a save error. Reopen the image before writing more data.");
             if (buffer == null)
                 throw new ArgumentNullException("buffer");
             if (offset < 0 || count < 0 || offset > buffer.Length - count)
@@ -213,6 +218,8 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             if (m_journal == null)
             {
                 var first = !File.Exists(m_journalPath);
+                // Never associate a leftover completed-save marker with a new session.
+                if (first && File.Exists(m_applyingPath)) File.Delete(m_applyingPath);
                 m_journal = new FileStream(PortablePaths.IoPath(m_journalPath),
                     first ? FileMode.CreateNew : FileMode.Open,
                     FileAccess.ReadWrite, FileShare.Read);
@@ -247,6 +254,26 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 m_source.Write(item.Value, 0, SectorSize);
             }
             m_source.Flush();
+            var file = m_source as FileStream;
+            if (file != null) file.Flush(true);
+        }
+
+        private void CompleteApply()
+        {
+            try
+            {
+                ApplyChangedSectors();
+                ClearJournal();
+            }
+            finally
+            {
+                // The exclusively writable source may have changed because
+                // OUR save stopped after some sectors. Keep the redo journal
+                // and accept a retry, but still check for later external edits.
+                try { m_fingerprint = Fingerprint(); }
+                catch (IOException ex) { m_fingerprint = null; Logger.Warn("Cannot check SD image after save: {0}", ex.Message); }
+                catch (UnauthorizedAccessException ex) { m_fingerprint = null; Logger.Warn("Cannot check SD image after save: {0}", ex.Message); }
+            }
         }
 
         public void CommitChanges()
@@ -273,23 +300,36 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
                 }
                 finally { m_position = position; }
                 var replacement = File.Open(target, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                // Do not switch streams while still retaining a journal for
+                // the external source if journal removal is denied.
+                try { ClearJournal(); }
+                catch { replacement.Dispose(); throw; }
                 m_source.Dispose();
                 m_source = replacement;
-                ClearJournal();
                 m_imagePath = target;
                 SetJournalPaths();
                 m_fingerprint = Fingerprint();
                 Logger.Info("External SD image saved locally: {0}", target);
                 return;
             }
-            File.WriteAllText(m_applyingPath, m_imagePath);
-            ApplyChangedSectors();
-            ClearJournal();
-            m_fingerprint = Fingerprint();
+            // Persist the redo journal and marker before changing the image.
+            if (m_journal != null) m_journal.Flush(true);
+            using (var marker = new FileStream(PortablePaths.IoPath(m_applyingPath),
+                FileMode.Create, FileAccess.Write, FileShare.Read))
+            {
+                var bytes = Encoding.UTF8.GetBytes(m_imagePath);
+                marker.Write(bytes, 0, bytes.Length);
+                marker.Flush(true);
+            }
+            m_applyStarted = true;
+            CompleteApply();
         }
 
         public void DiscardChanges()
         {
+            if (m_applyStarted)
+                throw new IOException("The SD image was partially saved. Its recovery journal must be kept. " +
+                    "Retry Save, or cancel this operation; Discard cannot undo sectors already written.");
             ClearJournal();
         }
 
@@ -302,9 +342,14 @@ namespace ZXMAK2.Hardware.Circuits.SecureDigital
             }
             if (File.Exists(m_journalPath))
                 File.Delete(m_journalPath);
-            if (File.Exists(m_applyingPath))
-                File.Delete(m_applyingPath);
             m_changed.Clear();
+            m_applyStarted = false;
+            m_validJournalLength = 0;
+            // Removing the journal is the commit point. A leftover marker
+            // alone is harmless; failure to clean it is not a failed save.
+            try { if (File.Exists(m_applyingPath)) File.Delete(m_applyingPath); }
+            catch (IOException ex) { Logger.Warn("Cannot remove SD save marker {0}: {1}", m_applyingPath, ex.Message); }
+            catch (UnauthorizedAccessException ex) { Logger.Warn("Cannot remove SD save marker {0}: {1}", m_applyingPath, ex.Message); }
         }
 
         public override void Flush()

@@ -38,20 +38,24 @@ namespace ZXMAK2.Host.WinForms.Mdx
     {
         #region Fields
 
-        private readonly DirectSound8 _device;
-        private readonly SecondarySoundBuffer _soundBuffer;
+        // Native objects belong to the playback worker, including recovery.
+        private DirectSound8 _device;
+        private SecondarySoundBuffer _soundBuffer;
+        private readonly IntPtr _windowHandle;
         private readonly ConcurrentQueue<uint[]> _fillQueue = new ConcurrentQueue<uint[]>();
         private readonly ConcurrentQueue<uint[]> _playQueue = new ConcurrentQueue<uint[]>();
         private readonly AutoResetEvent _fillEvent = new AutoResetEvent(true);
         private readonly AutoResetEvent _frameEvent = new AutoResetEvent(false);
         private readonly AutoResetEvent _cancelEvent = new AutoResetEvent(false);
+        private readonly ManualResetEvent _stopEvent = new ManualResetEvent(false);
         private readonly int _sampleRate;
         private readonly int _bufferSize;
         private readonly int _bufferCount;
         private readonly uint _zeroValue;
 
         private Thread _wavePlayThread;
-        private bool _isFinished;
+        private volatile bool _isFinished;
+        private volatile bool _isAvailable;
         private uint? _lastSample;
 
         #endregion Fields
@@ -66,6 +70,8 @@ namespace ZXMAK2.Host.WinForms.Mdx
             {
                 throw new ArgumentOutOfRangeException("sampleRate", "Sample rate must be a multiple of 50!");
             }
+            if (sampleRate <= 0 || bufferCount < 2)
+                throw new ArgumentOutOfRangeException("bufferCount", "A positive sample rate and at least two buffers are required.");
             _sampleRate = sampleRate;
             var bufferSize = sampleRate / 50;
             for (int i = 0; i < bufferCount; i++)
@@ -76,9 +82,19 @@ namespace ZXMAK2.Host.WinForms.Mdx
             _bufferCount = bufferCount;
             _zeroValue = 0;
 
-            var hWnd = form != null ? form.Handle : IntPtr.Zero;
+            _windowHandle = form != null ? form.Handle : IntPtr.Zero;
+
+            _wavePlayThread = new Thread(WavePlayThreadProc);
+            _wavePlayThread.IsBackground = true;
+            _wavePlayThread.Name = "WavePlay";
+            _wavePlayThread.Priority = ThreadPriority.Highest;
+            _wavePlayThread.Start();
+        }
+
+        private void CreateOutput()
+        {
             _device = new DirectSound8();
-            _device.SetCooperativeLevel(hWnd, DSSCL.PRIORITY);
+            _device.SetCooperativeLevel(_windowHandle, DSSCL.PRIORITY);
 
             // we always use 16 bit stereo (uint per sample)
             const short channels = 2;
@@ -105,12 +121,6 @@ namespace ZXMAK2.Host.WinForms.Mdx
                 posNotify[i].WaitHandle = _fillEvent;
             }
             _soundBuffer.SetNotificationPositions(posNotify);
-
-            _wavePlayThread = new Thread(WavePlayThreadProc);
-            _wavePlayThread.IsBackground = true;
-            _wavePlayThread.Name = "WavePlay";
-            _wavePlayThread.Priority = ThreadPriority.Highest;
-            _wavePlayThread.Start();
         }
 
         public void Dispose()
@@ -122,23 +132,10 @@ namespace ZXMAK2.Host.WinForms.Mdx
             try
             {
                 _isFinished = true;
-                Thread.MemoryBarrier();
+                _stopEvent.Set();
                 _fillEvent.Set();
                 _cancelEvent.Set();
                 _wavePlayThread.Join();
-
-                if (_soundBuffer != null)
-                {
-                    if (_soundBuffer.Status == DSBSTATUS.PLAYING)
-                    {
-                        _soundBuffer.Stop();
-                    }
-                    _soundBuffer.Dispose();
-                }
-                if (_device != null)
-                {
-                    _device.Dispose();
-                }
                 if (_fillEvent != null)
                 {
                     _fillEvent.Dispose();
@@ -151,6 +148,7 @@ namespace ZXMAK2.Host.WinForms.Mdx
                 {
                     _cancelEvent.Dispose();
                 }
+                _stopEvent.Dispose();
             }
             finally
             {
@@ -163,55 +161,111 @@ namespace ZXMAK2.Host.WinForms.Mdx
 
         private unsafe void WavePlayThreadProc()
         {
+            var hBuffer = IntPtr.Zero;
+            var failed = false;
             try
             {
                 const int sampleSize = 4;
                 var rawBufferLength = _bufferSize * sampleSize;
-                var hBuffer = Marshal.AllocHGlobal(rawBufferLength);
-                NativeHelper.INITBLK((void*)hBuffer, 0, rawBufferLength);
-                try
+                hBuffer = Marshal.AllocHGlobal(rawBufferLength);
+                while (!_isFinished)
                 {
-                    // A newly-created DirectSound buffer is not guaranteed to
-                    // contain PCM silence.  Clear every segment before starting
-                    // playback so host memory cannot be heard during start-up.
-                    for (var i = 0; i < _bufferCount; i++)
+                    try
                     {
-                        _soundBuffer.Write(
-                            i * rawBufferLength,
-                            (void*)hBuffer,
-                            rawBufferLength,
-                            DSBLOCK.None);
-                    }
-                    _soundBuffer.Play(0, DSBPLAY_FLAGS.LOOPING);
-
-                    var lastWrittenBuffer = -1;
-                    do
-                    {
-                        _fillEvent.WaitOne();
-                        var nextIndex = (lastWrittenBuffer + 1) % _bufferCount;
-                        var playPos = _soundBuffer.PlayPosition % (_bufferCount * rawBufferLength);
-                        var playingIndex = playPos / rawBufferLength;
-                        for (var i = nextIndex; i != playingIndex && !_isFinished; i = ++i % _bufferCount)
+                        CreateOutput();
+                        NativeHelper.INITBLK((void*)hBuffer, 0, rawBufferLength);
+                        _lastSample = _zeroValue;
+                        uint[] stale;
+                        while (_playQueue.TryDequeue(out stale)) _fillQueue.Enqueue(stale);
+                        // A newly-created DirectSound buffer is not guaranteed to
+                        // contain PCM silence.  Clear every segment before starting
+                        // playback so host memory cannot be heard during start-up.
+                        for (var i = 0; i < _bufferCount; i++)
                         {
-                            if (!OnBufferRequest((uint*)hBuffer, _bufferSize))
-                            {
-                                NativeHelper.INITBLK((void*)hBuffer, 0, rawBufferLength);
-                            }
-                            var writePos = i * rawBufferLength;
-                            _soundBuffer.Write(writePos, (void*)hBuffer, rawBufferLength, DSBLOCK.None);
-                            lastWrittenBuffer = i;
+                            _soundBuffer.Write(
+                                i * rawBufferLength,
+                                (void*)hBuffer,
+                                rawBufferLength,
+                                DSBLOCK.None);
                         }
-                    } while (!_isFinished);
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(hBuffer);
-                    _soundBuffer.Stop();
+                        _soundBuffer.Play(0, DSBPLAY_FLAGS.LOOPING);
+                        _isAvailable = true;
+                        if (failed) Logger.Info("DirectSound output recovered.");
+                        failed = false;
+
+                        var lastWrittenBuffer = -1;
+                        do
+                        {
+                            // A lost device may stop notifications entirely.
+                            if (!_fillEvent.WaitOne(1000) && !_isFinished)
+                            {
+                                var status = _soundBuffer.Status;
+                                if ((status & DSBSTATUS.PLAYING) == 0 || (status & DSBSTATUS.BUFFERLOST) != 0)
+                                    throw new InvalidOperationException("DirectSound playback stopped or its buffer was lost.");
+                            }
+                            if (_isFinished) break;
+                            var nextIndex = (lastWrittenBuffer + 1) % _bufferCount;
+                            var playPos = _soundBuffer.PlayPosition % (_bufferCount * rawBufferLength);
+                            var playingIndex = playPos / rawBufferLength;
+                            for (var i = nextIndex; i != playingIndex && !_isFinished; i = ++i % _bufferCount)
+                            {
+                                if (!OnBufferRequest((uint*)hBuffer, _bufferSize))
+                                {
+                                    NativeHelper.INITBLK((void*)hBuffer, 0, rawBufferLength);
+                                }
+                                var writePos = i * rawBufferLength;
+                                _soundBuffer.Write(writePos, (void*)hBuffer, rawBufferLength, DSBLOCK.None);
+                                lastWrittenBuffer = i;
+                            }
+                        } while (!_isFinished);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!failed && !_isFinished) Logger.Error(ex);
+                        failed = true;
+                    }
+                    finally
+                    {
+                        _isAvailable = false;
+                        _frameEvent.Set();
+                        ReleaseOutput();
+                    }
+                    // Keep the VM running on time sync while unavailable.
+                    // Retry at most once per second, never spin or grow queues.
+                    if (!_isFinished) _stopEvent.WaitOne(1000);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error(ex);
+            }
+            finally
+            {
+                _isAvailable = false;
+                _frameEvent.Set();
+                ReleaseOutput();
+                if (hBuffer != IntPtr.Zero) Marshal.FreeHGlobal(hBuffer);
+            }
+        }
+
+        private void ReleaseOutput()
+        {
+            var buffer = _soundBuffer;
+            var device = _device;
+            _soundBuffer = null;
+            _device = null;
+            // Even a failed Stop must not leak the buffer/device or prevent exit.
+            if (buffer != null)
+            {
+                try { buffer.Stop(); }
+                catch (Exception ex) { Logger.Warn("DirectSound stop: {0}", ex.Message); }
+                try { buffer.Dispose(); }
+                catch (Exception ex) { Logger.Warn("DirectSound buffer cleanup: {0}", ex.Message); }
+            }
+            if (device != null)
+            {
+                try { device.Dispose(); }
+                catch (Exception ex) { Logger.Warn("DirectSound device cleanup: {0}", ex.Message); }
             }
         }
 
@@ -286,7 +340,7 @@ namespace ZXMAK2.Host.WinForms.Mdx
 
         public bool IsSyncSupported 
         {
-            get { return true; }
+            get { return _isAvailable; }
         }
 
         public bool IsSynchronized { get; set; }
@@ -296,7 +350,7 @@ namespace ZXMAK2.Host.WinForms.Mdx
             _frameEvent.Reset();
             _cancelEvent.Reset();
             Thread.MemoryBarrier();
-            if (_playQueue.Count == 0)
+            if (!_isAvailable || _isFinished || _playQueue.Count == 0)
             {
                 return;
             }
@@ -318,10 +372,12 @@ namespace ZXMAK2.Host.WinForms.Mdx
             {
                 throw new ArgumentNullException("frame");
             }
+            if (!_isAvailable || _isFinished) return;
             if (IsSynchronized)
             {
                 WaitFrame();
             }
+            if (!_isAvailable || _isFinished) return;
             var buffer = LockBuffer();
             if (buffer == null)
             {

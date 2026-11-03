@@ -100,7 +100,13 @@ namespace ZXMAK2.Hardware.Evo
                     return true;
 
                 var query = Locator.Resolve<IUserQuery>();
-                var choice = query.Show(
+                var incomplete = image != null && image.IsSaveIncomplete;
+                var choice = incomplete ? query.Show(
+                    "The SD image save is incomplete. Some sectors were already written.\n\n" +
+                    "Retry: finish saving using the recovery journal.\n" +
+                    "Cancel: keep the card and recovery journal.\n\n" +
+                    "Discard is unavailable because it cannot undo a partial save.",
+                    "Finish SD save?", DlgButtonSet.RetryCancel, DlgIcon.Warning) : query.Show(
                     "The mounted SD card has unsaved changes.\n\n" +
                     (folder != null ? "Yes: save changes to the mounted folder.\n" :
                         "Yes: save changes (external image is saved as a local copy).\n") +
@@ -109,6 +115,7 @@ namespace ZXMAK2.Hardware.Evo
                     "Save SD changes?",
                     DlgButtonSet.YesNoCancel,
                     DlgIcon.Question);
+                if (incomplete) choice = choice == DlgResult.Retry ? DlgResult.Yes : DlgResult.Cancel;
                 if (choice == DlgResult.Cancel)
                     return false;
                 if (choice == DlgResult.Yes)
