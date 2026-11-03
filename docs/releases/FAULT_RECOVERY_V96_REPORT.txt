@@ -1,0 +1,148 @@
+ZXMAK2 v96 — Fault Recovery TEST
+3 ноября 2026. Отдельный кандидат; рабочая база остаётся принятой v95.
+
+Комплект: L:/Work_two/ZX/ZXMAK2-v96-Fault-Recovery-Test-20261103
+Ветка: codex/fault-recovery-v96
+База принятого runtime: cca4faaa93155ad1a2c87db63aa8b9d4101538aa (v95).
+Checkpoint аудита/приёмки до правок: 8d7217b.
+Production-исправления: 85bf816574f8c7eb0d979cdb01b71ca29f3b2a1e.
+Последующий commit отчёта/каталога не меняет production-код.
+OmniSound: 726c63d7cb00275aff7975eaac3687405568be74, без изменений.
+
+Что исправлено
+==============
+1. Частичное сохранение внутреннего SD IMG.
+   Было: первый сектор записан, второй получает IOException; дата источника
+   меняется собственной записью. Retry принимал это за внешнее изменение.
+   Discard удалял redo-журнал, оставляя частично обновлённый образ.
+
+   Теперь есть явное состояние начатого применения. После своей попытки
+   обновляется fingerprint; следующая попытка всё ещё проверяет источник.
+   Исходный stream в штатном пути держится с FileShare.Read, без доступа
+   другого писателя. Общая проверка внешних изменений не удалена.
+   До записи сохраняются журнал и marker; для FileStream применён Flush(true).
+   Пока сохранение не завершено, новые гостевые записи отклоняются.
+   Discard запрещён: повторный UI-вопрос содержит Retry / Cancel.
+   Cancel отменяет выход/смену носителя и оставляет журнал; Retry заканчивает
+   сохранение. После переоткрытия начатая транзакция завершается старым redo-
+   механизмом до доступа гостя к данным. Это не откат уже записанных секторов.
+
+   Очистка: отказ удаления самого journal сохраняет dirty/incomplete и retry.
+   Отказ удаления оставшегося marker после удаления journal не маскирует
+   успешное сохранение; новый journal не создаётся, пока старый marker нельзя
+   удалить. Исключено связывание нового несохранённого сеанса со старым marker.
+   При ошибке очистки journal внешнего IMG stream/путь остаются согласованными:
+   переключение на внутреннюю копию происходит только после очистки.
+
+2. Сохранение SD-папки и read-only.
+   Было: read-only исходник переносился в backup, новый файл сохранялся,
+   dirty очищался, затем удаление backup выбрасывало UnauthorizedAccessException.
+   Пользователь видел ошибку, хотя данные уже были записаны.
+
+   Теперь изменяемые/удаляемые read-only исходники проверяются до staging,
+   затем непосредственно перед переносом. Сессия остаётся, источник не заменяется.
+   Защита пользовательских файлов автоматически НЕ снимается.
+   IOException/UnauthorizedAccessException при уборке собственных stage/backup
+   не подменяют результат транзакции; журнал сообщает путь оставшегося каталога.
+   Основной rollback при ошибках записи/пересборки сохранён.
+
+3. Отказ звукового вывода Windows (DirectSound).
+   Было: исключение завершало playback thread, IsSyncSupported оставался true;
+   VM продолжала ждать неработающего потребителя до 40 мс на кадр.
+
+   Теперь native device/buffer создаются и освобождаются потоком вывода.
+   После исключения объявляется недоступность, разблокируется ожидание кадра,
+   устройство/буфер пересоздаются с паузой в одну секунду между попытками.
+   Watchdog при отсутствии уведомлений проверяет PLAYING/BUFFERLOST.
+   Очереди остаются ограниченными; старые кадры сбрасываются при восстановлении.
+   Каждый новый native-буфер полностью заполняется тишиной до запуска.
+   Ошибка Stop не препятствует освобождению буфера/устройства.
+   HostService при выбранной Sound-синхронизации временно использует TimeSync;
+   выбранная настройка не меняется, Sound возвращается автоматически.
+   Режим без синхронизации не замедляется. Фильтры, микшер, громкость, sample rate
+   и штатное число/размер буферов не менялись; v83 HQ не возвращена.
+
+Изменённые product-файлы
+=======================
+src/ZXMAK2.Hardware.Circuits/SecureDigital/SdImageSessionStream.cs
+src/ZXMAK2.Hardware.Circuits/SecureDigital/HostFolderFat32Stream.Commit.cs
+src/ZXMAK2.Hardware/Evo/ZsdPentEvo.cs
+src/ZXMAK2.Host.WinForms/Mdx/DirectSound.cs
+src/ZXMAK2.Host/Services/HostService.cs
+Также обновлены справка, README и диагностические пробы tools/FaultAudit.
+
+Проверки
+========
+StorageFaultProbe --fixed: 156 assertions, findings=0.
+- Два сектора: после внедрённого сбоя байты 65/0; Retry -> 65/66.
+- Discard/новая запись после частичного Save отклонены; reopen -> 65/66.
+- Save/Exit: первоначальная ошибка и Cancel сохраняют paused/running состояние;
+  UI RetryCancel вместо YesNoCancel, Retry сохраняет оба сектора и разрешает выход.
+- Обычные save/discard, повторная сессия, внешний edit guard сохранены.
+- Journal/marker cleanup denial, внешний IMG local-copy retry: PASS.
+- Read-only Commit/Refresh/Exit: отказ без потери сессии, затем успешный retry.
+- Read-only backup, созданный callback после записи: Save успешен, резерв остаётся.
+- Реальный NTFS DACL Deny Write только на тестовой папке; ACL восстановлен.
+- Блокировка файла, исчезновение папки, post-write callback failure и имитация
+  ERROR_DISK_FULL, атомарный конфиг, аварийное завершение собственного probe: PASS.
+  Это НЕ физическое заполнение диска/отключение питания.
+
+SdLifecycleProbe: 22 assertions PASS.
+RefreshProbe: 157 checks PASS.
+PortableFolderProbe + DirectFolderCases: 64 assertions PASS.
+
+SoundRecoveryProbe: 85 assertions PASS, production DirectSound.cs + fake native.
+- Сбои create/notifications/write/play при старте, write/position/BUFFERLOST
+  при работе; после снятия сбоя устройство восстановлено.
+- PCM после восстановления совпадает с переданным тестовым буфером,
+  стартовые сегменты — тишина; native объекты освобождены, managed pool=4.
+- Постоянный отказ не вызывает spin; Dispose не ждёт секундный retry interval.
+- Host fallback: 10 кадров 203 мс; после recovery лишнего TimeSync нет.
+- Native Stop exception не препятствует Dispose.
+NativeSoundSmoke: настоящий default DirectSound endpoint, 30 кадров тишины,
+  скрытый owner HWND, нормальная инициализация/воспроизведение/закрытие PASS.
+  Устройства, системная громкость и настройки звука не переключались.
+
+Общий RunRegressions: PASS.
+Клавиатура/F10/Max 569; PrintScreen; семь golden renderers; contention 46;
+INT/NMI 41; NMI-prefix 261 случаев / 12497 assertions; WAIT/AVR/COM/DOS 197981;
+video timing 12748; tape clock; SD SPI 6184; PentEvo profiles.
+Test /hostfoldersd, /moonsound, /omnisound, /multisoundmax, /omni-opl,
+/master-volume, /evo-display и полный Test/ULA/benchmark завершились успешно.
+Структурные тесты не заменяют ручную проверку всех машин/реального VGA.
+Benchmark здесь только контроль завершения, не заявление об ускорении.
+
+Достоверность и комплектация
+===========================
+Хранилища: D:/ZXMAK2_Work/fault_audit_v96_20261103_final.
+Звук/общие регрессии: D:/ZXMAK2_Work/fault_audit_v96_20261103_run02.
+Все 36 EXE/DLL поставки сверены с обоими стендами — идентичны.
+От v95 изменены только четыре managed DLL, Help и README.
+ZXMAK2.exe/Test.exe, CPU-библиотека, прочие DLL, native-ядра, ROM, sound banks,
+конфигурация Full — байт-в-байт от v95. Данные проверок в runtime не попали.
+Full ZIP: 78 файлов; Clean ZIP: 75, без активных root state-файлов.
+Записи обоих ZIP сверены по размерам/SHA256 и обязательным зависимостям.
+Логи: diagnostics/faults, diagnostics/regressions, build.txt, comparison CSV.
+Исходники с pinned OmniSound, отдельный OmniSound, обе Git bundle — source.
+Четыре прежних untracked файла ENGINE_RESEARCH_V81 не изменены; сохранены
+отдельно в checkpoints и намеренно не приписаны production-коду v96.
+Локальные git checkpoints сохранены, GitHub не изменялся.
+
+Не проверено / границы
+=====================
+Физические HDMI/USB unplug, смена endpoint, сон/гибернация/RDP, зависание native
+вызова внутри драйвера, GPU recovery, реальные multi-monitor/fullscreen переходы.
+Реальный полный диск, внезапное питание, UNC timeout, все сочетания ACL/антивируса.
+Не гарантируется аппаратная атомарность записи SD/VHD или восстановление после
+любого повреждения носителя. Для dynamic VHD отдельная fault campaign не проведена.
+Нет многочасового игрового/музыкального прогона или приёмки пользователя v96.
+Общая нормализация громкости, новые машины и дальнейшая оптимизация не выполнялись.
+
+Откат и приёмка
+==============
+Оригинальные установки и рабочие носители не трогались. В rollback сохранён
+неизменённый Full v95 ZIP. Не смешивать библиотеки; распаковывать отдельно.
+После частичного Save IMG сначала завершить Retry; сохранять IMG вместе с
+Data/Sessions/SD/Images. Откат программы не восстанавливает старые данные носителя.
+Full содержит прежние реальные пути; безопасная проверка — Clean + копии носителей.
+Новая база принимается только после явного подтверждения пользователя.
