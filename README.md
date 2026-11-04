@@ -14,8 +14,7 @@ configuration uses current compatible BIOS and ROM images.
 [Build from source](docs/BUILDING.md) · [Release notes](docs/releases/0.98.md) ·
 [Русское описание](#русское-описание)
 
-Maintained by **MoroAICraft**. Version 0.98 publishes the user-tested and accepted
-v98 runtime. The public version number is 0.98; historical build notes may call it v98.
+Maintained by **MoroAICraft**.
 
 ## Screenshots / Скриншоты
 
@@ -146,7 +145,7 @@ Earlier engineering records remain available in `docs/history` and Git history.
 конфликтов воспроизводятся по этой документации. В поддерживаемой конфигурации
 используются совместимые актуальные BIOS и ROM.
 
-Разработка: **MoroAICraft**. Выпуск основан на проверенной и принятой пользователем сборке v98.
+Разработка: **MoroAICraft**.
 
 ### Возможности ZX Evolution BaseConf
 
