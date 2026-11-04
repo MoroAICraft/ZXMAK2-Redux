@@ -1,3 +1,6 @@
+# ZXMAK2-Redux: preserve binary firmware and sound-bank data.
 *.rom binary
 *.ROM binary
 *.PAK binary
+
+*.sf2 binary

@@ -1,172 +1,124 @@
-# ZXMAK2 Fork — ZX Evo BaseConf RC1
+# ZXMAK2-Redux 0.98
 
-Local working versions, control sources and build archives:
-[LOCAL_VERSIONS.md](docs/LOCAL_VERSIONS.md). Current local working base: v93,
-branch `codex/working-base-v93`, selected on 2026-11-02. All v92 features plus
-the verified shared PSG noise-zero fix are retained. v92 is the immediate
-rollback; v84 and historical audio experiments remain preserved. This local
-baseline selection does not claim complete manual/hardware acceptance.
+**Windows emulator of ZX Evolution BaseConf with configurable ZXBUS hardware and expanded sound support.**
 
-ZXMAK2 Fork is a Windows emulator focused on ZX Evolution BaseConf. It models
-the machine as a configurable virtual system: processor, memory, firmware,
-storage, display modes and expansion hardware can be changed without leaving
-the emulator.
+[Download 0.98](https://github.com/MoroAICraft/ZXMAK2-Redux/releases/tag/v0.98) ·
+[Build from source](docs/BUILDING.md) · [Release notes](docs/releases/0.98.md) ·
+[Русское описание](#русское-описание)
 
-The implementation follows published ZX Evolution, NedoPC and chip-maker
-documentation. Registers, I/O ports, timing modes, board revisions and
-conflict rules are implemented from those specifications. The maintained
-configuration uses current compatible BIOS and ROM images.
+Maintained by **MoroAICraft**. Version 0.98 publishes the user-tested and accepted
+v98 runtime. The public version number is 0.98; historical build notes may call it v98.
 
-## Screenshots / Скриншоты
+## Features
 
-<table>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0001.png" alt="ZXMAK2 screenshot 0001" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0006.png" alt="ZXMAK2 screenshot 0006" width="480"></td>
-</tr>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0007.png" alt="ZXMAK2 screenshot 0007" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0008.png" alt="ZXMAK2 screenshot 0008" width="480"></td>
-</tr>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0010.png" alt="ZXMAK2 screenshot 0010" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0011.png" alt="ZXMAK2 screenshot 0011" width="480"></td>
-</tr>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0012.png" alt="ZXMAK2 screenshot 0012" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0015.png" alt="ZXMAK2 screenshot 0015" width="480"></td>
-</tr>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0017.png" alt="ZXMAK2 screenshot 0017" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0019.png" alt="ZXMAK2 screenshot 0019" width="480"></td>
-</tr>
-<tr>
-<td><img src="docs/images/screenshots/Screenshot_0021.png" alt="ZXMAK2 screenshot 0021" width="480"></td>
-<td><img src="docs/images/screenshots/Screenshot_0023.png" alt="ZXMAK2 screenshot 0023" width="480"></td>
-</tr>
-</table>
-
-## ZX Evolution BaseConf capabilities
-
-- 3.5, 7 and 14 MHz CPU modes; configurable memory, TR-DOS, keyboard, mouse,
-  joystick, tape and reset behaviour.
-- Optional **ULAplus** compatibility. When it is enabled in ULA settings,
-  supporting software selects the 64-colour palette automatically; disabling
-  it retains standard Spectrum video.
-- Two equivalent ZXBUS slots. Boards can be placed in either slot, while
-  duplicate and incompatible combinations are rejected.
-- Four floppy drives, IDE/HDD, Z-controller SD, independent NeoGS microSD,
-  CD-ROM access through Windows optical drives, TAP playback and mounting or
-  ejecting media from the toolbar.
-- ZXNetUSB Rev.C with WIZnet W5300, TCP, UDP, DHCP and DNS through regular
-  Windows networking; no TAP driver, network-adapter capture or administrator
-  rights are required.
-- Full Screen (`Alt+Enter`), border/no-border display, scaling modes, video
-  filters, antialiasing, Master Volume, configurable PC joystick mapping,
-  Warm Reset, CMOS Reset and Factory Reset.
+- ZX Evolution BaseConf: 3.5 / 7 / 14 MHz CPU modes, configurable memory, firmware,
+  TR-DOS, keyboard, mouse, PC joystick mapping and optional ULAplus compatibility.
+- Two interchangeable ZXBUS slots with checks for duplicate devices and port conflicts.
+- Four floppy drives, IDE/HDD, Z-controller SD, host-folder SD support,
+  NeoGS microSD, tape playback and mounting/ejecting media from the toolbar.
+- ZXNetUSB Rev.C / W5300 with TCP, UDP, DHCP and DNS through Windows networking.
+- Full screen (`Alt+Enter`), display scaling, filters, Master Volume and separate reset modes.
+- File/Open, **drag and drop into the emulator window**, and Windows **Open with**.
 
 ## Sound hardware
 
-| Board | Emulated facilities |
-| --- | --- |
-| **Neo General Sound (NeoGS C-VS)** | General Sound, MOD, MP3, VS1011 and its own microSD card. |
-| **TurboSound FM Pro Rev.C** | Dual YM2203 with FM and SAA1099. |
-| **ZX-MultiSound Rev.A2** | Two YM2203, SAA1099, General Sound, SoundDrive and MIDI. |
-| **ZX-MultiSound Max** | MultiSound facilities plus 2 MB General Sound and OPL2/OPL3 playback, including VGM. |
-| **ZXM-MoonSound Rev.01** | YMF278B OPL4, PCM/wavetable playback, YRW801-M ROM and sample RAM. |
-| **ZX OmniSound Virtual** | A virtual universal card combining NeoGS, MultiSound audio, MIDI, SoundDrive, Max-compatible OPL2/OPL3/VGM and MoonSound OPL4 in one ZXBUS slot. |
+| Board | Facilities |
+|---|---|
+| Neo General Sound (NeoGS C-VS) | General Sound, MOD/MP3, VS1011 and independent microSD. |
+| TurboSound FM Pro Rev.C | Two YM2203 and SAA1099. |
+| ZX-MultiSound Rev.A2 | Two YM2203, SAA1099, General Sound, SoundDrive and MIDI interface. |
+| ZX-MultiSound Max | MultiSound facilities, 2 MB General Sound and OPL2/OPL3. |
+| ZXM-MoonSound Rev.01 | YMF278B OPL4: FM, PCM/wavetable, sample RAM and external instrument ROM. |
+| ZXM-SoundCard Extreme Rev.03 | Two YM2203, SAA1099 and TLC7226 SoundDrive; board clock and port options. |
+| ZX OPL3 (UR4QBP) | Standalone YMF262/YAC512 OPL3 board; no sample ROM required. |
+| ZX OmniSound Virtual | Combined GS/MP3, YM/TSFM, SAA, SoundDrive, MIDI, OPL3 and OPL4 facilities in one slot. |
 
-The emulator models the board interfaces and prevents hardware-port conflicts.
-Sound output is mixed with per-board calibration and a Master Volume control.
-`ZX OmniSound Virtual` has a 40% output increase as part of its single final
-mix stage.
+Select boards in Machine Settings (`Alt+P`) → Other / ZXBUS PentEvo.
+Only compatible combinations can share the two slots. The virtual MIDI synthesizer
+is not a bit-exact model of a physical SAM2695. MoonSound PCM requires a separately
+obtained YRW801-M ROM; that instrument ROM is not included.
 
-## Published release (separate from the local working base)
+## Download and run
 
-[**ZXMAK2 Fork — ZX Evo BaseConf RC1**](https://github.com/Moro44444444/ZXMAK2-Fork/releases/tag/v1.0-rc1)
-is the published portable release for the ZX Evo BaseConf RC1 configuration.
-It is not the current local v93 working package; see LOCAL_VERSIONS above.
+1. Download **Clean** for default settings, or **Full** for the prepared ZX OPL3 profile.
+2. Extract the entire folder to a writable location. Keep EXE, DLL, Config and Resources together.
+3. Run `ZXMAK2.exe`. Windows and .NET Framework 4.6.2 or newer are required;
+   .NET Framework 4.8 is recommended. Legacy display backends may require their matching DirectX/XNA runtime.
+4. Open your own media through File/Open or drag a supported file into the window.
 
-The archive excludes personal machine state, mounted media, logs, PDB files
-and the Yamaha YRW801-M instrument ROM. Place a legally obtained YRW801-M ROM
-beside `ZXMAK2.exe` to enable MoonSound PCM/wavetable playback.
+Windows **Open with → ZXMAK2** supports TRD, SCL, TAP and SNA. Start the extracted
+copy manually once to register its location. With one running compatible instance,
+the file goes to that instance; with several, select the window by installation path.
+Drag and drop and File/Open operate on the window you use. After moving a folder,
+start that copy manually again. Existing Windows default-app choices are not forcibly changed.
 
-Stable builds and working states are retained as rollback points. CPU, ULA,
-media, sound-board and renderer tests accompany the development work.
+User disks, music and saved sessions are not bundled. Keep an existing installation
+separate for rollback; do not mix DLLs from different versions. See the release notes
+for the audio changes and remaining limitations.
+
+## Source and project history
+
+The complete ZX-OmniSound source snapshot is included under `src/ZX-OmniSound`.
+No private repository or developer-specific drive path is needed for a normal build.
+Use [`tools/Build.ps1`](tools/Build.ps1); details are in [BUILDING.md](docs/BUILDING.md).
+
+ZXMAK2-Redux continues the original ZXMAK2 project. Original authorship and commit
+history are preserved. The project is distributed under [GNU GPL v3](LICENSE.txt);
+bundled third-party components retain their own licenses and notices.
+Earlier engineering records remain available in `docs/history` and Git history.
 
 ---
 
-# ZXMAK2 Fork — ZX Evo BaseConf RC1
+## Русское описание
 
-ZXMAK2 Fork — эмулятор для Windows, ориентированный на ZX Evolution BaseConf.
-Машина моделируется как настраиваемая виртуальная система: процессор, память,
-прошивки, накопители, видеорежимы и платы расширения меняются прямо в
-эмуляторе.
+**ZXMAK2-Redux 0.98** — эмулятор ZX Evolution BaseConf для Windows с настраиваемыми
+платами ZXBUS и расширенной поддержкой звука. Разработка: **MoroAICraft**.
+Выпуск основан на проверенной и принятой пользователем сборке v98.
 
-Реализация опирается на опубликованную документацию ZX Evolution, NedoPC и
-производителей микросхем. Регистры, порты, режимы, ревизии плат и правила
-конфликтов воспроизводятся по этой документации. В поддерживаемой конфигурации
-используются совместимые актуальные BIOS и ROM.
+### Возможности
 
-## Возможности ZX Evolution BaseConf
+- Частоты 3,5 / 7 / 14 МГц, память, прошивки, TR-DOS, клавиатура, мышь,
+  PC-джойстик и опциональная совместимость ULAplus.
+- Два равноправных слота ZXBUS с проверкой конфликтов устройств и портов.
+- Четыре дисковода, IDE/HDD, SD Z-controller, папка Windows в режиме SD,
+  отдельная microSD NeoGS, лента и управление носителями с панели инструментов.
+- ZXNetUSB Rev.C / W5300: TCP, UDP, DHCP и DNS через сеть Windows.
+- Полноэкранный режим (`Alt+Enter`), масштабирование, фильтры, общая громкость
+  и отдельные режимы сброса.
+- Меню «Открыть», **перетаскивание файлов в окно** и Windows **«Открыть с помощью»**.
 
-- Режимы процессора 3,5 / 7 / 14 МГц, настраиваемые память, TR-DOS,
-  клавиатура, мышь, джойстик, лента и сброс машины.
-- Опциональная совместимость с **ULAplus**. При включении в настройках ULA
-  программа сама выбирает 64-цветную палитру; в выключенном состоянии работает
-  стандартное Spectrum-видео.
-- Два равноправных слота ZXBUS. Плату можно ставить в любой слот, а дублирующие
-  и несовместимые комбинации не допускаются.
-- Четыре FDD-дисковода, IDE/HDD, SD Z-controller, независимая microSD NeoGS,
-  CD-ROM через оптические приводы Windows, TAP и загрузка/извлечение носителей
-  с панели инструментов.
-- ZXNetUSB Rev.C с WIZnet W5300, TCP, UDP, DHCP и DNS через обычную сеть
-  Windows без TAP-драйверов, захвата сетевого адаптера и прав администратора.
-- Полноэкранный режим (`Alt+Enter`), рамка/без рамки, масштабирование,
-  видеофильтры, антиалиасинг, Master Volume, настройка PC-джойстика, Warm
-  Reset, CMOS Reset и Factory Reset.
+### Звуковые платы
 
-## Звуковое оборудование
+| Плата | Возможности |
+|---|---|
+| Neo General Sound (NeoGS C-VS) | General Sound, MOD/MP3, VS1011, собственная microSD. |
+| TurboSound FM Pro Rev.C | Два YM2203 и SAA1099. |
+| ZX-MultiSound Rev.A2 | Два YM2203, SAA1099, General Sound, SoundDrive и MIDI-интерфейс. |
+| ZX-MultiSound Max | Возможности MultiSound, General Sound 2 МБ и OPL2/OPL3. |
+| ZXM-MoonSound Rev.01 | YMF278B OPL4: FM, PCM/wavetable, sample RAM и внешний инструментальный ROM. |
+| ZXM-SoundCard Extreme Rev.03 | Два YM2203, SAA1099, TLC7226 SoundDrive, настройки частоты и портов платы. |
+| ZX OPL3 (UR4QBP) | Отдельная плата YMF262/YAC512; инструментальный ROM не нужен. |
+| ZX OmniSound Virtual | GS/MP3, YM/TSFM, SAA, SoundDrive, MIDI, OPL3 и OPL4 в одном слоте. |
 
-| Плата | Эмулируемые возможности |
-| --- | --- |
-| **Neo General Sound (NeoGS C-VS)** | General Sound, MOD, MP3, VS1011 и собственная microSD-карта. |
-| **TurboSound FM Pro Rev.C** | Два YM2203, FM и SAA1099. |
-| **ZX-MultiSound Rev.A2** | Два YM2203, SAA1099, General Sound, SoundDrive и MIDI. |
-| **ZX-MultiSound Max** | Возможности MultiSound, General Sound 2 МБ и OPL2/OPL3, включая VGM. |
-| **ZXM-MoonSound Rev.01** | YMF278B OPL4, PCM/wavetable-воспроизведение, ROM YRW801-M и sample RAM. |
-| **ZX OmniSound Virtual** | Виртуальная универсальная плата: NeoGS, звук MultiSound, MIDI, SoundDrive, OPL2/OPL3/VGM как у Max и OPL4 MoonSound в одном слоте ZXBUS. |
+Выбор: настройки машины (`Alt+P`) → Other / ZXBUS PentEvo. Одновременно доступны
+совместимые сочетания плат. Виртуальный MIDI-синтезатор не является побитовой
+моделью физического SAM2695. Для PCM MoonSound нужен отдельно полученный
+YRW801-M ROM; в комплект он не входит.
 
-Эмулятор моделирует интерфейсы плат и предотвращает конфликты аппаратных
-портов. Звук смешивается с калибровкой уровней отдельных плат и общей
-регулировкой Master Volume. У `ZX OmniSound Virtual` прибавка выхода 40%
-выполняется один раз на окончательном микшировании.
+### Начало работы
 
-## Текущий выпуск
+Скачайте **Clean** для запуска с исходными настройками или **Full** с подготовленной
+конфигурацией ZX OPL3. Распакуйте целую папку в доступное для записи место и
+запустите `ZXMAK2.exe`. Нужна Windows и .NET Framework 4.6.2 или новее;
+рекомендуется 4.8. Для старых графических бэкендов могут потребоваться соответствующие DirectX/XNA.
 
-[**ZXMAK2 Fork — ZX Evo BaseConf RC1**](https://github.com/Moro44444444/ZXMAK2-Fork/releases/tag/v1.0-rc1)
-— текущая portable-версия конфигурации ZX Evo BaseConf RC1.
+TRD/SCL/TAP/SNA открываются через Windows **«Открыть с помощью → ZXMAK2»**.
+После распаковки или переноса сначала один раз запустите эту копию вручную.
+При одном запущенном совместимом экземпляре файл передаётся ему; при нескольких
+появляется выбор окна по пути установки. Меню «Открыть» и перетаскивание работают
+с выбранным окном. Выбор приложения по умолчанию Windows принудительно не меняется.
 
-Из архива исключены личные состояния машины, смонтированные носители, логи,
-PDB-файлы и инструментальный ROM Yamaha YRW801-M. Законно полученную копию
-YRW801-M можно положить рядом с `ZXMAK2.exe`, чтобы работала PCM/wavetable
-часть MoonSound.
-
-Стабильные сборки и рабочие состояния сохраняются как точки отката. В ходе
-разработки выполняются тесты процессора, ULA, носителей, звуковых плат и
-производительности рендеринга.
-
-## History
-
-The project was previously hosted on CodePlex:
-https://archive.codeplex.com/?p=zxmak2
-
-ZXMAK2 discussions:
-
-- English: https://www.worldofspectrum.org/forums/discussion/39647/
-- Russian: http://zx-pk.ru/threads/16830-zxmak2-virtualnaya-mashina-zx-spectrum.html
-
-Earlier emulator history:
-
-- ZXMAK.NET (2005–2008): https://sourceforge.net/projects/zxmak-dotnet/files/zxmak-dotnet/
-- ZXMAK (2001–2003): http://zxmak.narod.ru/
+Рабочие диски, музыка и сохранённые сеансы пользователя не включены. Предыдущую
+установку сохраняйте отдельно для отката; не смешивайте DLL разных версий.
+Изменения звука и ограничения: [примечания к 0.98](docs/releases/0.98.md).
+Исходники и инструкции сборки: [BUILDING.md](docs/BUILDING.md).

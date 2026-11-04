@@ -21,3 +21,7 @@ tools/**/*.exe
 # Local checkpoints and downloaded reference material
 backup/
 tmp/
+
+# Public build staging
+/artifacts/
+/.codex/
