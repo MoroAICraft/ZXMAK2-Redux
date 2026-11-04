@@ -105,7 +105,7 @@ pending changes, the emulator offers to save or discard them first.
 
 ## Download and run
 
-1. Download **Clean** for default settings, or **Full** for the prepared ZX OPL3 profile.
+1. Download **Clean** to start with default settings.
 2. Extract the entire folder to a writable location. Keep EXE, DLL, Config and Resources together.
 3. Run `ZXMAK2.exe`. Windows and .NET Framework 4.6.2 or newer are required;
    .NET Framework 4.8 is recommended. Legacy display backends may require their matching DirectX/XNA runtime.
@@ -208,8 +208,7 @@ YRW801-M ROM; в комплект он не входит.
 
 ### Начало работы
 
-Скачайте **Clean** для запуска с исходными настройками или **Full** с подготовленной
-конфигурацией ZX OPL3. Распакуйте целую папку в доступное для записи место и
+Скачайте **Clean** для запуска с исходными настройками. Распакуйте целую папку в доступное для записи место и
 запустите `ZXMAK2.exe`. Нужна Windows и .NET Framework 4.6.2 или новее;
 рекомендуется 4.8. Для старых графических бэкендов могут потребоваться соответствующие DirectX/XNA.
 
